@@ -127,7 +127,7 @@ def run_optimization():
             prob += commercial_cost >= (share - 0.05) * total_budget
             prob += commercial_cost <= (share + 0.05) * total_budget
 
-    solver = PULP_CBC_CMD(msg=True)
+    solver = PULP_CBC_CMD(msg=True,timeLimit=120)
     prob.solve(solver)
     if prob.status != 1:
         return jsonify({
@@ -226,7 +226,7 @@ def optimize_by_rating():
         prob += ch_rating >= (share - 0.03) * total_rating_expr
         prob += ch_rating <= (share + 0.03) * total_rating_expr
 
-    solver = PULP_CBC_CMD(msg=True)
+    solver = PULP_CBC_CMD(msg=True , timeLimit=120)
     prob.solve(solver)
 
     # Assign solution
