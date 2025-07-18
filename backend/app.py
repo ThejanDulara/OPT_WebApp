@@ -3,6 +3,7 @@ from flask_cors import CORS
 import mysql.connector
 import pandas as pd
 from pulp import LpProblem, LpMaximize, LpVariable, lpSum, PULP_CBC_CMD
+from pulp import LpStatus
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for communication with React frontend
@@ -118,15 +119,21 @@ def run_optimization():
     prob += total_cost >= total_budget - budget_bound
     prob += total_cost <= total_budget + budget_bound
 
-    for c in range(num_commercials):
-        indices = df_full[df_full['Commercial'] == c].index
-        commercial_cost = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in indices)
-        share = 1 / num_commercials
-        prob += commercial_cost >= (share - 0.05) * total_budget
-        prob += commercial_cost <= (share + 0.05) * total_budget
+    if num_commercials > 1:
+        for c in range(num_commercials):
+            indices = df_full[df_full['Commercial'] == c].index
+            commercial_cost = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in indices)
+            share = 1 / num_commercials
+            prob += commercial_cost >= (share - 0.05) * total_budget
+            prob += commercial_cost <= (share + 0.05) * total_budget
 
     solver = PULP_CBC_CMD(msg=True)
     prob.solve(solver)
+    if prob.status != 1:
+        return jsonify({
+            "success": False,
+            "message": "⚠️ Optimization failed — no feasible solution found. Please check constraints or budget."
+        }), 200
 
     df_full['Spots'] = df_full.index.map(lambda i: int(x[i].varValue) if x[i].varValue else 0)
     df_full['Total_Cost'] = df_full['Spots'] * df_full['NCost']
