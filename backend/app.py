@@ -5,6 +5,7 @@ import pandas as pd
 from pulp import LpProblem, LpMaximize, LpVariable, lpSum, PULP_CBC_CMD
 from pulp import LpStatus
 
+
 app = Flask(__name__)
 CORS(app)  # Enable CORS for communication with React frontend
 
@@ -127,7 +128,8 @@ def run_optimization():
             prob += commercial_cost >= (share - 0.05) * total_budget
             prob += commercial_cost <= (share + 0.05) * total_budget
 
-    solver = PULP_CBC_CMD(msg=True,timeLimit=120)
+    time_limit = data.get("time_limit", 120)  # in seconds, default to 120 if not provided
+    solver = PULP_CBC_CMD(msg=True, timeLimit=time_limit)
     prob.solve(solver)
     if prob.status != 1:
         return jsonify({
@@ -226,7 +228,8 @@ def optimize_by_rating():
         prob += ch_rating >= (share - 0.03) * total_rating_expr
         prob += ch_rating <= (share + 0.03) * total_rating_expr
 
-    solver = PULP_CBC_CMD(msg=True , timeLimit=120)
+    time_limit = data.get("time_limit", 120)  # in seconds, default to 120 if not provided
+    solver = PULP_CBC_CMD(msg=True, timeLimit=time_limit)
     prob.solve(solver)
 
     # Assign solution
@@ -278,6 +281,67 @@ def optimize_by_rating():
         "commercials_summary": commercials_summary,
         "df_result": df_full.to_dict(orient='records')
     })
+
+@app.route('/programs/<channel>', methods=['GET'])
+def get_programs_by_channel(channel):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT program, cost, tvr, slot FROM programs WHERE channel = %s", (channel,))
+    programs = cursor.fetchall()
+    conn.close()
+    return jsonify({'programs': programs})
+
+
+@app.route('/create-channel', methods=['POST'])
+def create_channel():
+    data = request.get_json()
+    name = data.get('name')
+    # Nothing to do — handled when inserting programs later
+    return jsonify({'message': f'Channel "{name}" initialized (placeholder)'})
+
+
+@app.route('/update-programs', methods=['POST'])
+def update_programs():
+    data = request.get_json()
+    channel = data['channel']
+    programs = data['programs']
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Remove all existing programs for the channel
+    cursor.execute("DELETE FROM programs WHERE channel = %s", (channel,))
+
+    # Insert new/updated programs
+    for p in programs:
+        cursor.execute(
+            "INSERT INTO programs (channel, program, cost, tvr, slot) VALUES (%s, %s, %s, %s, %s)",
+            (channel, p['program'], p['cost'], p['tvr'], p['slot'])
+        )
+
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'Programs updated'})
+
+@app.route('/delete-program', methods=['POST'])
+def delete_program():
+    data = request.get_json()
+    channel = data['channel']
+    program = data['program']
+    slot = data['slot']
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM programs WHERE channel = %s AND program = %s AND slot = %s LIMIT 1",
+        (channel, program, slot)
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify({'message': 'Program deleted'})
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
