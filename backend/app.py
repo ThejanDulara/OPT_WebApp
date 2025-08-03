@@ -125,11 +125,12 @@ def run_optimization():
     prob += total_cost >= total_budget - budget_bound
     prob += total_cost <= total_budget + budget_bound
 
-    if num_commercials > 1:
+    budget_proportions = data.get("budget_proportions", [])
+    if num_commercials > 1 and budget_proportions:
         for c in range(num_commercials):
             indices = df_full[df_full['Commercial'] == c].index
             commercial_cost = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in indices)
-            share = 1 / num_commercials
+            share = budget_proportions[c] / 100
             prob += commercial_cost >= (share - 0.05) * total_budget
             prob += commercial_cost <= (share + 0.05) * total_budget
 
@@ -277,13 +278,14 @@ def optimize_by_budget_share():
     prob += total_cost >= total_budget - budget_bound
     prob += total_cost <= total_budget + budget_bound
 
-    # Commercial budget fairness
-    for c in range(num_commercials):
-        indices = df_full[df_full['Commercial'] == c].index
-        commercial_cost = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in indices)
-        share = 1 / num_commercials
-        prob += commercial_cost >= (share - 0.05) * total_budget
-        prob += commercial_cost <= (share + 0.05) * total_budget
+    budget_proportions = data.get("budget_proportions", [])
+    if budget_proportions:
+        for c in range(num_commercials):
+            indices = df_full[df_full['Commercial'] == c].index
+            commercial_cost = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in indices)
+            share = budget_proportions[c] / 100
+            prob += commercial_cost >= (share - 0.05) * total_budget
+            prob += commercial_cost <= (share + 0.05) * total_budget
 
     # Channel-specific budget and slot constraints
     for ch, pct in budget_shares.items():
