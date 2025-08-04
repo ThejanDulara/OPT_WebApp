@@ -5,8 +5,19 @@ import pandas as pd
 from pulp import LpProblem, LpMaximize, LpVariable, lpSum, PULP_CBC_CMD
 from pulp import LpStatus
 import logging
-logging.basicConfig(level=logging.INFO, filename='opt_error.log', filemode='a',
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+import logging
+import sys
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('/tmp/opt_error.log', mode='a'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+logging.info("✅ Logging initialized")
 
 
 
