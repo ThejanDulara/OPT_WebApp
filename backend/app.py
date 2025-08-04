@@ -121,6 +121,7 @@ def generate_df():
 @app.route('/optimize', methods=['POST'])
 def run_optimization():
     try:
+        logging.info("🚀 /optimize endpoint triggered")
         data = request.get_json()
         df_full = pd.DataFrame(data.get('df_full'))
         total_budget = data.get('budget')
