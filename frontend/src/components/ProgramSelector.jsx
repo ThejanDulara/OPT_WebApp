@@ -5,7 +5,7 @@ function ProgramSelector({ onSubmit }) {
   const [selectedPrograms, setSelectedPrograms] = useState({});
 
   useEffect(() => {
-    fetch('http://127.0.0.1:5000/all-programs')
+    fetch('/api/all-programs')
       .then(res => res.json())
       .then(data => {
         const grouped = {};

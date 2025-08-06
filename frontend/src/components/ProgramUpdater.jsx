@@ -8,12 +8,12 @@ function ProgramUpdater({ onBack }) {
   const [isAddingChannel, setIsAddingChannel] = useState(false);
 
   useEffect(() => {
-    fetch('http://127.0.0.1:5000/channels')
+    fetch('/api/channels')
       .then(res => res.json())
       .then(data => {
         setChannels(data.channels || []);
         if (data.channels.includes('Derana')) {
-          fetch(`http://127.0.0.1:5000/programs/Derana`)
+          fetch(`/api/programs/Derana`)
             .then(res => res.json())
             .then(data => setPrograms(data.programs || []));
         }
@@ -23,7 +23,7 @@ function ProgramUpdater({ onBack }) {
   const handleChannelSelect = (e) => {
     const channel = e.target.value;
     setSelectedChannel(channel);
-    fetch(`http://127.0.0.1:5000/programs/${channel}`)
+    fetch(`/api/programs/${channel}`)
       .then(res => res.json())
       .then(data => setPrograms(data.programs || []));
   };
@@ -41,7 +41,7 @@ function ProgramUpdater({ onBack }) {
   const deleteProgram = (program, slot) => {
     if (!window.confirm(`Are you sure you want to delete "${program}" from slot "${slot}"?`)) return;
 
-    fetch('http://127.0.0.1:5000/delete-program', {
+    fetch('/api/delete-program', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channel: selectedChannel, program, slot })
@@ -55,7 +55,7 @@ function ProgramUpdater({ onBack }) {
   };
 
   const saveChanges = () => {
-    fetch('http://127.0.0.1:5000/update-programs', {
+    fetch('/api/update-programs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channel: selectedChannel, programs })
@@ -67,7 +67,7 @@ function ProgramUpdater({ onBack }) {
 
   const createChannel = () => {
     if (!newChannelName) return;
-    fetch('http://127.0.0.1:5000/create-channel', {
+    fetch('/api/create-channel', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newChannelName })
