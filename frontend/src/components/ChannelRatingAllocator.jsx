@@ -86,7 +86,7 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
     setIsProcessing(true);
     setStopRequested(false);
 
-    fetch('/api/optimize-by-budget-share', {
+    fetch('http://127.0.0.1:5000/optimize-by-budget-share', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
