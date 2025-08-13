@@ -8,12 +8,12 @@ function ProgramUpdater({ onBack }) {
   const [isAddingChannel, setIsAddingChannel] = useState(false);
 
   useEffect(() => {
-    fetch('/api/channels')
+    fetch('https://optwebapp-production.up.railway.app/channels')
       .then(res => res.json())
       .then(data => {
         setChannels(data.channels || []);
         if (data.channels.includes('Derana')) {
-          fetch(`/api/programs/Derana`)
+          fetch(`https://optwebapp-production.up.railway.app/programs/Derana`)
             .then(res => res.json())
             .then(data => setPrograms(data.programs || []));
         }
@@ -23,7 +23,7 @@ function ProgramUpdater({ onBack }) {
   const handleChannelSelect = (e) => {
     const channel = e.target.value;
     setSelectedChannel(channel);
-    fetch(`/api/programs/${channel}`)
+    fetch(`https://optwebapp-production.up.railway.app/programs/${channel}`)
       .then(res => res.json())
       .then(data => setPrograms(data.programs || []));
   };
@@ -41,7 +41,7 @@ function ProgramUpdater({ onBack }) {
   const deleteProgram = (program, slot) => {
     if (!window.confirm(`Are you sure you want to delete "${program}" from slot "${slot}"?`)) return;
 
-    fetch('/api/delete-program', {
+    fetch('https://optwebapp-production.up.railway.app/delete-program', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channel: selectedChannel, program, slot })
@@ -55,7 +55,7 @@ function ProgramUpdater({ onBack }) {
   };
 
   const saveChanges = () => {
-    fetch('/api/update-programs', {
+    fetch('https://optwebapp-production.up.railway.app/update-programs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channel: selectedChannel, programs })
@@ -67,7 +67,7 @@ function ProgramUpdater({ onBack }) {
 
   const createChannel = () => {
     if (!newChannelName) return;
-    fetch('/api/create-channel', {
+    fetch('https://optwebapp-production.up.railway.app/create-channel', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newChannelName })
