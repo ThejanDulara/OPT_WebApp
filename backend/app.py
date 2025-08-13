@@ -4,6 +4,7 @@ import mysql.connector
 import pandas as pd
 from pulp import LpProblem, LpMaximize, LpVariable, lpSum, PULP_CBC_CMD
 from pulp import LpStatus
+import os
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for communication with React frontend
@@ -12,12 +13,13 @@ CORS(app)  # Enable CORS for communication with React frontend
 # === Database Connection ===
 def get_db_connection():
     return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="",  # Replace with your password if any
-        database="optimization"  # We'll create this DB shortly
+        host=os.environ.get("DB_HOST", "127.0.0.1"),
+        port=int(os.environ.get("DB_PORT", 3306)),
+        user=os.environ.get("DB_USER", "root"),
+        password=os.environ.get("DB_PASS", ""),
+        database=os.environ.get("DB_NAME", "optimization"),
+        autocommit=True
     )
-
 
 # === Routes ===
 
@@ -383,4 +385,5 @@ def optimize_by_budget_share():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)
