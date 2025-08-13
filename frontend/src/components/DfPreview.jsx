@@ -40,7 +40,7 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack }) {
       durations: optimizationInput.durations
     };
 
-    fetch('http://127.0.0.1:5000/generate-df', {
+    fetch('https://optwebapp-production.up.railway.app/generate-df', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -72,7 +72,7 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack }) {
       time_limit: optimizationInput.timeLimit || 120
     };
 
-    fetch('http://127.0.0.1:5000/optimize', {
+    fetch('https://optwebapp-production.up.railway.app/optimize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
