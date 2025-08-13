@@ -16,7 +16,7 @@ function Header() {
 
       {/* Right: App context */}
       <div style={styles.right}>
-        <span style={styles.environment}>📺 Television Media Scheduling Optimization Tool </span>
+        <span style={styles.environment}>Television Media Scheduling Optimization Tool </span>
         <span style={styles.year}>2025</span>
       </div>
     </header>
