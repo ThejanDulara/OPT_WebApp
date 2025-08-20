@@ -425,7 +425,8 @@ def optimize_by_budget_share():
         "cprp": round(total_cost_all / total_rating, 2) if total_rating else None,
         "channel_summary": channel_summary,
         "commercials_summary": commercials_summary,
-        "df_result": df_full.to_dict(orient='records')
+        "df_result": df_full.to_dict(orient='records'),
+        "is_optimal": is_optimal
     })
 
 
