@@ -348,6 +348,12 @@ def optimize_by_budget_share():
     solver = PULP_CBC_CMD(msg=True, timeLimit=time_limit)
     prob.solve(solver)
 
+    has_solution = any((x[i].varValue is not None) for i in df_full.index)
+    is_optimal = (LpStatus[prob.status] == 'Optimal')
+
+    if not has_solution:
+        return jsonify({"success": False, "message": "⚠️ No feasible solution found."}), 200
+
     # Build result dataframe
     df_full['Spots'] = df_full.index.map(lambda i: int(x[i].varValue) if x[i].varValue else 0)
     df_full['Total_Cost'] = df_full['Spots'] * df_full['NCost']
