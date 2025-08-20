@@ -101,13 +101,28 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
           return sortedRow;
         });
 
-          setResult(data);
-          if (data.is_optimal) {
-            toast.success("🎯 Optimal solution found. Proceed to download.");
-          } else {
-            toast.info("✅ Feasible plan found within the time limit (not proven optimal). If possible, increase the time limit and re‑optimize.");
+          // If backend ever signals failure
+          if (data && data.success === false) {
+            setResult(null);
+            alert(data.message || "⚠️ No feasible solution found.");
+            return;
           }
 
+          // (Optional) tidy the channel summary like you already do
+          data.channel_summary = data.channel_summary.map(row => {
+            const sortedRow = {};
+            summaryOrder.forEach(key => sortedRow[key] = row[key]);
+            return sortedRow;
+          });
+
+          // ✅ Show a blocking popup only if it's NOT proven optimal
+          if (data && data.is_optimal === false) {
+            window.alert("✅ Feasible plan found within the time limit (not proven optimal).\n\nIf you have time, increase the time limit and re‑optimize.");
+          }
+
+          // Keep your existing success flow
+          setResult(data);
+          toast.success("✅ Optimization completed! Scroll down to see results.");
           setTimeout(() => {
             const section = document.getElementById("optimization-summary");
             section?.scrollIntoView({ behavior: "smooth" });
