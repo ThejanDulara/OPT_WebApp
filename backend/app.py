@@ -348,7 +348,8 @@ def optimize_by_budget_share():
     solver = PULP_CBC_CMD(msg=True, timeLimit=time_limit)
     prob.solve(solver)
 
-    has_solution = any((x[i].varValue is not None) for i in df_full.index)
+    # after: prob.solve(solver)
+    has_solution = any((v.varValue is not None and v.varValue > 0) for v in x.values())
     is_optimal = (LpStatus[prob.status] == 'Optimal')
 
     if not has_solution:
@@ -426,7 +427,8 @@ def optimize_by_budget_share():
         "channel_summary": channel_summary,
         "commercials_summary": commercials_summary,
         "df_result": df_full.to_dict(orient='records'),
-        "is_optimal": is_optimal
+        "is_optimal": is_optimal,
+        "solver_status": LpStatus[prob.status]
     })
 
 
