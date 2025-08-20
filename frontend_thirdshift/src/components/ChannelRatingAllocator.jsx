@@ -101,12 +101,17 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
           return sortedRow;
         });
 
-        setResult(data);
-        toast.success("✅ Optimization completed! Scroll down to see results.");
-        setTimeout(() => {
-          const section = document.getElementById("optimization-summary");
-          section?.scrollIntoView({ behavior: "smooth" });
-        }, 300);
+          setResult(data);
+          if (data.is_optimal) {
+            toast.success("🎯 Optimal solution found. Proceed to download.");
+          } else {
+            toast.info("✅ Feasible plan found within the time limit (not proven optimal). If possible, increase the time limit and re‑optimize.");
+          }
+
+          setTimeout(() => {
+            const section = document.getElementById("optimization-summary");
+            section?.scrollIntoView({ behavior: "smooth" });
+          }, 300);
         })
       .catch(() => alert("Optimization failed. Try adjusting your inputs."))
       .finally(() => setIsProcessing(false));
