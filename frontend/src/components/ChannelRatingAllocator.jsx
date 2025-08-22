@@ -517,6 +517,8 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
           //totalProperty={totalProperty}
           //propertyNGRPTotal={propertyNGRPTotal}
           inclusiveTotals={inclusiveTotals}
+          channels={channels}
+          propertyPrograms={propertyPrograms}
         />
       )}
     </div>

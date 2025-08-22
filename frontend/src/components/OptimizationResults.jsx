@@ -9,7 +9,9 @@ export default function OptimizationResults({
   summaryOrder,
   formatLKR,
   styles,
-  inclusiveTotals
+  inclusiveTotals,
+  channels,
+  propertyPrograms
 }) {
   const toFixedOrInt = (key, val) => {
     const numericCols = ['Cost','TVR','NCost','NTVR','Total_Cost','Total_Rating'];
@@ -28,6 +30,53 @@ export default function OptimizationResults({
 
     const workbook = XLSX.utils.book_new();
     const desiredOrder = displayOrder;
+
+    // Channel, Name of the program, Com name, Day, Time, Budget, NCost, Duration, TVR, NTVR, Spots, NGRP
+    const toNum = (v) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
+
+    const propertyRows = [];
+    (channels || []).forEach((ch) => {
+      const rows = (propertyPrograms?.[ch] || []);
+      rows.forEach((r) => {
+        // accept either camelCase or Title Case keys
+        const name      = r.name ?? r.Name ?? '';
+        const comName   = r.comName ?? r['Com name'] ?? r.ComName ?? r['Com Name'] ?? '';
+        const day       = r.day ?? r.Day ?? '';
+        const time      = r.time ?? r.Time ?? '';
+
+        const budget    = toNum(r.budget ?? r.Budget);
+        const duration  = toNum(r.duration ?? r.Duration);
+        const tvr       = toNum(r.tvr ?? r.TVR);
+        const spots     = parseInt(r.spots ?? r.Spots ?? 0, 10) || 0;
+
+        const ntvrRaw   = r.ntvr ?? r.NTVR;
+        const ntvr      = ntvrRaw != null ? toNum(ntvrRaw) : (tvr / 30) * duration;
+
+        const ncostRaw  = r.ncost ?? r.NCost;
+        const ncost     = ncostRaw != null ? toNum(ncostRaw) : (spots > 0 ? budget / spots : 0);
+
+        const ngrpRaw   = r.ngrp ?? r.NGRP;
+        const ngrp      = ngrpRaw != null ? toNum(ngrpRaw) : (ntvr * spots);
+
+        propertyRows.push({
+          Channel: ch,
+          'Name of the program': name,
+          'Com name': comName,
+          Day: day,
+          Time: time,
+          Budget: budget,
+          NCost: ncost,
+          Duration: duration,
+          TVR: tvr,
+          NTVR: ntvr,
+          Spots: spots,
+          NGRP: ngrp,
+        });
+      });
+    });
+
+    const wsProperty = XLSX.utils.json_to_sheet(propertyRows);
+    XLSX.utils.book_append_sheet(workbook, wsProperty, 'Property Programs');
 
     // One sheet per commercial
     (result.commercials_summary || []).forEach((c, idx) => {
