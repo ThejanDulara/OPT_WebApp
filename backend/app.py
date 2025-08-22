@@ -348,12 +348,27 @@ def optimize_by_budget_share():
     solver = PULP_CBC_CMD(msg=True, timeLimit=time_limit)
     prob.solve(solver)
 
-    # after: prob.solve(solver)
+    status_str = LpStatus[prob.status]  # 'Optimal', 'Not Solved', 'Infeasible', 'Unbounded', 'Undefined'
     has_solution = any((v.varValue is not None and v.varValue > 0) for v in x.values())
-    is_optimal = (LpStatus[prob.status] == 'Optimal')
+    is_optimal = (status_str == 'Optimal')
 
+    # Fail fast on solver-declared bad statuses
+    if status_str in ('Infeasible', 'Unbounded', 'Undefined'):
+        return jsonify({
+            "success": False,
+            "message": f"⚠️ No feasible solution. Solver status: {status_str}",
+            "solver_status": status_str
+        }), 200
+
+    # If no incumbent at all, also fail
     if not has_solution:
-        return jsonify({"success": False, "message": "⚠️ No feasible solution found."}), 200
+        return jsonify({
+            "success": False,
+            "message": "⚠️ No feasible solution found (no incumbent).",
+            "solver_status": status_str
+        }), 200
+
+    feasible_but_not_optimal = (not is_optimal and status_str in ('Not Solved',))
 
     # Build result dataframe
     df_full['Spots'] = df_full.index.map(lambda i: int(x[i].varValue) if x[i].varValue else 0)
@@ -418,7 +433,7 @@ def optimize_by_budget_share():
             'Prime Cost %': round((prime_cost_val / ch_cost * 100), 2) if ch_cost else 0,
             'Non-Prime Cost %': round((nonprime_cost_val / ch_cost * 100), 2) if ch_cost else 0
         })
-    feasible_but_not_optimal = has_solution and not is_optimal
+    #feasible_but_not_optimal = has_solution and not is_optimal
     return jsonify({
         "success": True,
         "total_cost": round(total_cost_all, 2),
