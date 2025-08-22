@@ -134,11 +134,11 @@ export default function OptimizationResults({
             <p style={styles.summaryValue}>{formatLKR(result.total_cost)}</p>
           </div>
           <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>NGRP</h4>
+            <h4 style={styles.summaryTitle}>NGRP (excl. Property)</h4>
             <p style={styles.summaryValue}>{Number(result.total_rating).toFixed(2)}</p>
           </div>
           <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>CPRP</h4>
+            <h4 style={styles.summaryTitle}>CPRP (excl. Property)</h4>
             <p style={styles.summaryValue}>{Number(result.cprp).toFixed(2)}</p>
           </div>
         </div>
@@ -154,7 +154,7 @@ export default function OptimizationResults({
           </div>
 
           <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>Total NGRP (incl. Property)</h4>
+            <h4 style={styles.summaryTitle}>NGRP (incl. Property)</h4>
             <p style={styles.summaryValue}>
               {Number(inclusiveTotals?.totalNGRPIncl || 0).toFixed(2)}
             </p>

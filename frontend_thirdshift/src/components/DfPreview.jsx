@@ -208,19 +208,19 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack }) {
         {!isProcessing && (
           <>
             <button onClick={goBack} style={styles.backButton}>
-              ← Back to Edit Constraints
+              Go Back
             </button>
             <button onClick={handleStartOptimization} style={styles.primaryButton}>
-              Start Optimization →
+              Start Optimization
             </button>
           </>
         )}
 
         {isProcessing && (
           <>
-            <p style={styles.processingMsg}>🕒 Optimization is processing. Please wait...</p>
+            <p style={styles.processingMsg}>Optimization is processing. Please wait...</p>
             <button onClick={handleStop} style={styles.stopButton}>
-              ⛔ Stop Optimization
+              Stop Optimization
             </button>
           </>
         )}
@@ -228,9 +228,9 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack }) {
 
       {!isProcessing && optimizationFailed && (
         <div style={styles.notificationBox}>
-          <p>⚠️ Optimization failed or returned no solution.</p>
+          <p>Optimization failed or returned no solution.</p>
           <button onClick={goBack} style={styles.backButton}>
-            ← Go Back & Edit Constraints
+            Go Back
           </button>
         </div>
       )}
