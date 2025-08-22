@@ -39,7 +39,7 @@ export default function OptimizationResults({
       const rows = (propertyPrograms?.[ch] || []);
       rows.forEach((r) => {
         // accept either camelCase or Title Case keys
-        const name      = r.name ?? r.Name ?? '';
+        const name      = r.programName ?? r['Name of the program'] ?? r.programName ?? r['Name of the program'] ?? '';
         const comName   = r.comName ?? r['Com name'] ?? r.ComName ?? r['Com Name'] ?? '';
         const day       = r.day ?? r.Day ?? '';
         const time      = r.time ?? r.Time ?? '';
