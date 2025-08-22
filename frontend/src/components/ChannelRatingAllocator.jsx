@@ -109,7 +109,7 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
       (channels || []).forEach(ch => {
         const rows = propertyPrograms[ch] || [];
         rows.forEach(r => {
-          total += toNumber(r.NGRP || 0); // assuming your property table rows store NGRP
+          total += toNumber(r.NGRP || 0);
         });
       });
       return total;
@@ -496,10 +496,10 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
           styles={styles}
           onExport={handleExportToExcel}
           // NEW: show totals including property
-          totalsWithProperty={totalsWithProperty}
+          //totalsWithProperty={totalsWithProperty}
           // (optional for debugging/visibility in Results)
-          totalProperty={totalProperty}
-          propertyNGRPTotal={propertyNGRPTotal}
+          //totalProperty={totalProperty}
+          //propertyNGRPTotal={propertyNGRPTotal}
           inclusiveTotals={inclusiveTotals}
         />
       )}
