@@ -104,16 +104,32 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
   }, [channels, hasProperty, propertyAmounts, propertyPrograms]);
 
       // Sum NGRP from property programs
+    // Sum NGRP from property programs (derive if not provided)
     const propertyNGRPTotal = useMemo(() => {
-      let total = 0;
-      (channels || []).forEach(ch => {
-        const rows = propertyPrograms[ch] || [];
-        rows.forEach(r => {
-          total += toNumber(r.NGRP || 0);
+      let sum = 0;
+      (channels || []).forEach((ch) => {
+        (propertyPrograms[ch] || []).forEach((r) => {
+          const toNum = (v) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
+          const duration = toNum(r.duration ?? r.Duration);
+          const tvr      = toNum(r.tvr ?? r.TVR);
+          const spots    = parseInt(r.spots ?? r.Spots ?? 0, 10) || 0;
+
+          // derive NTVR if missing: TVR/30 * Duration
+          const ntvr = (r.ntvr ?? r.NTVR) != null
+            ? toNum(r.ntvr ?? r.NTVR)
+            : (tvr / 30) * duration;
+
+          // derive NGRP if missing: NTVR * Spots
+          const ngrp = (r.ngrp ?? r.NGRP) != null
+            ? toNum(r.ngrp ?? r.NGRP)
+            : ntvr * spots;
+
+          sum += ngrp;
         });
       });
-      return total;
+      return sum;
     }, [channels, propertyPrograms]);
+
 
     // Inclusive totals (optimization result + property add-ons)
     const inclusiveTotals = useMemo(() => {
