@@ -328,10 +328,10 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack }) {
 
           <div style={styles.buttonRow}>
             <button onClick={handleExportToExcel} style={styles.exportButton}>
-              📥 Export Final Plan to Excel
+              Export Plan to Excel
             </button>
             <button onClick={() => onReady(dfFull)} style={styles.primaryButton}>
-              Proceed to Channel Budget Share Optimization →
+              Proceed to Channel Share Optimization
             </button>
           </div>
         </div>

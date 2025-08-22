@@ -310,7 +310,7 @@ function OptimizationSetup({ onSubmit, onBack, initialValues }) {
         <div style={enhancedStyles.sectionContainer}>
           <h3 style={enhancedStyles.sectionTitle}>Optimization Settings</h3>
           <div style={enhancedStyles.formGroup}>
-            <label style={enhancedStyles.label}>⏱ Time Limit (seconds):</label>
+            <label style={enhancedStyles.label}>Time Limit (seconds):</label>
             <input
               type="number"
               value={timeLimit}

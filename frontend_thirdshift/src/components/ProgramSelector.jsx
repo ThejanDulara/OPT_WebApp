@@ -104,7 +104,7 @@ function ProgramSelector({ onSubmit }) {
       ))}
 
       <button type="submit" style={styles.submitButton}>
-        Next → Optimization Setup
+        Go to Optimization Setup
       </button>
     </form>
   );
