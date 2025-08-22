@@ -1,5 +1,6 @@
 // ChannelBudgetSetup.jsx
 import React from 'react';
+import PropertyProgramsEditor from './PropertyProgramsEditor';
 
 export default function ChannelBudgetSetup({
   channels,
@@ -15,18 +16,26 @@ export default function ChannelBudgetSetup({
   channelSplits, handleChannelSplitChange,
   budgetProportions, handleBudgetProportionChange,
   perChannelSplitErrors,
+  propertyPrograms, setPropertyPrograms,
   // derived
   totalBudget, enteredPctTotal, totalProperty, totalAvailable, channelMoney,
   // helpers
   toNumber, formatLKR, applyGlobalToAllChannels,
   // actions
   onBack, onSubmit, onStop, isProcessing,
+  // validation coming from parent
+  propertyValidation, // { ok: boolean, perChannel?: { [channel]: {target:number, sum:number} } }
   // styles
   styles
 }) {
   const handleInputChange = (channel, value) => {
     setBudgetShares(prev => ({ ...prev, [channel]: toNumber(value) }));
   };
+
+  // disable optimize if property program totals don’t match or while processing
+  const disableOptimize = isProcessing || (propertyValidation && !propertyValidation.ok);
+
+  const anyPropertyOn = Object.values(hasProperty || {}).some(Boolean);
 
   return (
     <>
@@ -38,14 +47,15 @@ export default function ChannelBudgetSetup({
         <div><strong>Optimizable Total (excl. Property):</strong> {formatLKR(totalAvailable)}</div>
         <div style={{ marginTop: 6 }}>
           <strong>Global PT/NPT defaults:</strong> {toNumber(primePct)}% / {toNumber(nonPrimePct)}%
-          <button type="button" onClick={applyGlobalToAllChannels} style={styles.smallSyncBtn}>Apply to all channels</button>
+          <button type="button" onClick={applyGlobalToAllChannels} style={styles.smallSyncBtn}>
+            Apply to all channels
+          </button>
         </div>
       </div>
 
       {/* Channel rows */}
       <div style={styles.channelInputs}>
         {channels.map((ch, idx) => {
-          const pct = toNumber(budgetShares[ch]);
           const chAmount = channelMoney[ch]?.chAmount || 0;
           const prop = channelMoney[ch]?.prop || 0;
           const available = channelMoney[ch]?.available || 0;
@@ -100,7 +110,9 @@ export default function ChannelBudgetSetup({
               {/* Calculated totals */}
               <div style={{ fontSize: 12, color: '#2d3748', marginTop: 6 }}>
                 <div><strong>Channel Budget:</strong> {formatLKR(chAmount)}</div>
-                <div><strong>Property:</strong> {formatLKR(prop)} &nbsp;|&nbsp; <strong>Available:</strong> {formatLKR(available)}</div>
+                <div>
+                  <strong>Property:</strong> {formatLKR(prop)} &nbsp;|&nbsp; <strong>Available:</strong> {formatLKR(available)}
+                </div>
                 <div style={{ color: '#4a5568' }}>
                   PT on available: {formatLKR(chPrimeAmount)} &nbsp;|&nbsp; NPT: {formatLKR(chNonPrimeAmount)}
                 </div>
@@ -175,7 +187,8 @@ export default function ChannelBudgetSetup({
             ))}
           </div>
           <p style={{ marginTop: 4, color: '#4a5568', fontSize: 14 }}>
-            💡 Total must be 100% — Current: {budgetProportions.reduce((a, b) => a + (isNaN(parseFloat(b)) ? 0 : parseFloat(b)), 0).toFixed(2)}%
+            💡 Total must be 100% — Current:{' '}
+            {budgetProportions.reduce((a, b) => a + (isNaN(parseFloat(b)) ? 0 : parseFloat(b)), 0).toFixed(2)}%
           </p>
         </>
       )}
@@ -202,11 +215,37 @@ export default function ChannelBudgetSetup({
         />
       </div>
 
+      {/* Property programs editor (appears if any channel has property) */}
+      {anyPropertyOn && (
+        <>
+          <h3 style={styles.sectionTitle}>Property Programs</h3>
+          {/* This component enforces: sum(Budget) per channel == Property (LKR) for that channel */}
+          <PropertyProgramsEditor
+            channels={channels}
+            hasProperty={hasProperty}
+            propertyAmounts={propertyAmounts}
+            propertyPrograms={propertyPrograms}
+            setPropertyPrograms={setPropertyPrograms}
+            toNumber={toNumber}
+            formatLKR={formatLKR}
+            styles={styles}
+          />
+          {!propertyValidation?.ok && (
+            <div style={{ color: '#e53e3e', fontSize: 13, marginTop: 8 }}>
+              Fix property program totals so they exactly match each channel’s Property amount.
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Buttons */}
       <div style={styles.buttonRow}>
         {!isProcessing ? (
           <>
             <button onClick={onBack} style={styles.backButton}>← Back</button>
-            <button onClick={onSubmit} style={styles.primaryButton}>Re-Optimize by Budget Share →</button>
+            <button onClick={onSubmit} style={{ ...styles.primaryButton, opacity: disableOptimize ? 0.7 : 1 }} disabled={disableOptimize}>
+              Re-Optimize by Budget Share →
+            </button>
           </>
         ) : (
           <>
