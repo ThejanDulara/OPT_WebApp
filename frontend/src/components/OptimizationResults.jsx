@@ -8,7 +8,8 @@ export default function OptimizationResults({
   displayOrder,
   summaryOrder,
   formatLKR,
-  styles
+  styles,
+  inclusiveTotals
 }) {
   const toFixedOrInt = (key, val) => {
     const numericCols = ['Cost','TVR','NCost','NTVR','Total_Cost','Total_Rating'];
@@ -92,6 +93,32 @@ export default function OptimizationResults({
             <p style={styles.summaryValue}>{Number(result.cprp).toFixed(2)}</p>
           </div>
         </div>
+        {/* Existing summary cards (excl. property) remain unchanged */}
+
+        {/* New: inclusive totals (includes property) */}
+        <div style={styles.summaryGrid}>
+          <div style={styles.summaryCard}>
+            <h4 style={styles.summaryTitle}>Total Budget (incl. Property)</h4>
+            <p style={styles.summaryValue}>
+              {formatLKR(inclusiveTotals?.totalBudgetIncl || 0)}
+            </p>
+          </div>
+
+          <div style={styles.summaryCard}>
+            <h4 style={styles.summaryTitle}>Total NGRP (incl. Property)</h4>
+            <p style={styles.summaryValue}>
+              {Number(inclusiveTotals?.totalNGRPIncl || 0).toFixed(2)}
+            </p>
+          </div>
+
+          <div style={styles.summaryCard}>
+            <h4 style={styles.summaryTitle}>CPRP (incl. Property)</h4>
+            <p style={styles.summaryValue}>
+              {Number(inclusiveTotals?.cprpIncl || 0).toFixed(2)}
+            </p>
+          </div>
+        </div>
+
 
         <h3 style={styles.sectionTitle}>Commercial-wise Allocation</h3>
         {(result.commercials_summary || []).map((c, idx) => (
