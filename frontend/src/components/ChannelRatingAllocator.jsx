@@ -103,6 +103,28 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
     return { ok: issues.length === 0, issues };
   }, [channels, hasProperty, propertyAmounts, propertyPrograms]);
 
+      // Sum NGRP from property programs
+    const propertyNGRPTotal = useMemo(() => {
+      let total = 0;
+      (channels || []).forEach(ch => {
+        const rows = propertyPrograms[ch] || [];
+        rows.forEach(r => {
+          total += toNumber(r.NGRP || 0); // assuming your property table rows store NGRP
+        });
+      });
+      return total;
+    }, [channels, propertyPrograms]);
+
+    // Inclusive totals (optimization result + property add-ons)
+    const inclusiveTotals = useMemo(() => {
+      if (!result) return {};
+      const totalBudgetIncl = toNumber(result.total_cost) + toNumber(totalProperty);
+      const totalNGRPIncl = toNumber(result.total_rating) + toNumber(propertyNGRPTotal);
+      const cprpIncl = totalNGRPIncl > 0 ? totalBudgetIncl / totalNGRPIncl : 0;
+      return { totalBudgetIncl, totalNGRPIncl, cprpIncl };
+    }, [result, totalProperty, propertyNGRPTotal, toNumber]);
+
+
   const applyGlobalToAllChannels = () => {
     const next = {};
     channels.forEach(ch => {
@@ -370,18 +392,6 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
     saveAs(fileData, 'optimized_schedule.xlsx');
   };
 
-  // Compute “including property” KPIs on the frontend
-  const propertyNGRPTotal = useMemo(() => {
-    let sum = 0;
-    (channels || []).forEach(ch => {
-      (propertyPrograms[ch] || []).forEach(r => {
-        const ntvr = toNumber(r.ntvr) || (toNumber(r.tvr) / 30) * toNumber(r.duration);
-        const ngrp = toNumber(r.ngrp) || (ntvr * toNumber(r.spots));
-        sum += ngrp;
-      });
-    });
-    return sum;
-  }, [channels, propertyPrograms]);
 
   const totalsWithProperty = useMemo(() => {
     const optCost = toNumber(result?.total_cost);
@@ -490,6 +500,7 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
           // (optional for debugging/visibility in Results)
           totalProperty={totalProperty}
           propertyNGRPTotal={propertyNGRPTotal}
+          inclusiveTotals={inclusiveTotals}
         />
       )}
     </div>
