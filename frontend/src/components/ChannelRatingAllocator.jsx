@@ -408,21 +408,6 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
     saveAs(fileData, 'optimized_schedule.xlsx');
   };
 
-
-  const totalsWithProperty = useMemo(() => {
-    const optCost = toNumber(result?.total_cost);
-    const optRating = toNumber(result?.total_rating);
-    const totalBudgetInclProperty = optCost + totalProperty;
-    const totalRatingInclProperty = optRating + propertyNGRPTotal;
-    const cprpInclProperty =
-      totalRatingInclProperty > 0 ? totalBudgetInclProperty / totalRatingInclProperty : 0;
-    return {
-      budget: totalBudgetInclProperty,
-      rating: totalRatingInclProperty,
-      cprp: cprpInclProperty,
-    };
-  }, [result, totalProperty, propertyNGRPTotal]);
-
   // shared styles (passed to children)
   const styles = {
     container: { padding: '32px', maxWidth: '1200px', margin: '0 auto', backgroundColor: '#d5e9f7', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0, 0, 0, 0.05)' },
