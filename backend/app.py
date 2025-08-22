@@ -418,7 +418,7 @@ def optimize_by_budget_share():
             'Prime Cost %': round((prime_cost_val / ch_cost * 100), 2) if ch_cost else 0,
             'Non-Prime Cost %': round((nonprime_cost_val / ch_cost * 100), 2) if ch_cost else 0
         })
-
+    feasible_but_not_optimal = has_solution and not is_optimal
     return jsonify({
         "success": True,
         "total_cost": round(total_cost_all, 2),
@@ -428,6 +428,7 @@ def optimize_by_budget_share():
         "commercials_summary": commercials_summary,
         "df_result": df_full.to_dict(orient='records'),
         "is_optimal": is_optimal,
+        "feasible_but_not_optimal": feasible_but_not_optimal,
         "solver_status": LpStatus[prob.status]
     })
 
