@@ -5,6 +5,7 @@ import pandas as pd
 from pulp import LpProblem, LpMaximize, LpVariable, lpSum, PULP_CBC_CMD
 from pulp import LpStatus
 import os
+import json
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for communication with React frontend
@@ -193,8 +194,10 @@ def run_optimization():
         "total_rating": round(df_full['Total_Rating'].sum(), 2),
         "cprp": round(total_cost_all / df_full['Total_Rating'].sum(), 2) if df_full['Total_Rating'].sum() else None,
         "commercials_summary": commercials_summary,
-        "channel_summary": channel_summary.to_dict(orient='records'),
-        "df_result": df_full.to_dict(orient='records')
+        #"channel_summary": channel_summary.to_dict(orient='records'),
+        "channel_summary": json.loads(channel_summary.to_json(orient='records')),
+        "df_result": json.loads(df_full.to_json(orient='records'))
+        #"df_result": df_full.to_dict(orient='records')
     })
 
 
