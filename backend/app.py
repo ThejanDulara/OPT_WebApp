@@ -442,11 +442,14 @@ def optimize_by_budget_share():
         "total_cost": float(round(total_cost_all, 2)),
         "total_rating": float(round(total_rating, 2)),
         "cprp": float(round(total_cost_all / total_rating, 2)) if total_rating else None,
-        "channel_summary": channel_summary.to_dict(orient="records") if hasattr(channel_summary,
-                                                                                "to_dict") else channel_summary,
+        #"channel_summary": channel_summary.to_dict(orient="records") if hasattr(channel_summary,
+                                                                                #"to_dict") else channel_summary,
+        "channel_summary": json.loads(channel_summary.to_json(orient='records')),
+
         "commercials_summary": [dict(c) for c in commercials_summary] if isinstance(commercials_summary,
                                                                                     list) else commercials_summary,
-        "df_result": df_full.to_dict(orient="records"),
+        #"df_result": df_full.to_dict(orient="records"),
+        "df_result": json.loads(df_full.to_json(orient='records')),
         "is_optimal": bool(is_optimal),
         "feasible_but_not_optimal": bool(feasible_but_not_optimal),
         "solver_status": str(LpStatus[prob.status])
