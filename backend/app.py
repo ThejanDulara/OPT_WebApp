@@ -6,6 +6,7 @@ from pulp import LpProblem, LpMaximize, LpVariable, lpSum, PULP_CBC_CMD
 from pulp import LpStatus
 import os
 import json
+import time
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for communication with React frontend
@@ -348,26 +349,40 @@ def optimize_by_budget_share():
         prob += nonprime_cost >= ((ch_nonprime_pct / 100.0) - 0.05) * ch_budget
         prob += nonprime_cost <= ((ch_nonprime_pct / 100.0) + 0.05) * ch_budget
 
-    #solver = PULP_CBC_CMD(msg=True, timeLimit=time_limit)
+    # Use CBC with (optional) log files
     solver = PULP_CBC_CMD(msg=True, timeLimit=time_limit, keepFiles=True)
-    prob.solve(solver)
 
-    hit_time_limit = False
+    # Measure elapsed time to detect time-limit finishes reliably
+    start_ts = time.time()
+    prob.solve(solver)
+    elapsed = time.time() - start_ts
+
+    # --- Detect time-limit via logs (if present) ---
+    hit_time_limit_log = False
     try:
-        # CBC writes {prob.name}.log in the working dir when keepFiles=True
         log_file = f"{prob.name}.log"
         if os.path.exists(log_file):
             with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
                 log_txt = f.read().lower()
-            # robust match for various CBC wordings
             if "stopped on time limit" in log_txt or "time limit reached" in log_txt:
-                hit_time_limit = True
+                hit_time_limit_log = True
     except Exception:
-        hit_time_limit = False  # fail-safe
+        pass  # ignore log read issues
+
+    # --- Detect time-limit via elapsed time (robust, no logs needed) ---
+    hit_time_limit_elapsed = elapsed >= max(time_limit - 1.0, 0.95 * time_limit)
+
+    # Combine both signals
+    hit_time_limit = hit_time_limit_log or hit_time_limit_elapsed
 
     status_str = LpStatus[prob.status]  # 'Optimal', 'Not Solved', 'Infeasible', 'Unbounded', 'Undefined'
     has_solution = any((v.varValue is not None and v.varValue > 0) for v in x.values())
-    is_optimal = (status_str == 'Optimal')
+
+    # Only call it optimal if solver says Optimal AND we did NOT hit the time limit
+    is_optimal = (status_str == 'Optimal') and (not hit_time_limit)
+
+    # Treat time-limit or 'Not Solved' as feasible-but-not-proven-optimal (given we have an incumbent)
+    feasible_but_not_optimal = (status_str == 'Not Solved') or hit_time_limit
 
     # Fail fast on solver-declared bad statuses
     if status_str in ('Infeasible', 'Unbounded', 'Undefined'):
@@ -385,7 +400,7 @@ def optimize_by_budget_share():
             "solver_status": status_str
         }), 200
 
-    feasible_but_not_optimal = (not is_optimal and status_str in ('Not Solved',))
+    #feasible_but_not_optimal = (not is_optimal and status_str in ('Not Solved',))
 
     # Build result dataframe
     df_full['Spots'] = df_full.index.map(lambda i: int(x[i].varValue) if x[i].varValue else 0)
