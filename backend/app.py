@@ -348,8 +348,22 @@ def optimize_by_budget_share():
         prob += nonprime_cost >= ((ch_nonprime_pct / 100.0) - 0.05) * ch_budget
         prob += nonprime_cost <= ((ch_nonprime_pct / 100.0) + 0.05) * ch_budget
 
-    solver = PULP_CBC_CMD(msg=True, timeLimit=time_limit)
+    #solver = PULP_CBC_CMD(msg=True, timeLimit=time_limit)
+    solver = PULP_CBC_CMD(msg=True, timeLimit=time_limit, keepFiles=True)
     prob.solve(solver)
+
+    hit_time_limit = False
+    try:
+        # CBC writes {prob.name}.log in the working dir when keepFiles=True
+        log_file = f"{prob.name}.log"
+        if os.path.exists(log_file):
+            with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
+                log_txt = f.read().lower()
+            # robust match for various CBC wordings
+            if "stopped on time limit" in log_txt or "time limit reached" in log_txt:
+                hit_time_limit = True
+    except Exception:
+        hit_time_limit = False  # fail-safe
 
     status_str = LpStatus[prob.status]  # 'Optimal', 'Not Solved', 'Infeasible', 'Unbounded', 'Undefined'
     has_solution = any((v.varValue is not None and v.varValue > 0) for v in x.values())
@@ -479,7 +493,8 @@ def optimize_by_budget_share():
 
         "is_optimal": bool(is_optimal),
         "feasible_but_not_optimal": bool(feasible_but_not_optimal),
-        "solver_status": str(LpStatus[prob.status])
+        "solver_status": str(LpStatus[prob.status]),
+        "hit_time_limit": bool(hit_time_limit)
     }), 200
 
 
