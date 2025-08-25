@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect ,useRef } from 'react';
+
 
 function ProgramSelector({ onSubmit }) {
   const [programsByChannel, setProgramsByChannel] = useState({});
@@ -24,6 +25,20 @@ function ProgramSelector({ onSubmit }) {
     }));
   };
 
+    const bottomRef = useRef(null);
+
+    const handleSelectAllGlobal = () => {
+      const updated = { ...selectedPrograms };
+      Object.values(programsByChannel).forEach(list => {
+        (list || []).forEach(p => { updated[p.id] = true; });
+      });
+      setSelectedPrograms(updated);
+    };
+
+    const scrollToBottom = () => {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
   const handleSelectAll = (channel) => {
     const updated = { ...selectedPrograms };
     programsByChannel[channel].forEach(p => {
@@ -31,6 +46,15 @@ function ProgramSelector({ onSubmit }) {
     });
     setSelectedPrograms(updated);
   };
+
+    const handleDeselectAll = (channel) => {
+      const updated = { ...selectedPrograms };
+      (programsByChannel[channel] || []).forEach(p => {
+        updated[p.id] = false;
+      });
+      setSelectedPrograms(updated);
+    };
+
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -43,19 +67,29 @@ function ProgramSelector({ onSubmit }) {
   return (
     <form onSubmit={handleSubmit} style={styles.form}>
       <h2 style={styles.title}>Select Programs from Channels</h2>
+     <div style={styles.toolbar}>
+      <button type="button" onClick={handleSelectAllGlobal} style={styles.selectAllButton_2}>
+        Select All (All Channels)
+      </button>
+      <button type="button" onClick={scrollToBottom} style={styles.selectAllButton_2}>
+        Go Down
+      </button>
+    </div>
 
       {Object.entries(programsByChannel).map(([channel, programs]) => (
         <div key={channel} style={styles.channelCard}>
-          <div style={styles.channelHeader}>
-            <div style={styles.channelInfo}>
-              <img
-                src={getLogoPath(channel)}
-                alt={channel}
-                style={styles.channelLogo}
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-              <h3 style={styles.channelName}>{channel}</h3>
-            </div>
+        <div style={styles.channelHeader}>
+          <div style={styles.channelInfo}>
+            <img
+              src={getLogoPath(channel)}
+              alt={channel}
+              style={styles.channelLogo}
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+            <h3 style={styles.channelName}>{channel}</h3>
+          </div>
+
+          <div style={styles.actionButtons}>
             <button
               type="button"
               onClick={() => handleSelectAll(channel)}
@@ -63,7 +97,16 @@ function ProgramSelector({ onSubmit }) {
             >
               Select All
             </button>
+            <button
+              type="button"
+              onClick={() => handleDeselectAll(channel)}
+              style={styles.selectAllButton}
+            >
+              Deselect All
+            </button>
           </div>
+        </div>
+
 
           <div style={styles.tableContainer}>
             <table style={styles.table}>
@@ -103,6 +146,7 @@ function ProgramSelector({ onSubmit }) {
         </div>
       ))}
 
+      <div ref={bottomRef} />
       <button type="submit" style={styles.submitButton}>
         Go to Optimization Setup
       </button>
@@ -123,8 +167,8 @@ const styles = {
     color: '#2d3748',
     fontSize: '24px',
     fontWeight: '600',
-    marginBottom: '32px',
-    paddingBottom: '16px',
+    marginBottom: '1px',
+    paddingBottom: '1px',
     borderBottom: '1px solid #e2e8f0',
   },
   channelCard: {
@@ -243,6 +287,36 @@ const styles = {
       color: '#4a5568',
       textAlign: 'center',
   },
+    actionButtons: {
+      display: 'flex',
+      gap: '10px',
+      flexWrap: 'wrap',
+    },
+
+    toolbar: {
+      display: 'flex',
+      gap: '8px',
+      justifyContent: 'flex-end',
+      flexWrap: 'wrap',
+      marginBottom: '16px',
+    },
+
+  selectAllButton_2: {
+    padding: '8px 16px',
+    backgroundColor: '#FFFFFF',
+    color: '#4a5568',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'all 0.2s ease',
+    ':hover': {
+      backgroundColor: '#e2e8f0',
+    },
+  },
+
+
 };
 
 export default ProgramSelector;
