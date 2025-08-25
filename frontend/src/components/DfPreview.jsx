@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState ,useRef} from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import * as XLSX from 'xlsx';
@@ -29,6 +29,14 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack }) {
     'Total_Cost': 'Total Budget (LKR)',
     'Total_Rating': 'NGRP',
   };
+
+  const bottomRef = useRef(null);
+
+    const goDown = () => {
+      const summary = document.getElementById('optimization-summary');
+      if (summary) summary.scrollIntoView({ behavior: 'smooth' });
+      else bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
 
 
   useEffect(() => {
@@ -160,6 +168,11 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack }) {
     <div style={styles.container}>
       <ToastContainer position="top-right" autoClose={3000} />
       <h2 style={styles.title}>Optimization-Ready Table</h2>
+      <div style={styles.toolbar}>
+      <button type="button" onClick={goDown} style={styles.backButton_2}>
+        Go Down
+      </button>
+    </div>
 
       <div style={styles.tableContainer}>
         <table style={styles.table}>
@@ -203,12 +216,12 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack }) {
           </tbody>
         </table>
       </div>
-
+      <div ref={bottomRef} />
       <div style={styles.buttonRow}>
         {!isProcessing && (
           <>
             <button onClick={goBack} style={styles.backButton}>
-              GO Back
+              Go Back
             </button>
             <button onClick={handleStartOptimization} style={styles.primaryButton}>
               Start Optimization
@@ -230,7 +243,7 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack }) {
         <div style={styles.notificationBox}>
           <p>Optimization failed or returned no solution.</p>
           <button onClick={goBack} style={styles.backButton}>
-            Go Back & Edit Constraints
+            Go Back
           </button>
         </div>
       )}
@@ -353,7 +366,7 @@ const styles = {
     color: '#2d3748',
     fontSize: '24px',
     fontWeight: '600',
-    marginBottom: '24px',
+    marginBottom: '2px',
   },
   tableContainer: {
     overflowX: 'auto',
@@ -411,6 +424,18 @@ const styles = {
     fontWeight: '500',
     cursor: 'pointer',
   },
+
+  backButton_2: {
+    padding: '12px 24px',
+    backgroundColor: '#FFFFFF',
+    color: '#2d3748',
+    border: '1px solid #cbd5e0',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+  },
+
   primaryButton: {
     padding: '12px 24px',
     backgroundColor: '#4299e1',
@@ -520,6 +545,13 @@ const styles = {
     textAlign: 'center',
     color: '#e53e3e',
   },
+
+  toolbar: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '8px',
+    marginBottom: '12px',
+      },
 };
 
 export default DfPreview;
