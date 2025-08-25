@@ -305,14 +305,24 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
 
         const hasDisplayablePlan = Array.isArray(data.df_result) && data.df_result.length > 0;
         const solverStatus = data?.solver_status || 'Unknown';
-        const isOptimal = Boolean(data?.is_optimal === true);
-        const notProvenOptimal = Boolean(data?.feasible_but_not_optimal === true) || solverStatus === 'Not Solved';
+        const isOptimal = data?.is_optimal === true;
+        const hitTimeLimit = data?.hit_time_limit === true;
+
+        const notProvenOptimal =
+          data?.feasible_but_not_optimal === true ||
+          solverStatus === 'Not Solved' ||
+          hitTimeLimit;
 
         if (hasDisplayablePlan) {
           setResult(data);
-          if (isOptimal) toast.success('🎯 Optimal solution found. Proceed to download.');
-          else if (notProvenOptimal) toast.info('Feasible plan found within the time limit (not proven optimal). If possible, increase the time limit and re‑optimize.');
-          else toast.info('Feasible plan returned.');
+
+          if (isOptimal && !notProvenOptimal) {
+            toast.success('🎯 Optimal solution found. Proceed to download.');
+          } else if (notProvenOptimal) {
+            toast.info('Feasible plan found within the time limit (not proven optimal). If possible, increase the time limit and re-optimize.');
+          } else {
+            toast.info('Feasible plan returned.');
+          }
 
           setTimeout(() => {
             document.getElementById('optimization-summary')?.scrollIntoView({ behavior: 'smooth' });
@@ -321,6 +331,7 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
           setResult(null);
           window.alert(`Result ambiguous (no rows to display).\nSolver status: ${solverStatus}`);
         }
+
       })
       .catch((err) => {
         if (stopRequested) return;
@@ -426,11 +437,11 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
     primaryButton: { padding: '12px 24px', backgroundColor: '#4299e1', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', fontWeight: '500', cursor: 'pointer' },
     resultContainer: { marginTop: '32px', paddingTop: '32px', borderTop: '1px solid #e2e8f0' },
     sectionTitle: { color: '#2d3748', fontSize: '20px', fontWeight: '600', marginBottom: '24px' },
-    summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' },
-    summaryCard: { backgroundColor: 'white', borderRadius: '8px', padding: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)' },
+    summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' },
+    summaryCard: { backgroundColor: 'white', borderRadius: '8px', padding: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)' ,marginBottom: '24px'},
     summaryTitle: { color: '#4a5568', fontSize: '14px', fontWeight: '600', marginBottom: '8px' },
     summaryValue: { color: '#2d3748', fontSize: '18px', fontWeight: '700' },
-    exportButton: { padding: '12px 24px', backgroundColor: '#38a169', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', fontWeight: '500', cursor: 'pointer', transition: 'all 0.2s ease', marginTop: '24px' },
+    exportButton: { padding: '12px 24px', backgroundColor: '#38a169', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', fontWeight: '500', cursor: 'pointer', transition: 'all 0.2s ease', marginTop: '24px',marginRight: '20px' },
     processingMsg: { fontSize: '16px', fontWeight: '500', color: '#718096', marginTop: '4px' },
     table: { width: '100%', borderCollapse: 'collapse', marginTop: '16px' },
     th: { border: '1px solid #ccc', padding: '8px', background: '#f7fafc', fontWeight: '600' },

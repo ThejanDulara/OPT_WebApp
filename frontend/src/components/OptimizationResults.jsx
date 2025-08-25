@@ -240,8 +240,8 @@ export default function OptimizationResults({
           </tbody>
         </table>
 
-        <button onClick={handleExportToExcel} style={styles.exportButton}>📥 Export Final Plan to Excel</button>
-        <button onClick={() => (window.location.href = '/')} style={styles.backHomeButton}>⬅️ Go Back to Home</button>
+        <button onClick={handleExportToExcel} style={styles.exportButton}>Export Final Plan to Excel</button>
+        <button onClick={() => (window.location.href = '/')} style={styles.backHomeButton}>Go Back to Home</button>
       </div>
     </div>
   );
