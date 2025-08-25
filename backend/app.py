@@ -437,7 +437,7 @@ def optimize_by_budget_share():
             'Non-Prime Cost %': round((nonprime_cost_val / ch_cost * 100), 2) if ch_cost else 0
         })
     #feasible_but_not_optimal = has_solution and not is_optimal
-    return jsonify({
+    """return jsonify({
         "success": True,
         "total_cost": float(round(total_cost_all, 2)),
         "total_rating": float(round(total_rating, 2)),
@@ -450,6 +450,33 @@ def optimize_by_budget_share():
                                                                                     list) else commercials_summary,
         #"df_result": df_full.to_dict(orient="records"),
         "df_result": json.loads(df_full.to_json(orient='records')),
+        "is_optimal": bool(is_optimal),
+        "feasible_but_not_optimal": bool(feasible_but_not_optimal),
+        "solver_status": str(LpStatus[prob.status])
+    }), 200"""
+
+    return jsonify({
+        "success": True,
+        "total_cost": float(round(total_cost_all, 2)),
+        "total_rating": float(round(total_rating, 2)),
+        "cprp": float(round(total_cost_all / total_rating, 2)) if total_rating else None,
+
+        # channel_summary is already a Python list of dicts → return as-is
+        "channel_summary": channel_summary,
+
+        # commercials_summary.details comes from a DataFrame → convert safely
+        "commercials_summary": [
+            {
+                **{k: v for k, v in c.items() if k != "details"},
+                "details": json.loads(pd.DataFrame(c["details"]).to_json(orient="records"))
+                if isinstance(c.get("details"), list) else json.loads(c["details"].to_json(orient="records"))
+            }
+            for c in commercials_summary
+        ],
+
+        # df_full is a DataFrame → convert safely
+        "df_result": json.loads(df_full.to_json(orient="records")),
+
         "is_optimal": bool(is_optimal),
         "feasible_but_not_optimal": bool(feasible_but_not_optimal),
         "solver_status": str(LpStatus[prob.status])
