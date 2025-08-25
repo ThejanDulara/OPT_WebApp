@@ -31,14 +31,14 @@ function FrontPage({ onStart, onManagePrograms }) {
             onClick={onStart}
             style={styles.startButton}
           >
-            Start Optimization →
+            Start Optimization
           </button>
 
           <button
             onClick={onManagePrograms}
             style={styles.secondaryButton}
           >
-            Manage Program Data 🛠
+            Manage Program Data
           </button>
         </div>
       </div>

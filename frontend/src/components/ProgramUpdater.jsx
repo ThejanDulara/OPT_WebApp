@@ -86,7 +86,7 @@ function ProgramUpdater({ onBack }) {
 
   return (
     <div style={styles.form}>
-      <h2 style={styles.title}>📺 Program Manager</h2>
+      <h2 style={styles.title}>Program Manager</h2>
 
       <div style={styles.channelSelector}>
         <label style={styles.label}>Select Channel:</label>
@@ -220,14 +220,14 @@ function ProgramUpdater({ onBack }) {
               ➕ Add Program
             </button>
             <button onClick={saveChanges} style={styles.primaryButton}>
-              💾 Save Changes
+              Save Changes
             </button>
           </div>
         </div>
       )}
 
       <button onClick={onBack} style={styles.backButton}>
-        ← Back to Home
+        Back to Home
       </button>
     </div>
   );
