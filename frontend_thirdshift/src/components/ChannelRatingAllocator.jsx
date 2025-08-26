@@ -317,7 +317,7 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
           setResult(data);
 
           if (isOptimal && !notProvenOptimal) {
-            toast.success('🎯 Optimal solution found. Proceed to download.');
+            toast.success('Optimal solution found. Proceed to download.');
           } else if (notProvenOptimal) {
             toast.info('Feasible plan found within the time limit (not proven optimal). If possible, increase the time limit and re-optimize.');
           } else {
