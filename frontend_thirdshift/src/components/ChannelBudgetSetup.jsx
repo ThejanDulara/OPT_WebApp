@@ -1,5 +1,5 @@
 // ChannelBudgetSetup.jsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import PropertyProgramsEditor from './PropertyProgramsEditor';
 
 export default function ChannelBudgetSetup({
@@ -31,6 +31,36 @@ export default function ChannelBudgetSetup({
   const handleInputChange = (channel, value) => {
     setBudgetShares(prev => ({ ...prev, [channel]: toNumber(value) }));
   };
+
+    // add near the top of the component body
+    const [countdown, setCountdown] = useState(null);
+
+    const formatMMSS = (secs) => {
+      const m = Math.floor(secs / 60).toString().padStart(2, '0');
+      const s = (secs % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
+    };
+
+    useEffect(() => {
+      let id;
+      if (isProcessing) {
+        setCountdown(parseInt(timeLimit, 10) || 0);
+        id = setInterval(() => {
+          setCountdown(prev => {
+            if (prev == null) return prev;
+            if (prev <= 1) {
+              clearInterval(id);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        setCountdown(null);
+      }
+      return () => { if (id) clearInterval(id); };
+    }, [isProcessing, timeLimit]);
+
 
   // disable optimize if property program totals don't match or while processing
   const disableOptimize = isProcessing || (propertyValidation && !propertyValidation.ok);
@@ -491,12 +521,28 @@ export default function ChannelBudgetSetup({
               Start Optimization
             </button>
           </>
-        ) : (
-          <>
-            <p style={styles.processingMsg}>Optimization is processing. Please wait...</p>
-            <button onClick={onStop} style={styles.stopButton}>Stop Optimization</button>
-          </>
-        )}
+            ) : (
+              <>
+                <p style={styles.processingMsg}>
+                  Optimization is processing. Please wait...
+                  {typeof countdown === 'number' && (
+                    <span
+                      style={{
+                        marginLeft: 8,
+                        fontFamily: 'monospace',
+                        fontWeight: 700,
+                        padding: '2px 6px',
+                        borderRadius: 4
+                      }}
+                    >
+                      {formatMMSS(Math.max(0, countdown))}
+                    </span>
+                  )}
+                </p>
+                <button onClick={onStop} style={styles.stopButton}>Stop Optimization</button>
+              </>
+            )}
+
       </div>
     </>
   );
