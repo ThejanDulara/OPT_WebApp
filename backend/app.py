@@ -213,12 +213,15 @@ def run_optimization():
         total_rating_c = df_c['Total_Rating'].sum()
         cprp_c = total_cost_c / total_rating_c if total_rating_c else None
 
+        details_safe = json.loads(df_c.to_json(orient='records'))
+
         commercials_summary.append({
             "commercial_index": c,
             "total_cost": round(total_cost_c, 2),
             "total_rating": round(total_rating_c, 2),
             "cprp": round(cprp_c, 2) if cprp_c else None,
-            "details": df_c.to_dict(orient='records')
+            #"details": df_c.to_dict(orient='records')
+            "details": details_safe
         })
 
     # Channel summary
@@ -236,6 +239,7 @@ def run_optimization():
         "channel_summary": json.loads(channel_summary.to_json(orient='records')),
         "df_result": json.loads(df_full.to_json(orient='records'))
         #"df_result": df_full.to_dict(orient='records')
+
     })
 
 
