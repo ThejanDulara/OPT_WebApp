@@ -75,30 +75,27 @@ def generate_df():
     num_commercials = data.get('num_commercials')
     durations = data.get('durations')
 
-    # NEW: session-scoped overrides coming from the UI
-    negotiated_rates = data.get('negotiated_rates', {})       # { programId: negotiatedValue }
-    channel_discounts = data.get('channel_discounts', {})     # { channelName: pct } e.g., {"Derana": 30}
+    negotiated_rates = data.get('negotiated_rates', {})     # { programId: value }
+    channel_discounts = data.get('channel_discounts', {})   # { channel: pct }
 
     if not program_ids or not num_commercials or not durations:
         return jsonify({"error": "Missing required data"}), 400
 
-    # 1) Fetch selected programs from DB (include id so we can map overrides)
+    # 1) Fetch selected programs from DB (include id so overrides work)
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    format_strings = ','.join(['%s'] * len(program_ids))
-    cursor.execute(f"SELECT id, channel, day, time, program, cost, tvr, slot FROM programs WHERE id IN ({format_strings})", tuple(program_ids))
+    fmt = ','.join(['%s'] * len(program_ids))
+    cursor.execute(f"SELECT id, channel, day, time, program, cost, tvr, slot FROM programs WHERE id IN ({fmt})", tuple(program_ids))
     rows = cursor.fetchall()
     conn.close()
 
     if not rows:
         return jsonify({"error": "No programs found for given IDs"}), 400
 
-    # 2) Build base df
-    df = pd.DataFrame(rows, columns=['id', 'channel', 'day', 'time', 'program', 'cost', 'tvr,', 'slot'])
-    # fix a possible stray comma in column list
-    if 'tvr,' in df.columns:
-        df.rename(columns={'tvr,': 'tvr'}, inplace=True)
+    # 2) Build df directly from dict rows (no custom columns list)
+    df = pd.DataFrame(rows)
 
+    # Standardize column names
     df.rename(columns={
         'id': 'Id',
         'channel': 'Channel',
@@ -114,34 +111,32 @@ def generate_df():
     df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce').fillna(0.0)
     df['TVR']  = pd.to_numeric(df['TVR'],  errors='coerce').fillna(0.0)
 
-    # 3) Compute effective/negotiated rate per row
-    # Priority: per-program negotiated override -> per-channel % discount -> fallback 0% discount
+    # 3) Effective/Negotiated rate
     def effective_cost(row):
         pid = row['Id']
         ch  = row['Channel']
         base = float(row['Cost'])
         if pid in negotiated_rates and negotiated_rates[pid] is not None:
             return float(negotiated_rates[pid])
-        disc_pct = float(channel_discounts.get(ch, 30))  # default 30% if not provided
+        disc_pct = float(channel_discounts.get(ch, 30.0))
         return round(base * (1.0 - disc_pct / 100.0), 2)
 
     df['Negotiated_Rate'] = df.apply(effective_cost, axis=1)
 
-    # 4) Expand to commercials; compute NTVR/NCost **from negotiated rate**
+    # 4) Expand by commercials; compute NTVR/NCost
     df_list = []
     for c in range(int(num_commercials)):
-        temp_df = df.copy()
-        temp_df['Commercial'] = c
+        temp = df.copy()
+        temp['Commercial'] = c
         duration = float(durations[c])
-        temp_df['NTVR']  = (temp_df['TVR']  / 30.0) * duration
-        temp_df['NCost'] = (temp_df['Negotiated_Rate'] / 30.0) * duration
-        df_list.append(temp_df)
+        temp['NTVR']  = (temp['TVR'] / 30.0) * duration
+        temp['NCost'] = (temp['Negotiated_Rate'] / 30.0) * duration
+        df_list.append(temp)
 
     df_full = pd.concat(df_list, ignore_index=True)
-
-    # 5) Return df_full; keep both original Cost and Negotiated_Rate for visibility
-    # (Downstream optimization will use NCost derived from Negotiated_Rate.)
-    df_full[['Cost', 'TVR', 'Negotiated_Rate', 'NTVR', 'NCost']] = df_full[['Cost', 'TVR', 'Negotiated_Rate', 'NTVR', 'NCost']].astype(float).round(2)
+    cols_to_round = ['Cost', 'TVR', 'Negotiated_Rate', 'NTVR', 'NCost']
+    for col in cols_to_round:
+        df_full[col] = pd.to_numeric(df_full[col], errors='coerce').fillna(0.0).round(2)
 
     return jsonify({"df_full": json.loads(df_full.to_json(orient='records'))})
 
