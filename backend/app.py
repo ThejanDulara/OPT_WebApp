@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import mysql.connector
 import pandas as pd
-from pulp import LpProblem, LpMaximize, LpVariable, lpSum, PULP_CBC_CMD
+from pulp import LpProblem, LpMaximize, LpVariable, lpSum, PULP_CBC_CMD,LpInteger
 from pulp import LpStatus
 import os
 import json
@@ -548,7 +548,160 @@ def optimize_by_budget_share():
         "hit_time_limit": bool(hit_time_limit)
     }), 200
 
+@app.route('/optimize-bonus', methods=['POST'])
+def optimize_bonus():
+    """
+    Request JSON:
+    {
+      "df_bonus": [ { Channel, Program, Day, Time, Duration, Slot, Rate_DB, TVR, Commercial, NCost, NTVR }, ... ],
+      "bonus_budgets": { "Derana": 1000000, ... },                 # per-channel bonus budget
+      "channel_bounds_pct": { "Derana": 0.10, ... },               # ± % (decimal)
+      "commercial_budgets": { "Derana": {"Commercial 1": 500000, "Commercial 2": 500000}, ... },
+      "commercial_tolerance_pct": 0.05,                            # ± 5%
+      "max_spots": 10,
+      "time_limit": 120
+    }
+    """
+    try:
+        data = request.get_json(force=True)
+        df_bonus = pd.DataFrame(data.get("df_bonus", []))
+        if df_bonus.empty:
+            return jsonify({"success": False, "message": "No bonus candidate rows provided."}), 200
 
+        # sanitize & required cols
+        required_cols = {"Channel","Program","Day","Time","Duration","Slot","Rate_DB","TVR","Commercial","NCost","NTVR"}
+        missing = required_cols - set(df_bonus.columns)
+        if missing:
+            return jsonify({"success": False, "message": f"Missing columns: {sorted(list(missing))}"}), 200
+
+        bonus_budgets = data.get("bonus_budgets", {}) or {}
+        channel_bounds_pct = data.get("channel_bounds_pct", {}) or {}
+        commercial_budgets = data.get("commercial_budgets", {}) or {}
+        comm_tol = float(data.get("commercial_tolerance_pct", 0.05))
+        max_spots = int(data.get("max_spots", 10))
+        time_limit = int(data.get("time_limit", 120))
+
+        # Only Slot B programs; if any A slipped in, filter them out
+        df_bonus = df_bonus[df_bonus["Slot"].astype(str).str.upper().eq("B")].copy()
+        if df_bonus.empty:
+            return jsonify({"success": False, "message": "No Slot B rows after filtering."}), 200
+
+        # Build index
+        df_bonus["key"] = (
+            df_bonus["Channel"].astype(str) + "||" +
+            df_bonus["Program"].astype(str) + "||" +
+            df_bonus["Commercial"].astype(str)
+        )
+
+        # Model
+        prob = LpProblem("Bonus_Optimization", LpMaximize)
+
+        # Variables: integer spots 0..max_spots
+        x = {k: LpVariable(f"x_{i}", lowBound=0, upBound=max_spots, cat=LpInteger)
+             for i, k in enumerate(df_bonus["key"])}
+
+        # Maps
+        key_to_channel = dict(zip(df_bonus["key"], df_bonus["Channel"]))
+        key_to_comm    = dict(zip(df_bonus["key"], df_bonus["Commercial"]))
+        key_to_cost    = dict(zip(df_bonus["key"], df_bonus["NCost"]))
+        key_to_rating  = dict(zip(df_bonus["key"], df_bonus["NTVR"]))
+
+        # Objective: maximize sum of ratings
+        prob += lpSum(x[k] * key_to_rating[k] for k in x.keys()), "Maximize_NGRP"
+
+        # Per-channel budget bounds around bonus budget (±)
+        channels = sorted(df_bonus["Channel"].unique())
+        for ch in channels:
+            bb = float(bonus_budgets.get(ch, 0.0))
+            tol = float(channel_bounds_pct.get(ch, 0.0))
+            ch_keys = [k for k in x if key_to_channel[k] == ch]
+            total_cost_ch = lpSum(x[k] * key_to_cost[k] for k in ch_keys)
+            # Only bind if a positive budget is provided
+            if bb > 0 and tol >= 0:
+                prob += total_cost_ch >= bb * (1 - tol), f"{ch}_bonus_cost_lower"
+                prob += total_cost_ch <= bb * (1 + tol), f"{ch}_bonus_cost_upper"
+
+        # Per-channel, per-commercial budget bands (±5% default)
+        for ch in channels:
+            comm_map = (commercial_budgets.get(ch) or {})
+            for comm_name, cb in comm_map.items():
+                target = float(cb)
+                if target <= 0:
+                    continue
+                comm_keys = [k for k in x if key_to_channel[k] == ch and key_to_comm[k] == comm_name]
+                cost_comm = lpSum(x[k] * key_to_cost[k] for k in comm_keys)
+                lower = target * (1 - comm_tol)
+                upper = target * (1 + comm_tol)
+                prob += cost_comm >= lower, f"{ch}_{comm_name}_cost_lower"
+                prob += cost_comm <= upper, f"{ch}_{comm_name}_cost_upper"
+
+        # Solve
+        solver = PULP_CBC_CMD(msg=True, timeLimit=time_limit)
+        prob.solve(solver)
+        status_str = LpStatus.get(prob.status, "Undefined")
+
+        has_solution = any((v.value() is not None and v.value() > 0) for v in x.values())
+        if status_str in ("Infeasible", "Unbounded", "Undefined") or not has_solution:
+            return jsonify({
+                "success": False,
+                "message": f"No feasible bonus solution. Solver status: {status_str}",
+                "solver_status": status_str
+            }), 200
+
+        # Build result df
+        df = df_bonus.copy()
+        df["Spots"] = df["key"].map(lambda k: int(round(x[k].value() or 0)))
+        df = df[df["Spots"] > 0].copy()
+        if df.empty:
+            return jsonify({
+                "success": False,
+                "message": f"No spots assigned although status {status_str}.",
+                "solver_status": status_str
+            }), 200
+
+        df["Cost"] = df["Spots"] * df["NCost"]
+        df["Rating"] = df["Spots"] * df["NTVR"]
+
+        total_cost = float(df["Cost"].sum())
+        total_rating = float(df["Rating"].sum())
+        cprp = (total_cost / total_rating) if total_rating > 0 else None
+
+        # Channel summary (bonus-only)
+        ch_summ = (
+            df.groupby(["Channel"], as_index=False)
+              .agg(Total_Spots=("Spots","sum"),
+                   Bonus_Cost=("Cost","sum"),
+                   Bonus_NGRP=("Rating","sum"))
+              .sort_values("Bonus_NGRP", ascending=False)
+        )
+        channel_summary = ch_summ.to_dict(orient="records")
+
+        # Commercial summary (bonus-only)
+        comm_summ = (
+            df.groupby(["Commercial"], as_index=False)
+              .agg(Total_Spots=("Spots","sum"),
+                   Bonus_Cost=("Cost","sum"),
+                   Bonus_NGRP=("Rating","sum"))
+              .sort_values("Commercial")
+        )
+        commercials_summary = comm_summ.to_dict(orient="records")
+
+        return jsonify({
+            "success": True,
+            "total_cost": round(total_cost, 2),
+            "total_rating": round(total_rating, 2),
+            "cprp": round(cprp, 4) if cprp else None,
+            "channel_summary": channel_summary,
+            "commercials_summary": commercials_summary,
+            "df_result": df.sort_values(["Channel","Commercial","Program"]).to_dict(orient="records"),
+            "is_optimal": (status_str == "Optimal"),
+            "feasible_but_not_optimal": (status_str != "Optimal"),
+            "solver_status": status_str
+        }), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Server error: {e}"}), 200
+# --- END BONUS ENDPOINT ------------------------------------------------------
 #4
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
