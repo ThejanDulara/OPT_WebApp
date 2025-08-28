@@ -7,26 +7,29 @@ import FrontPage from './components/FrontPage';
 import ProgramUpdater from './components/ProgramUpdater';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import NegotiatedRates from './components/NegotiatedRates';
 
 function App() {
   const [step, setStep] = useState(0);
   const [selectedProgramIds, setSelectedProgramIds] = useState([]);
   const [optimizationInput, setOptimizationInput] = useState(null);
   const [dfFull, setDfFull] = useState([]);
+  const [negotiatedRates, setNegotiatedRates] = useState({});
+  const [channelDiscounts, setChannelDiscounts] = useState({});
 
   const handleProgramsSubmit = (programIds) => {
     setSelectedProgramIds(programIds);
-    setStep(2);
+    setStep(3);
   };
 
   const handleOptimizationSubmit = (data) => {
     setOptimizationInput(data);
-    setStep(3);
+    setStep(4);
   };
 
   const handleDfReady = (df) => {
     setDfFull(df);
-    setStep(4);
+    setStep(5);
   };
 
   const renderStep = () => {
@@ -35,43 +38,57 @@ function App() {
         return (
           <FrontPage
             onStart={() => setStep(1)}
-            onManagePrograms={() => setStep(5)}
+            onManagePrograms={() => setStep(6)}
           />
         );
-      case 1:
-        return (
-          <ProgramSelector
-            onSubmit={handleProgramsSubmit}
-            onBack={() => setStep(0)}
-          />
-        );
-      case 2:
+        case 1:
+          return (
+            <NegotiatedRates
+              onBack={() => setStep(0)}
+              onProceed={({ channelDiscounts, negotiatedRates }) => {
+                setNegotiatedRates(negotiatedRates);
+                setChannelDiscounts(channelDiscounts);
+                setStep(2);
+              }}
+            />
+          );
+        case 2:
+          return (
+            <ProgramSelector
+              negotiatedRates={negotiatedRates}
+              onSubmit={handleProgramsSubmit}
+              onBack={() => setStep(1)}
+            />
+          );
+      case 3:
         return (
           <OptimizationSetup
             onSubmit={handleOptimizationSubmit}
-            onBack={() => setStep(1)}
+            onBack={() => setStep(2)}
             initialValues={optimizationInput}
           />
         );
-      case 3:
+      case 4:
         return (
           <DfPreview
             programIds={selectedProgramIds}
             optimizationInput={optimizationInput}
+            negotiatedRates={negotiatedRates}      // ✅ pass down
+            channelDiscounts={channelDiscounts}    // ✅ pass down
             onReady={handleDfReady}
-            goBack={() => setStep(2)}
+            goBack={() => setStep(3)}
           />
         );
-      case 4:
+      case 5:
         return (
           <ChannelRatingAllocator
             channels={[...new Set(dfFull.map(row => row.Channel))]}
             dfFull={dfFull}
             optimizationInput={optimizationInput}
-            onBack={() => setStep(3)}
+            onBack={() => setStep(4)}
           />
         );
-      case 5:
+      case 6:
         return <ProgramUpdater onBack={() => setStep(0)} />;
       default:
         return null;

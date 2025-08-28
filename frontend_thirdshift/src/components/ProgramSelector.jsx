@@ -1,7 +1,7 @@
 import React, { useState, useEffect ,useRef } from 'react';
 
 
-function ProgramSelector({ onSubmit }) {
+function ProgramSelector({ onSubmit, onBack, negotiatedRates }) {
   const [programsByChannel, setProgramsByChannel] = useState({});
   const [selectedPrograms, setSelectedPrograms] = useState({});
 
@@ -116,7 +116,8 @@ function ProgramSelector({ onSubmit }) {
                     <th style={styles.tableHeader}>Day</th>
                     <th style={styles.tableHeader}>Time</th>
                     <th style={styles.tableHeader}>Program</th>
-                    <th style={styles.tableHeader}>Cost</th>
+                    <th style={styles.tableHeader}>Rate card Rate</th>
+                    <th style={styles.tableHeader}>Negotiated Rate</th>
                     <th style={styles.tableHeader}>TVR</th>
                     <th style={styles.tableHeader}>Slot</th>
                   </tr>
@@ -136,6 +137,7 @@ function ProgramSelector({ onSubmit }) {
                       <td style={styles.tableCell}>{p.time}</td>
                       <td style={styles.tableCell}>{p.program}</td>
                       <td style={styles.rightAlignedCell}>{p.cost !== null && p.cost !== undefined ? Number(p.cost).toFixed(2) : '-'}</td>
+                      <td style={styles.rightAlignedCell}>{negotiatedRates?.[p.id] != null ? Number(negotiatedRates[p.id]).toFixed(2): (p.cost != null ? Number(p.cost).toFixed(2) : '-')}</td>
                       <td style={styles.rightAlignedCell}>{p.tvr}</td>
                       <td style={styles.centerAlignedCell}>{p.slot}</td>
                     </tr>
@@ -147,6 +149,9 @@ function ProgramSelector({ onSubmit }) {
       ))}
 
       <div ref={bottomRef} />
+      <button type="button" onClick={onBack} style={styles.backButton}>
+          Go Back
+      </button>
       <button type="submit" style={styles.submitButton}>
         Go to Optimization Setup
       </button>
@@ -260,6 +265,19 @@ const styles = {
     height: '16px',
     cursor: 'pointer',
   },
+    backButton: {
+      padding: '12px 20px',
+      backgroundColor: '#edf2f7',
+      color: '#2d3748',
+      border: 'none',
+      borderRadius: '6px',
+      fontSize: '14px',
+      fontWeight: '500',
+      cursor: 'pointer',
+      transition: 'background-color 0.2s ease',
+      flex: 1,
+      marginRight: '20px'
+    },
 
   submitButton: {
     marginTop: '24px',

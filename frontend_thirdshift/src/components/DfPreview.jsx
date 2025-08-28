@@ -4,7 +4,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
-function DfPreview({ programIds, optimizationInput, onReady, goBack }) {
+function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRates ,channelDiscounts}) {
   const [dfFull, setDfFull] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -14,11 +14,14 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack }) {
   const [optimizationFailed, setOptimizationFailed] = useState(false);
 
   // Define column orders and name mappings
-  const previewOrder = ['Commercial','Channel', 'Day', 'Time', 'Program', 'Cost', 'TVR', 'Slot','NCost', 'NTVR'];
+  const previewOrder = ['Commercial','Channel', 'Day', 'Time', 'Program', 'Cost', 'Negotiated_Rate', 'TVR', 'Slot','NCost', 'NTVR'];
   const displayOrder = ['Channel', 'Program', 'Day', 'Time', 'Slot','Cost', 'TVR', 'NCost', 'NTVR', 'Total_Cost', 'Total_Rating', 'Spots'];
   const channelSummaryOrder = ['Channel', 'Total_Cost', '% of Total'];
 
-  const columnNameMappings_1 = { };
+  const columnNameMappings_1 = {
+    'Cost': 'Rate card Rate',
+   'Negotiated_Rate': 'Negotiated Rate',
+   };
 
   const columnNameMappings_2 = {
     'Total_Cost': 'Total Budget',
@@ -45,7 +48,9 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack }) {
     const payload = {
       program_ids: programIds,
       num_commercials: optimizationInput.numCommercials,
-      durations: optimizationInput.durations
+      durations: optimizationInput.durations,
+      negotiated_rates: negotiatedRates,       // { [programId]: number }
+      channel_discounts: channelDiscounts      // { [channel]: number }
     };
 
     fetch('https://optwebapp-production.up.railway.app/generate-df', {
@@ -191,7 +196,7 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack }) {
               <tr key={idx} style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
                 {previewOrder.map((col, i) => {
                   let val = row[col];
-                  const isNumeric = ['Cost', 'TVR', 'NCost', 'NTVR'].includes(col);
+                  const isNumeric = ['Cost', 'TVR', 'NCost', 'NTVR','Negotiated_Rate'].includes(col);
                   if (isNumeric) {
                     val = typeof val === 'number' ? val.toFixed(2) : parseFloat(val || 0).toFixed(2);
                   }
@@ -291,7 +296,7 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack }) {
                   {c.details.map((row, i) => (
                     <tr key={i} style={i % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
                       {displayOrder.map((key, j) => {
-                        const isNumeric = ['Cost', 'TVR', 'NCost', 'NTVR','Total_Cost' , 'Total_Rating'].includes(key);
+                        const isNumeric = ['Cost', 'TVR', 'NCost', 'NTVR','Total_Cost' , 'Total_Rating',].includes(key);
                         const val = isNumeric && typeof row[key] === 'number'
                           ? row[key].toFixed(2)
                           : row[key];
