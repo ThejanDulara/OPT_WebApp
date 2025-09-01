@@ -554,68 +554,81 @@ def optimize_by_budget_share():
 @app.route('/optimize-bonus', methods=['POST'])
 def optimize_bonus():
     data = request.get_json()
-    df_full = pd.DataFrame(data.get('df_full'))
-    bonus_budgets = data.get('bonus_budgets')             # dict keyed by channel
-    channel_bounds = data.get('channel_bounds')           # dict keyed by channel
-    commercial_budgets = data.get('commercial_budgets')   # dict of per‑channel lists
-    min_spots = data.get('min_spots')
-    max_spots = data.get('max_spots')
+
+    # Map frontend → backend names
+    df_full = pd.DataFrame(data.get('df_full') or data.get('programRows'))
+    bonus_budgets = data.get('bonus_budgets') or data.get('bonusBudgetsByChannel')
+    channel_bounds = data.get('channel_bounds') or data.get('channelAllowPctByChannel')
+    commercial_budgets = data.get('commercial_budgets') or data.get('commercialTargetsByChannel')
+    min_spots = data.get('min_spots', 0)
+    max_spots = data.get('max_spots', 20)
+    time_limit = data.get('time_limit') or data.get('timeLimitSec', 120)
+
+    if df_full.empty:
+        return jsonify({"success": False, "message": "⚠️ df_full/programRows is empty"}), 400
 
     results = []
     for channel in df_full['Channel'].unique():
         df_ch = df_full[df_full['Channel'] == channel].copy()
-        bonus_budget = bonus_budgets[channel]
-        budget_bound = channel_bounds[channel]
-        comm_budgets = commercial_budgets[channel]
+        bonus_budget = bonus_budgets.get(channel, 0)
+        budget_bound = channel_bounds.get(channel, 0)
+        comm_budgets = commercial_budgets.get(channel, {})
 
         # set up an LP for this channel
-        prob = LpProblem(f"Maximize_NGRP_{channel}", LpMaximize)
+        prob = LpProblem(f"Maximize_NTVR_{channel}", LpMaximize)
         x = {i: LpVariable(f"x_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer')
              for i in df_ch.index}
 
-        # maximise NGRP for this channel
-        prob += lpSum(df_ch.loc[i, 'NGRP'] * x[i] for i in df_ch.index)
+        # maximise NTVR for this channel
+        prob += lpSum(df_ch.loc[i, 'NTVR'] * x[i] for i in df_ch.index)
 
         # channel budget constraint
         total_cost = lpSum(df_ch.loc[i, 'NCost'] * x[i] for i in df_ch.index)
         prob += total_cost >= bonus_budget - budget_bound
         prob += total_cost <= bonus_budget + budget_bound
 
-        # commercial‑wise budget bounds (±5 % of each commercial’s budget)
+        # commercial-wise budget bounds (±5 % of each commercial’s budget)
         for c in df_ch['Commercial'].unique():
             indices = df_ch[df_ch['Commercial'] == c].index
-            share = comm_budgets[c] / 100
+            target = comm_budgets.get(c, 0)
+            if target <= 0:
+                continue
             comm_cost = lpSum(df_ch.loc[i, 'NCost'] * x[i] for i in indices)
-            prob += comm_cost >= (share - 0.05) * bonus_budget
-            prob += comm_cost <= (share + 0.05) * bonus_budget
+            prob += comm_cost >= 0.95 * target
+            prob += comm_cost <= 1.05 * target
 
         # solve
-        solver = PULP_CBC_CMD(msg=True, timeLimit=data.get('time_limit', 120))
+        solver = PULP_CBC_CMD(msg=True, timeLimit=time_limit)
         prob.solve(solver)
         if prob.status != 1:
-            results.append({"channel": channel, "success": False})
+            results.append({"channel": channel, "success": False, "solver_status": LpStatus[prob.status]})
             continue
 
         # collect results
         df_ch['Spots'] = df_ch.index.map(lambda i: int(x[i].varValue) if x[i].varValue else 0)
         df_ch['Total_Cost'] = df_ch['Spots'] * df_ch['NCost']
-        df_ch['Total_NGRP'] = df_ch['Spots'] * df_ch['NGRP']
+        df_ch['Total_NTVR'] = df_ch['Spots'] * df_ch['NTVR']
         df_ch = df_ch[df_ch['Spots'] > 0]
 
         total_cost_ch = df_ch['Total_Cost'].sum()
-        total_ngrps_ch = df_ch['Total_NGRP'].sum()
-        cprp_ch = total_cost_ch / total_ngrps_ch if total_ngrps_ch else None
+        total_ntvr_ch = df_ch['Total_NTVR'].sum()
+        cprp_ch = total_cost_ch / total_ntvr_ch if total_ntvr_ch else None
 
         results.append({
             "channel": channel,
             "success": True,
+            "solver_status": LpStatus[prob.status],
             "total_cost": round(total_cost_ch, 2),
-            "total_ngrps": round(total_ngrps_ch, 2),
+            "total_ntvr": round(total_ntvr_ch, 2),
             "cprp": round(cprp_ch, 2) if cprp_ch else None,
             "details": json.loads(df_ch.to_json(orient='records'))
         })
 
-    return jsonify(results)
+    return jsonify({
+        "success": True,
+        "results": results
+    })
+
 
 
 #4
