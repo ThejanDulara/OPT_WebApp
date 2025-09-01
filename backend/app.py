@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import mysql.connector
 import pandas as pd
-import pulp
+#import pulp
 from pulp import LpProblem, LpMaximize, LpVariable, lpSum, PULP_CBC_CMD,LpInteger
 from pulp import LpStatus
 import os
@@ -694,8 +694,8 @@ def optimize_bonus():
             com_bounds[(ch, cm)] = (lower, upper)
 
     # ---------- Optimization model ----------
-    if pulp is None:
-        return jsonify({"success": False, "message": "PuLP not available in this environment."}), 500
+ #   if pulp is None:
+#        return jsonify({"success": False, "message": "PuLP not available in this environment."}), 500
 
     prob = LpProblem("Bonus_Optimization", LpMaximize)
 
