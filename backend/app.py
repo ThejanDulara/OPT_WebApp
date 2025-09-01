@@ -2,12 +2,14 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import mysql.connector
 import pandas as pd
+import pulp
 from pulp import LpProblem, LpMaximize, LpVariable, lpSum, PULP_CBC_CMD,LpInteger
 from pulp import LpStatus
 import os
 import json
 import time
 from collections import defaultdict
+
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for communication with React frontend
