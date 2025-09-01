@@ -551,7 +551,7 @@ def optimize_by_budget_share():
         "hit_time_limit": bool(hit_time_limit)
     }), 200
 
-@app.route('/optimize_bonus', methods=['POST'])
+@app.route('/optimize-bonus', methods=['POST'])
 def optimize_bonus():
     data = request.get_json()
     df_full = pd.DataFrame(data.get('df_full'))
