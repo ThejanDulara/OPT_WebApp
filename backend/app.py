@@ -626,9 +626,33 @@ def optimize_bonus():
 
     return jsonify({
         "success": True,
-        "results": results
+        "solver_status": "Optimal",
+        "totals": {
+            "bonus_total_cost": sum(r["total_cost"] for r in results if r["success"]),
+            "bonus_total_rating": sum(r["total_ntvr"] for r in results if r["success"]),
+        },
+        "tables": {
+            "by_channel": [
+                {
+                    "Channel": r["channel"],
+                    "Slot": "B",
+                    "Spots": sum(d["Spots"] for d in r["details"]),
+                    "Total_Cost": r["total_cost"],
+                    "Total_Rating": r["total_ntvr"],
+                }
+                for r in results if r["success"]
+            ],
+            "by_program": [
+                {
+                    **d,
+                    "Channel": r["channel"],
+                    "Slot": "B"
+                }
+                for r in results if r["success"]
+                for d in r["details"]
+            ]
+        }
     })
-
 
 
 #4
