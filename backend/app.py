@@ -561,7 +561,7 @@ def optimize_bonus():
     channel_bounds = data.get('channel_bounds') or data.get('channelAllowPctByChannel')
     commercial_budgets = data.get('commercial_budgets') or data.get('commercialTargetsByChannel')
     min_spots = data.get('min_spots', 0)
-    max_spots = data.get('max_spots', 20)
+    max_spots = data.get('max_spots') or data.get('maxSpots', 20)
     time_limit = data.get('time_limit') or data.get('timeLimitSec', 120)
 
     if df_full.empty:
