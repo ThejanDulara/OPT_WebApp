@@ -1,14 +1,13 @@
 // ChannelRatingAllocator.jsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 import ChannelBudgetSetup from './ChannelBudgetSetup';
-import OptimizationResults from './OptimizationResults';
 
-function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack }) {
+function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack, onProceedToBonus, onChannelMoney, onResultReady }) {
   const [budgetShares, setBudgetShares] = useState({});
   const [maxSpots, setMaxSpots] = useState(optimizationInput.maxSpots || 10);
   const [timeLimit, setTimeLimit] = useState(optimizationInput.timeLimit || 120);
@@ -46,7 +45,12 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
     return seed;
   });
 
-  const toNumber = v => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
+  // Then wrap toNumber in useCallback
+  const toNumber = useCallback((v) => {
+    const n = parseFloat(v);
+    return isNaN(n) ? 0 : n;
+  }, []);
+
   const totalBudget = toNumber(optimizationInput.budget);
   const formatLKR = n => `Rs. ${Number(n || 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`;
 
@@ -80,16 +84,21 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
     return map;
   }, [channels, budgetShares, totalBudget, hasProperty, propertyAmounts]);
 
+  useEffect(() => {
+    if (typeof onChannelMoney === 'function') onChannelMoney(channelMoney);
+  }, [channelMoney, onChannelMoney]);
+
   const totalProperty = useMemo(
     () => Object.values(channelMoney).reduce((a, v) => a + toNumber(v.prop), 0),
     [channelMoney]
   );
+
   const totalAvailable = useMemo(
     () => Object.values(channelMoney).reduce((a, v) => a + toNumber(v.available), 0),
     [channelMoney]
   );
 
-  // ✅ FRONTEND validation: each channel’s property programs budget sum must equal its property amount
+  // ✅ FRONTEND validation: each channel's property programs budget sum must equal its property amount
   const propertyValidation = useMemo(() => {
     const issues = [];
     (channels || []).forEach(ch => {
@@ -103,43 +112,40 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
     return { ok: issues.length === 0, issues };
   }, [channels, hasProperty, propertyAmounts, propertyPrograms]);
 
-      // Sum NGRP from property programs
-    // Sum NGRP from property programs (derive if not provided)
-    const propertyNGRPTotal = useMemo(() => {
-      let sum = 0;
-      (channels || []).forEach((ch) => {
-        (propertyPrograms[ch] || []).forEach((r) => {
-          const toNum = (v) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
-          const duration = toNum(r.duration ?? r.Duration);
-          const tvr      = toNum(r.tvr ?? r.TVR);
-          const spots    = parseInt(r.spots ?? r.Spots ?? 0, 10) || 0;
+  // Sum NGRP from property programs (derive if not provided)
+  const propertyNGRPTotal = useMemo(() => {
+    let sum = 0;
+    (channels || []).forEach((ch) => {
+      (propertyPrograms[ch] || []).forEach((r) => {
+        const toNum = (v) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
+        const duration = toNum(r.duration ?? r.Duration);
+        const tvr      = toNum(r.tvr ?? r.TVR);
+        const spots    = parseInt(r.spots ?? r.Spots ?? 0, 10) || 0;
 
-          // derive NTVR if missing: TVR/30 * Duration
-          const ntvr = (r.ntvr ?? r.NTVR) != null
-            ? toNum(r.ntvr ?? r.NTVR)
-            : (tvr / 30) * duration;
+        // derive NTVR if missing: TVR/30 * Duration
+        const ntvr = (r.ntvr ?? r.NTVR) != null
+          ? toNum(r.ntvr ?? r.NTVR)
+          : (tvr / 30) * duration;
 
-          // derive NGRP if missing: NTVR * Spots
-          const ngrp = (r.ngrp ?? r.NGRP) != null
-            ? toNum(r.ngrp ?? r.NGRP)
-            : ntvr * spots;
+        // derive NGRP if missing: NTVR * Spots
+        const ngrp = (r.ngrp ?? r.NGRP) != null
+          ? toNum(r.ngrp ?? r.NGRP)
+          : ntvr * spots;
 
-          sum += ngrp;
-        });
+        sum += ngrp;
       });
-      return sum;
-    }, [channels, propertyPrograms]);
+    });
+    return sum;
+  }, [channels, propertyPrograms]);
 
-
-    // Inclusive totals (optimization result + property add-ons)
-    const inclusiveTotals = useMemo(() => {
-      if (!result) return {};
-      const totalBudgetIncl = toNumber(result.total_cost) + toNumber(totalProperty);
-      const totalNGRPIncl = toNumber(result.total_rating) + toNumber(propertyNGRPTotal);
-      const cprpIncl = totalNGRPIncl > 0 ? totalBudgetIncl / totalNGRPIncl : 0;
-      return { totalBudgetIncl, totalNGRPIncl, cprpIncl };
-    }, [result, totalProperty, propertyNGRPTotal, toNumber]);
-
+  // Inclusive totals (optimization result + property add-ons)
+  const inclusiveTotals = useMemo(() => {
+    if (!result) return {};
+    const totalBudgetIncl = toNumber(result.total_cost) + toNumber(totalProperty);
+    const totalNGRPIncl = toNumber(result.total_rating) + toNumber(propertyNGRPTotal);
+    const cprpIncl = totalNGRPIncl > 0 ? totalBudgetIncl / totalNGRPIncl : 0;
+    return { totalBudgetIncl, totalNGRPIncl, cprpIncl };
+  }, [result, totalProperty, propertyNGRPTotal, toNumber]);
 
   const applyGlobalToAllChannels = () => {
     const next = {};
@@ -172,6 +178,7 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
   const displayOrder = [
     'Channel','Program','Day','Time','Slot','Cost','TVR','NCost','NTVR','Total_Cost','Total_Rating','Spots'
   ];
+
   const summaryOrder = [
     'Channel','Total_Cost','% Cost','Total_Rating','% Rating',
     'Prime Cost','Prime Cost %','Non-Prime Cost','Non-Prime Cost %','Prime Rating','Non-Prime Rating',
@@ -316,6 +323,37 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
         if (hasDisplayablePlan) {
           setResult(data);
 
+          // Calculate inclusiveTotals
+          const inclusiveTotals = {
+            totalBudgetIncl: toNumber(data.total_cost) + toNumber(totalProperty),
+            totalNGRPIncl: toNumber(data.total_rating) + toNumber(propertyNGRPTotal),
+            cprpIncl: (toNumber(data.total_rating) + toNumber(propertyNGRPTotal)) > 0
+              ? (toNumber(data.total_cost) + toNumber(totalProperty)) / (toNumber(data.total_rating) + toNumber(propertyNGRPTotal))
+              : 0
+          };
+
+          const adaptedForFinal = {
+            tables: {
+              by_program: Array.isArray(data.df_result) ? data.df_result : [],
+              by_channel: Array.isArray(data.channel_summary) ? data.channel_summary : [],
+            },
+            commercials_summary: Array.isArray(data.commercials_summary) ? data.commercials_summary : [],
+            totals: {
+              total_budget_incl_property: data.total_cost,
+              total_cost_incl_property: data.total_cost,
+              total_rating: data.total_rating,
+            },
+            inclusiveTotals,
+          };
+
+          // forward to parent
+          onResultReady?.({
+            raw: data,
+            final: adaptedForFinal,
+            inclusiveTotals,
+            propertyPrograms,
+          });
+
           if (isOptimal && !notProvenOptimal) {
             toast.success('Optimal solution found. Proceed to download.');
           } else if (notProvenOptimal) {
@@ -349,76 +387,6 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
     alert('⛔ Optimization process manually stopped.');
   };
 
-  const handleExportToExcel = () => {
-    if (!result || !result.df_result || result.df_result.length === 0) {
-      alert('No data to export.');
-      return;
-    }
-
-    const workbook = XLSX.utils.book_new();
-    const desiredOrder = [
-      'Channel','Program','Day','Time','Slot','Cost','TVR','NCost','NTVR','Total_Cost','Total_Rating','Spots'
-    ];
-
-    // One sheet per commercial
-    (result.commercials_summary || []).forEach((c, idx) => {
-      const headerMap = { 'Total_Cost': 'Total Budget', 'Total_Rating': 'NGRP' };
-      const cleanedData = (c.details || []).map(row => {
-        const newRow = {};
-        desiredOrder.forEach(key => (newRow[headerMap[key] || key] = row[key]));
-        return newRow;
-      });
-      const ws = XLSX.utils.json_to_sheet(cleanedData);
-      XLSX.utils.book_append_sheet(workbook, ws, `Commercial ${idx + 1}`);
-    });
-
-    // Summary sheet
-    const summaryOrder_ex = [
-      'Channel','Total_Cost','% Cost','Total_Rating','% Rating',
-      'Prime Cost','Prime Cost %','Non-Prime Cost','Non-Prime Cost %','Prime Rating','Non-Prime Rating',
-    ];
-    const summaryHeaderMap = {
-      'Total_Cost': 'Total Budget',
-      '% Cost': 'Budget %',
-      'Total_Rating': 'NGRP',
-      '% Rating': 'NGRP %',
-      'Prime Cost': 'PT Budget',
-      'Non-Prime Cost': 'NPT Budget',
-      'Prime Rating': 'PT NGRP',
-      'Non-Prime Rating': 'NPT NGRP',
-      'Prime Cost %': 'PT Budget %',
-      'Non-Prime Cost %': 'NPT Budget %',
-    };
-
-    if (result.channel_summary && result.channel_summary.length > 0) {
-      const cleanedSummary = result.channel_summary.map(row => {
-        const newRow = {};
-        summaryOrder_ex.forEach(key => (newRow[summaryHeaderMap[key] || key] = row[key]));
-        return newRow;
-      });
-      const wsSummary = XLSX.utils.json_to_sheet(cleanedSummary);
-      XLSX.utils.book_append_sheet(workbook, wsSummary, 'Summary');
-    }
-
-    // Optional: a sheet showing property inputs & available budgets
-    const propertySheet = (channels || []).map(ch => ({
-      Channel: ch,
-      'Channel %': toNumber(budgetShares[ch] || 0),
-      'Channel Budget': channelMoney[ch]?.chAmount || 0,
-      'Has Property': hasProperty[ch] ? 'Yes' : 'No',
-      'Property Amount': channelMoney[ch]?.prop || 0,
-      'Available Budget': channelMoney[ch]?.available || 0,
-      'PT %': channelSplits[ch]?.prime ?? primePct,
-      'NPT %': channelSplits[ch]?.nonprime ?? nonPrimePct
-    }));
-    const wsProp = XLSX.utils.json_to_sheet(propertySheet);
-    XLSX.utils.book_append_sheet(workbook, wsProp, 'Property & Available');
-
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const fileData = new Blob([excelBuffer], { type: 'application/octet-stream' });
-    saveAs(fileData, 'optimized_schedule.xlsx');
-  };
-
   // shared styles (passed to children)
   const styles = {
     container: { padding: '32px', maxWidth: '1200px', margin: '0 auto', backgroundColor: '#d5e9f7', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0, 0, 0, 0.05)' },
@@ -447,8 +415,11 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
     th: { border: '1px solid #ccc', padding: '8px', background: '#f7fafc', fontWeight: '600' },
     td: { border: '1px solid #eee', padding: '8px', textAlign: 'center' },
     stopButton: { padding: '12px 20px', backgroundColor: '#e53e3e', color: 'white', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' },
-    backHomeButton: { padding: '12px 24px', backgroundColor: '#edf2f7', color: '#2d3748', border: '1px solid #cbd5e0', borderRadius: '6px', fontSize: '16px', fontWeight: '500', cursor: 'pointer', marginTop: '16px' }
+    backHomeButton: { padding: '12px 24px', backgroundColor: '#edf2f7', color: '#2d3748', border: '1px solid #cbd5e0', borderRadius: '6px', fontSize: '16px', fontWeight: '500', cursor: 'pointer', marginTop: '16px' , marginRight: '20px'}
   };
+
+// ChannelRatingAllocator.jsx - Remove the OptimizationResults rendering from here
+// ... (keep all the imports and state declarations)
 
   return (
     <div style={styles.container}>
@@ -498,25 +469,6 @@ function ChannelRatingAllocator({ channels, dfFull, optimizationInput, onBack })
         isProcessing={isProcessing}
         styles={styles}
       />
-
-      {result && (
-        <OptimizationResults
-          result={result}
-          displayOrder={displayOrder}
-          summaryOrder={summaryOrder}
-          formatLKR={formatLKR}
-          styles={styles}
-          onExport={handleExportToExcel}
-          // NEW: show totals including property
-          //totalsWithProperty={totalsWithProperty}
-          // (optional for debugging/visibility in Results)
-          //totalProperty={totalProperty}
-          //propertyNGRPTotal={propertyNGRPTotal}
-          inclusiveTotals={inclusiveTotals}
-          channels={channels}
-          propertyPrograms={propertyPrograms}
-        />
-      )}
     </div>
   );
 }

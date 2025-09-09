@@ -244,6 +244,27 @@ export default function ChannelBudgetSetup({
     channelRows.push(channels.slice(i, i + 2));
   }
 
+    const handleStartOptimization = () => {
+      // Calculate channelMoneyMap first
+      const channelMoneyMap = {};
+      channels.forEach((ch) => {
+        const pct = Number(budgetShares[ch] || 0);
+        const chAmount = (totalBudget * pct) / 100;
+        const prop = Number(propertyAmounts[ch] || 0);
+        const available = Math.max(0, chAmount - prop);
+        channelMoneyMap[ch] = { chAmount, prop, available };
+      });
+
+      // Create a simple payload with just channelMoney for now
+      const payload = {
+        channelMoney: channelMoneyMap
+      };
+
+      console.log('Final payload being sent:', payload);
+      onSubmit && onSubmit(payload);
+    };
+
+
   return (
     <>
       {/* Channel rows - Two channels per row */}
@@ -517,9 +538,14 @@ export default function ChannelBudgetSetup({
         {!isProcessing ? (
           <>
             <button onClick={onBack} style={styles.backButton}>Go Back</button>
-            <button onClick={onSubmit} style={{ ...styles.primaryButton, opacity: disableOptimize ? 0.7 : 1 }} disabled={disableOptimize}>
+            <button
+              onClick={handleStartOptimization}
+              style={{ ...styles.primaryButton, opacity: disableOptimize ? 0.7 : 1 }}
+              disabled={disableOptimize}
+            >
               Start Optimization
             </button>
+
           </>
             ) : (
               <>

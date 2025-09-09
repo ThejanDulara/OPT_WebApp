@@ -8,11 +8,40 @@ export default function OptimizationResults({
   displayOrder,
   summaryOrder,
   formatLKR,
-  styles,
   inclusiveTotals,
   channels,
-  propertyPrograms
+  propertyPrograms,
+  onProceedToBonus,
+  onHome,
+  onExport,
+  channelBaseBudgets,
+  commercialPercentsByChannel,
+  commercialDurationsByChannel,
+  defaultChannelBoundPct,
+  maxSpots,
+  timeLimit,
+  allDbPrograms,
+  propertyRunSummary,
+  setMainOptimizationResult
 }) {
+  // Define styles within the component
+  const styles = {
+    container: {marginTop: '24px', padding: '32px', maxWidth: '1200px', margin: '0 auto', backgroundColor: '#d5e9f7', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0, 0, 0, 0.05)' },
+    title: { color: '#2d3748', fontSize: '24px', fontWeight: '600', marginBottom: '24px' },
+    sectionTitle: { color: '#2d3748', fontSize: '20px', fontWeight: '600', marginBottom: '24px' },
+    summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' },
+    summaryCard: { marginBottom: '24px',backgroundColor: 'white', borderRadius: '8px', padding: '16px', border: '1px solid e2e8f0', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)' },
+    summaryTitle: { color: '#4a5568', fontSize: '14px', fontWeight: '600', marginBottom: '8px' },
+    summaryValue: { color: '#2d3748', fontSize: '18px', fontWeight: '700' },
+    table: { width: '100%', borderCollapse: 'collapse', marginTop: '16px' },
+    th: { border: '1px solid #ccc', padding: '8px', background: '#f7fafc', fontWeight: '600' },
+    td: { border: '1px solid #eee', padding: '8px', textAlign: 'center' },
+    exportButton: { padding: '12px 24px', backgroundColor: '#38a169', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', fontWeight: '500', cursor: 'pointer', transition: 'all 0.2s ease', marginTop: '24px', marginRight: '20px' },
+    backHomeButton: { padding: '12px 24px', backgroundColor: '#edf2f7', color: '#2d3748', border: '1px solid #cbd5e0', borderRadius: '6px', fontSize: '16px', fontWeight: '500', cursor: 'pointer', marginTop: '16px', marginRight: '20px' },
+    primaryButton: { padding: '12px 24px', backgroundColor: '#4299e1', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', fontWeight: '500', cursor: 'pointer' },
+    label: { color: '#4a5568', fontWeight: '500', fontSize: '14px' }
+  };
+
   const toFixedOrInt = (key, val) => {
     const numericCols = ['Cost','TVR','NCost','NTVR','Total_Cost','Total_Rating'];
     const isNumeric = numericCols.includes(key);
@@ -20,6 +49,12 @@ export default function OptimizationResults({
     if (isCount) return parseInt(val);
     if (isNumeric) return Number(val).toFixed(2);
     return val;
+  };
+
+  // keep this helper near the top (you already have it in your file)
+  const handleProceedToBonus = () => {
+    console.log('Proceed to bonus clicked');
+    onProceedToBonus?.();
   };
 
   const handleExportToExcel = () => {
@@ -124,7 +159,7 @@ export default function OptimizationResults({
   };
 
   return (
-    <div id="optimization-summary">
+    <div id="optimization-summary" style={styles.container}>
       <div style={styles.resultContainer}>
         <h3 style={styles.sectionTitle}>Final Optimization Result</h3>
 
@@ -149,25 +184,24 @@ export default function OptimizationResults({
           <div style={styles.summaryCard}>
             <h4 style={styles.summaryTitle}>Total Budget (incl. Property)</h4>
             <p style={styles.summaryValue}>
-              {formatLKR(inclusiveTotals?.totalBudgetIncl || 0)}
+              {formatLKR(inclusiveTotals?.totalBudgetIncl || result.total_cost)}
             </p>
           </div>
 
           <div style={styles.summaryCard}>
             <h4 style={styles.summaryTitle}>NGRP (incl. Property)</h4>
             <p style={styles.summaryValue}>
-              {Number(inclusiveTotals?.totalNGRPIncl || 0).toFixed(2)}
+              {Number(inclusiveTotals?.totalNGRPIncl || result.total_rating).toFixed(2)}
             </p>
           </div>
 
           <div style={styles.summaryCard}>
             <h4 style={styles.summaryTitle}>CPRP (incl. Property)</h4>
             <p style={styles.summaryValue}>
-              {Number(inclusiveTotals?.cprpIncl || 0).toFixed(2)}
+              {Number(inclusiveTotals?.cprpIncl || result.cprp).toFixed(2)}
             </p>
           </div>
         </div>
-
 
         <h3 style={styles.sectionTitle}>Commercial-wise Allocation</h3>
         {(result.commercials_summary || []).map((c, idx) => (
@@ -211,7 +245,7 @@ export default function OptimizationResults({
         ))}
 
         <h3 style={styles.sectionTitle}>Channel Summary with Slot Breakdown</h3>
-        <table style={styles.summaryCard}>
+        <table style={{...styles.table, ...styles.summaryCard}}>
           <thead>
             <tr>
               {summaryOrder.map((key, i) => {
@@ -240,8 +274,19 @@ export default function OptimizationResults({
           </tbody>
         </table>
 
-        <button onClick={handleExportToExcel} style={styles.exportButton}>Export Final Plan to Excel</button>
-        <button onClick={() => (window.location.href = '/')} style={styles.backHomeButton}>Go Back to Home</button>
+        <button onClick={handleExportToExcel} style={styles.exportButton}>
+          Export Final Plan to Excel
+        </button>
+
+        <button onClick={onHome} style={styles.backHomeButton}>
+          Go Back to Home
+        </button>
+
+        <button type="button" onClick={handleProceedToBonus} disabled={!onProceedToBonus}
+          style={{ ...styles.primaryButton, opacity: onProceedToBonus ? 1 : 0.6 }}
+        >
+          Proceed to Bonus Program Optimization
+        </button>
       </div>
     </div>
   );

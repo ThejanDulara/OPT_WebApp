@@ -1,65 +1,204 @@
+// src/App.js
 import React, { useState } from 'react';
+
+import Header from './components/Header';
+import Footer from './components/Footer';
+
+// Core flow
+import FrontPage from './components/FrontPage';
+import NegotiatedRates from './components/NegotiatedRates';
 import ProgramSelector from './components/ProgramSelector';
 import OptimizationSetup from './components/OptimizationSetup';
 import DfPreview from './components/DfPreview';
 import ChannelRatingAllocator from './components/ChannelRatingAllocator';
-import FrontPage from './components/FrontPage';
 import ProgramUpdater from './components/ProgramUpdater';
-import Header from './components/Header';
-import Footer from './components/Footer';
-import NegotiatedRates from './components/NegotiatedRates';
+import OptimizationResults from './components/OptimizationResults';
+
+// Bonus flow
+import BonusProgramSelector from './components/BonusProgramSelector';
+import BonusChannelBudgetSetup from './components/BonusChannelBudgetSetup';
+import BonusDfPreview from './components/BonusDfPreview';
+import BonusResults from './components/BonusResults';
+import FinalPlan from './components/FinalPlan';
 
 function App() {
+  // -------- Global step --------
   const [step, setStep] = useState(0);
+
+  // Negotiated rates / discounts
+  const [negotiatedRates, setNegotiatedRates] = useState({});
+  const [channelDiscounts, setChannelDiscounts] = useState({});
+  const [channelMoney, setChannelMoney] = useState({});
+
+  // Base optimization state
   const [selectedProgramIds, setSelectedProgramIds] = useState([]);
   const [optimizationInput, setOptimizationInput] = useState(null);
   const [dfFull, setDfFull] = useState([]);
-  const [negotiatedRates, setNegotiatedRates] = useState({});
-  const [channelDiscounts, setChannelDiscounts] = useState({});
+  const [channels, setChannels] = useState([]);
+  const [basePlanResult, setBasePlanResult] = useState(null);     // RAW for step 6
+  const [basePlanForFinal, setBasePlanForFinal] = useState(null); // ADAPTED for step 11
+  const [basePlanInclusiveTotals, setBasePlanInclusiveTotals] = useState(null);
+  const [showResults, setShowResults] = useState(false); // NEW: Control results visibility
+  const [propertyProgramsForFinal, setPropertyProgramsForFinal] = useState({});
 
+
+  // Bonus flow state
+  const [bonusSelectedIds, setBonusSelectedIds] = useState([]);   // consumed by BonusDfPreview
+  const [bonusSharesInput, setBonusSharesInput] = useState(null);
+  const [bonusDfFull, setBonusDfFull] = useState([]);
+  const [bonusResult, setBonusResult] = useState(null);
+  const [channelBudgetData, setChannelBudgetData] = useState({});
+  const [bonusReadyRows, setBonusReadyRows] = useState([]);
+
+  // NEW: selector uses rows by channel; we keep them and later derive IDs for your existing pipeline
+  const [selectedBonusPrograms, setSelectedBonusPrograms] = useState({}); // { [channel]: Array<row> }
+
+  // -------- Core handlers --------
   const handleProgramsSubmit = (programIds) => {
-    setSelectedProgramIds(programIds);
+    setSelectedProgramIds(programIds || []);
     setStep(3);
   };
 
   const handleOptimizationSubmit = (data) => {
-    setOptimizationInput(data);
+    console.log('Data received in handleOptimizationSubmit:', data);
+    console.log('Channel money in data:', data?.channelMoney);
+
+    setOptimizationInput(data || null);
+    setChannelMoney(data?.channelMoney || {});
     setStep(4);
   };
 
   const handleDfReady = (df) => {
-    setDfFull(df);
+    const safeDf = df || [];
+    setDfFull(safeDf);
+
+    const chs = Array.from(new Set(safeDf.map(r => r.Channel))).filter(Boolean);
+    setChannels(chs);
+
     setStep(5);
   };
 
+  // From ChannelRatingAllocator when the base optimization result is ready
+  const handleBasePlanReady = (payload) => {
+    // payload = { raw, final, inclusiveTotals }
+    setBasePlanResult(payload?.raw || null);                 // use RAW in step 6
+    setBasePlanForFinal(payload?.final || null);             // use ADAPTED in step 11
+    setBasePlanInclusiveTotals(payload?.inclusiveTotals || null);
+    setPropertyProgramsForFinal(payload?.propertyPrograms || {});
+    setShowResults(true); // Show results alongside setup
+  };
+
+  // -------- Helper: derive IDs for BonusDfPreview from selected rows --------
+  const extractIdsFromSelected = (selectedByChannel, fullRows) => {
+    const ids = [];
+    if (!selectedByChannel || !fullRows) return ids;
+
+    // Build a quick index on dfFull by a composite key of common fields
+    const keyOf = (r) => {
+      const toStr = (v) => (v === null || v === undefined ? '' : String(v));
+      return [
+        toStr(r.Channel),
+        toStr(r.Program),
+        toStr(r.Day ?? r.Date ?? ''),
+        toStr(r.Time ?? r.Start_Time ?? r.StartTime ?? ''),
+        toStr(r.Duration ?? r.DURATION ?? r.Dur ?? ''),
+        toStr(r.Slot ?? '')
+      ].join('||');
+    };
+
+    const indexByKey = new Map();
+    fullRows.forEach((r, idx) => indexByKey.set(keyOf(r), idx)); // use index as fallback id
+
+    Object.values(selectedByChannel).forEach((rows = []) => {
+      rows.forEach((r) => {
+        // Prefer explicit IDs if present
+        const explicitId = r.id ?? r._id ?? r.ID ?? r.Id;
+        if (explicitId !== undefined && explicitId !== null) {
+          ids.push(explicitId);
+          return;
+        }
+        // Fallback: map to first matching dfFull index via composite key
+        const k = keyOf(r);
+        if (indexByKey.has(k)) {
+          ids.push(indexByKey.get(k));
+        }
+      });
+    });
+
+    return ids;
+  };
+
+  // -------- Bonus handlers --------
+  // Called by the button inside OptimizationResults.jsx
+  const handleProceedToBonusSelector = () => {
+    setBonusSelectedIds([]);            // fresh selection for bonus
+    setSelectedBonusPrograms({});       // clear any prior row selections
+    setStep(7);
+    setShowResults(false); // Hide results when moving to bonus
+  };
+
+  // If a component still gives us IDs directly, keep this path
+  const handleBonusProgramSubmit = (ids) => {
+    setBonusSelectedIds(ids || []);
+    setStep(8); // go to BonusChannelBudgetSetup
+  };
+
+  // Used when the selector finishes (it calls onNext, not onSubmit)
+  const handleBonusProgramSubmitFromRows = () => {
+    const ids = extractIdsFromSelected(selectedBonusPrograms, dfFull);
+    setBonusSelectedIds(ids);
+    setStep(8);
+  };
+
+  const handleBonusSharesSubmit = (sharesInput) => {
+    setBonusSharesInput(sharesInput || {});
+    setStep(9); // build bonus-ready table
+  };
+
+  const handleBonusDfReady = (df) => {
+    setBonusDfFull(df || []);
+    setStep(10); // bonus optimization results
+  };
+
+  const handleBonusResultReady = (res) => {
+    const safe = res || { total_cost: 0, total_rating: 0, rows: [] };
+    setBonusResult(safe);
+  };
+
+  const handleProceedToFinalPlan = () => setStep(11);
+
+  // -------- Render by step --------
   const renderStep = () => {
     switch (step) {
       case 0:
         return (
           <FrontPage
             onStart={() => setStep(1)}
-            onManagePrograms={() => setStep(6)}
+            onManagePrograms={() => setStep(12)}
           />
         );
-        case 1:
-          return (
-            <NegotiatedRates
-              onBack={() => setStep(0)}
-              onProceed={({ channelDiscounts, negotiatedRates }) => {
-                setNegotiatedRates(negotiatedRates);
-                setChannelDiscounts(channelDiscounts);
-                setStep(2);
-              }}
-            />
-          );
-        case 2:
-          return (
-            <ProgramSelector
-              negotiatedRates={negotiatedRates}
-              onSubmit={handleProgramsSubmit}
-              onBack={() => setStep(1)}
-            />
-          );
+
+      case 1:
+        return (
+          <NegotiatedRates
+            onBack={() => setStep(0)}
+            onProceed={({ channelDiscounts: cd = {}, negotiatedRates: nr = {} }) => {
+              setChannelDiscounts(cd);
+              setNegotiatedRates(nr);
+              setStep(2);
+            }}
+          />
+        );
+
+      case 2:
+        return (
+          <ProgramSelector
+            negotiatedRates={negotiatedRates}
+            onSubmit={handleProgramsSubmit}
+            onBack={() => setStep(1)}
+          />
+        );
+
       case 3:
         return (
           <OptimizationSetup
@@ -68,28 +207,185 @@ function App() {
             initialValues={optimizationInput}
           />
         );
+
       case 4:
         return (
           <DfPreview
             programIds={selectedProgramIds}
             optimizationInput={optimizationInput}
-            negotiatedRates={negotiatedRates}      // ✅ pass down
-            channelDiscounts={channelDiscounts}    // ✅ pass down
+            negotiatedRates={negotiatedRates}
+            channelDiscounts={channelDiscounts}
             onReady={handleDfReady}
             goBack={() => setStep(3)}
           />
         );
+
       case 5:
         return (
-          <ChannelRatingAllocator
-            channels={[...new Set(dfFull.map(row => row.Channel))]}
-            dfFull={dfFull}
-            optimizationInput={optimizationInput}
-            onBack={() => setStep(4)}
+          <div>
+            <ChannelRatingAllocator
+              channels={channels}
+              dfFull={dfFull}
+              optimizationInput={optimizationInput}
+              onBack={() => setStep(4)}
+              onResultReady={handleBasePlanReady}
+              onProceedToBonus={handleProceedToBonusSelector}
+              onChannelMoney={(cm) => setChannelMoney(cm)}
+            />
+
+            {showResults && basePlanResult && (
+              <OptimizationResults
+                result={basePlanResult || { total_cost: 0, total_rating: 0, df_result: [], channel_summary: [] }}
+                displayOrder={[
+                  'Channel','Program','Day','Time','Slot','Cost','TVR','NCost','NTVR','Total_Cost','Total_Rating','Spots'
+                ]}
+                summaryOrder={[
+                  'Channel','Total_Cost','% Cost','Total_Rating','% Rating',
+                  'Prime Cost','Prime Cost %','Non-Prime Cost','Non-Prime Cost %','Prime Rating','Non-Prime Rating',
+                ]}
+                formatLKR={(n) => `Rs. ${Number(n||0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`}
+                styles={{}}
+                inclusiveTotals={basePlanInclusiveTotals || {}}
+                channels={channels}
+                propertyPrograms={[]}
+                onProceedToBonus={handleProceedToBonusSelector}
+                onHome={() => setStep(0)}
+                onExport={() => {}}
+              />
+            )}
+          </div>
+        );
+
+      // 6. Base results (button here goes to step 7)
+      case 6:
+        return (
+          <OptimizationResults
+            result={basePlanResult || { total_cost: 0, total_rating: 0, df_result: [], channel_summary: [] }}
+            displayOrder={[
+              'Channel','Program','Day','Time','Slot','Cost','TVR','NCost','NTVR','Total_Cost','Total_Rating','Spots'
+            ]}
+            summaryOrder={[
+              'Channel','Total_Cost','% Cost','Total_Rating','% Rating',
+              'Prime Cost','Prime Cost %','Non-Prime Cost','Non-Prime Cost %','Prime Rating','Non-Prime Rating',
+            ]}
+            formatLKR={(n) => `Rs. ${Number(n||0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`}
+            styles={{}}
+            inclusiveTotals={basePlanInclusiveTotals || {}}
+            channels={channels}
+            propertyPrograms={[]}
+            onProceedToBonus={handleProceedToBonusSelector}
+            onHome={() => setStep(0)}
+            onExport={() => {}}
           />
         );
-      case 6:
+
+      // 7. BONUS: Select Slot-B programs (uses rows, not IDs)
+      case 7:
+        return (
+          <BonusProgramSelector
+            channels={channels || []}
+            allDbPrograms={dfFull}
+            selectedBonusPrograms={selectedBonusPrograms}
+            setSelectedBonusPrograms={setSelectedBonusPrograms}
+            onNext={handleBonusProgramSubmitFromRows}
+            onBack={() => setStep(6)}
+          />
+        );
+
+      // 8. BONUS: Setup page
+      case 8:
+        return (
+          <BonusChannelBudgetSetup
+            channels={channels}
+            channelMoney={channelMoney}
+            optimizationInput={optimizationInput}
+            onBack={() => setStep(7)}
+            onProceed={handleBonusSharesSubmit}
+          />
+        );
+
+      // 9. BONUS: Build bonus-ready table
+      case 9:
+        return (
+          <BonusDfPreview
+            channels={channels}
+            selectedBonusPrograms={selectedBonusPrograms}
+            bonusBudgetsByChannel={bonusSharesInput?.bonusBudget || {}}
+            bonusCommercialPercentsByChannel={
+              (bonusSharesInput?.budgetProportions || []).reduce((m, pct, i) => {
+                m[`com_${i + 1}`] = Number(pct) || 0;
+                return m;
+              }, {})
+            }
+            commercialDurationsByChannel={
+              (bonusSharesInput?.durations || []).reduce((m, dur, i) => {
+                m[`com_${i + 1}`] = Number(dur) || 30;
+                return m;
+              }, {})
+            }
+            maxSpots={bonusSharesInput?.maxSpots ?? 20}
+            channelAllowPctByChannel={bonusSharesInput?.channelAllowPctByChannel || {}}
+            defaultChannelAllowPct={bonusSharesInput?.defaultChannelAllowPct ?? 0.10}
+            timeLimitSec={bonusSharesInput?.timeLimitSec ?? 120}
+            setBonusReadyRows={setBonusReadyRows}
+            onBack={() => setStep(8)}
+            commercialTolerancePct={bonusSharesInput?.commercialTolerancePct ?? 0.05}
+            formatLKR={(n) => `Rs. ${Number(n||0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`}
+            onBackToSetup={() => setStep(8)}
+            onProceedToFinalPlan={() => setStep(11)}
+            setBonusOptimizationResult={handleBonusResultReady}
+          />
+        );
+
+      // 10. BONUS: Results
+      case 10:
+        return (
+          <BonusResults
+            channels={channels}
+            bonusReadyRows={bonusReadyRows}
+            bonusBudgetsByChannel={bonusSharesInput?.bonusBudget || {}}
+            bonusCommercialPercentsByChannel={
+              bonusSharesInput?.perChannelPercents ||
+              (Array.isArray(bonusSharesInput?.budgetProportions)
+                ? bonusSharesInput.budgetProportions.reduce((m, pct, i) => {
+                    m[`com_${i + 1}`] = Number(pct) || 0;
+                    return m;
+                  }, {})
+                : {})
+            }
+            bonusChannelAllowPctByChannel={bonusSharesInput?.channelAllowPctByChannel || {}}
+            timeLimit={bonusSharesInput?.timeLimit || 120}
+            maxSpots={bonusSharesInput?.maxSpots || 20}
+            setBonusOptimizationResult={handleBonusResultReady}
+            onBack={() => setStep(9)}
+            onNext={handleProceedToFinalPlan}
+          />
+        );
+
+      // 11. Final Plan
+      case 11:
+        return (
+          <FinalPlan
+            mainResults={basePlanForFinal || {
+              tables: { by_program: basePlanResult?.df_result || [], by_channel: basePlanResult?.channel_summary || [] },
+              commercials_summary: basePlanResult?.commercials_summary || [],
+              totals: { total_rating: basePlanResult?.total_rating || 0, total_cost_incl_property: basePlanResult?.total_cost || 0 },
+            }}
+            bonusResults={bonusResult || { totals: { bonus_total_rating: 0 }, tables: { by_program: [], by_channel: [] } }}
+            totalBudgetInclProperty={
+              basePlanForFinal?.totals?.total_budget_incl_property ??
+              basePlanResult?.total_cost ?? 0
+            }
+            propertyPrograms={propertyProgramsForFinal}
+            onBack={() => setStep(10)}
+            onHome={() => setStep(9)}
+          />
+        );
+
+      // 12. Optional: Manage Programs
+      case 12:
         return <ProgramUpdater onBack={() => setStep(0)} />;
+
       default:
         return null;
     }
