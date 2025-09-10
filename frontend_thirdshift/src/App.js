@@ -363,24 +363,58 @@ function App() {
         );
 
       // 11. Final Plan
-      case 11:
-        return (
-          <FinalPlan
-            mainResults={basePlanForFinal || {
-              tables: { by_program: basePlanResult?.df_result || [], by_channel: basePlanResult?.channel_summary || [] },
-              commercials_summary: basePlanResult?.commercials_summary || [],
-              totals: { total_rating: basePlanResult?.total_rating || 0, total_cost_incl_property: basePlanResult?.total_cost || 0 },
-            }}
-            bonusResults={bonusResult || { totals: { bonus_total_rating: 0 }, tables: { by_program: [], by_channel: [] } }}
-            totalBudgetInclProperty={
-              basePlanForFinal?.totals?.total_budget_incl_property ??
-              basePlanResult?.total_cost ?? 0
-            }
-            propertyPrograms={propertyProgramsForFinal}
-            onBack={() => setStep(10)}
-            onHome={() => setStep(9)}
-          />
-        );
+        // 11. Final Plan
+        case 11: {
+          // Sum property budgets in case we need an inclusive fallback
+          const toNum = (v) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
+          const propertyBudgetSum = Object.values(propertyProgramsForFinal || {}).reduce((acc, arr) => {
+            if (!Array.isArray(arr)) return acc;
+            return acc + arr.reduce((a, r) => a + toNum(r.budget ?? r.Budget), 0);
+          }, 0);
+
+          // Choose the best available "incl. property" total
+          const totalBudgetIncl =
+            basePlanInclusiveTotals?.totalBudgetIncl ??
+            basePlanForFinal?.totals?.total_cost_incl_property ??
+            basePlanForFinal?.totals?.total_budget_incl_property ??
+            ((basePlanResult?.total_cost ?? 0) + propertyBudgetSum); // spot-only + property fallback
+
+          return (
+            <FinalPlan
+              // Pass main results with inclusiveTotals attached so FinalPlan can read them
+              mainResults={
+                basePlanForFinal
+                  ? { ...basePlanForFinal, inclusiveTotals: basePlanInclusiveTotals || null }
+                  : {
+                      tables: {
+                        by_program: basePlanResult?.df_result || [],
+                        by_channel: basePlanResult?.channel_summary || [],
+                      },
+                      commercials_summary: basePlanResult?.commercials_summary || [],
+                      totals: { total_rating: basePlanResult?.total_rating || 0 },
+                      inclusiveTotals: basePlanInclusiveTotals || null,
+                    }
+              }
+
+              // Bonus results as before
+              bonusResults={
+                bonusResult || {
+                  totals: { bonus_total_rating: 0 },
+                  tables: { by_program: [], by_channel: [] },
+                }
+              }
+
+              // Now truly inclusive
+              totalBudgetInclProperty={totalBudgetIncl}
+
+              // Needed for property table + fallback sum
+              propertyPrograms={propertyProgramsForFinal}
+
+              onBack={() => setStep(10)}
+              onHome={() => setStep(9)}
+            />
+          );
+        }
 
       // 12. Optional: Manage Programs
       case 12:

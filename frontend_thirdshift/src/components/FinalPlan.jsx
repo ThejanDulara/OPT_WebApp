@@ -13,7 +13,7 @@ export default function FinalPlan({
   propertyPrograms = {},
   styles = {},
   formatLKR = (v) =>
-    `Rs. ${Number(v ?? 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`,
+    `LKR ${Number(v ?? 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`,
   formatLKR_1 = (v) =>
     `${Number(v ?? 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`,
   onHome,
@@ -155,6 +155,12 @@ export default function FinalPlan({
       return rows;
     }, [propertyPrograms]);
 
+    const propertyTotals = useMemo(() => {
+      const budget = (flatPropertyPrograms || []).reduce((a, r) => a + num(r.Budget), 0);
+      const ngrp   = (flatPropertyPrograms || []).reduce((a, r) => a + num(r.NGRP), 0);
+      const cprp   = ngrp > 0 ? budget / ngrp : 0;
+      return { budget, ngrp, cprp };
+    }, [flatPropertyPrograms]);
 
   // ---------- Bonus totals ----------
   const bonusNGRP = useMemo(() => {
@@ -313,6 +319,83 @@ export default function FinalPlan({
     });
   }, [mainByChannel, bonusByChannel]);
 
+      // Spot-only NGRP from main optimization tables (excludes Property & Bonus)
+    const mainSpotNGRP = useMemo(() => {
+      const ch = (mainByChannel || []).reduce((a, r) => a + num(r.Total_Rating), 0);
+      if (ch > 0) return ch;
+      return (mainByProgram || []).reduce((a, r) => a + num(r.Total_Rating), 0);
+    }, [mainByChannel, mainByProgram]);
+
+    // Total NGRP including Property + Bonus
+    const totalNGRP_InclPropertyBonus = useMemo(
+      () => mainSpotNGRP + (propertyTotals?.ngrp || 0) + (bonusNGRP || 0),
+      [mainSpotNGRP, propertyTotals, bonusNGRP]
+    );
+
+    // CPRP using (Budget incl. Property) / (NGRP incl. Property + Bonus)
+    const cprp_InclPropertyBonus = useMemo(
+      () => (totalNGRP_InclPropertyBonus > 0 ? budgetInclProperty / totalNGRP_InclPropertyBonus : 0),
+      [budgetInclProperty, totalNGRP_InclPropertyBonus]
+    );
+
+        // ---------- Per-channel Property & Combined summary ----------
+    const propertyByChannel = useMemo(() => {
+      const budgetByCh = {};
+      const ngrpByCh = {};
+      (flatPropertyPrograms || []).forEach((r) => {
+        const ch = toStr(r.Channel);
+        budgetByCh[ch] = (budgetByCh[ch] || 0) + num(r.Budget);
+        ngrpByCh[ch] = (ngrpByCh[ch] || 0) + num(r.NGRP);
+      });
+      return { budgetByCh, ngrpByCh };
+    }, [flatPropertyPrograms]);
+
+    const mainCostByCh = useMemo(() => {
+      const m = new Map();
+      (mainByChannel || []).forEach((r) => m.set(toStr(r.Channel), num(r.Total_Cost)));
+      return m;
+    }, [mainByChannel]);
+
+    const mainNGRPByCh = useMemo(() => {
+      const m = new Map();
+      (mainByChannel || []).forEach((r) => m.set(toStr(r.Channel), num(r.Total_Rating)));
+      return m;
+    }, [mainByChannel]);
+
+    const combinedChannelRows = useMemo(() => {
+      const allCh = new Set([
+        ...Array.from(mainCostByCh.keys()),
+        ...Object.keys(propertyByChannel.budgetByCh || {}),
+        ...Object.keys(bonusNGRPByChannel || {}),
+      ]);
+
+      return Array.from(allCh).sort().map((ch) => {
+        const costSpot    = mainCostByCh.get(ch) ?? 0;                                // Cost (LKR) Excl. property
+        const propVal     = propertyByChannel.budgetByCh?.[ch] ?? 0;                  // Property value (LKR)
+        const totalCost   = costSpot + propVal;                                       // Total Cost (incl. property)
+
+        const ngrpSpot    = mainNGRPByCh.get(ch) ?? 0;                                // NGRP (Spot Buying)
+        const ngrpProp    = propertyByChannel.ngrpByCh?.[ch] ?? 0;                    // NGRP (Property)
+        const ngrpBonus   = bonusNGRPByChannel?.[ch] ?? 0;                            // Bonus NGRP
+        const ngrpTotal   = ngrpSpot + ngrpProp + ngrpBonus;                          // Total NGRP
+
+        const cprp        = ngrpTotal > 0 ? totalCost / ngrpTotal : 0;                // CPRP (LKR)
+
+        return {
+          Channel: ch,
+          Cost_LKR: costSpot,
+          Property_LKR: propVal,
+          TotalCost_LKR: totalCost,
+          NGRP_Spot: ngrpSpot,
+          NGRP_Property: ngrpProp,
+          NGRP_Bonus: ngrpBonus,
+          NGRP_Total: ngrpTotal,
+          CPRP_LKR: cprp,
+        };
+      });
+    }, [mainCostByCh, mainNGRPByCh, propertyByChannel, bonusNGRPByChannel]);
+
+
   // ---------- Export ----------
   const handleExport = () => {
     const wb = XLSX.utils.book_new();
@@ -397,36 +480,36 @@ export default function FinalPlan({
   return (
     <div style={s.container}>
        <h2 style={s.pageTitle || {fontSize: 22,fontWeight: 700, margin: '8px 0 16px', letterSpacing: 0.3,}}>Final Optimized Plan (Property + Spot Buying + Bonus)</h2>
-      {/* KPI Cards: first row (main), second row (with bonus) */}
-      <div style={s.summaryGrid}>
-        <div style={s.summaryCard}>
-          <div style={s.summaryTitle}>Total Budget (incl. Property)</div>
-          <div style={s.summaryValue}>{formatLKR(budgetInclProperty)}</div>
-        </div>
-        <div style={s.summaryCard}>
-          <div style={s.summaryTitle}>NGRP (incl. Property)</div>
-          <div style={s.summaryValue}>{safeFx(mainNGRP)}</div>
-        </div>
-        <div style={s.summaryCard}>
-          <div style={s.summaryTitle}>CPRP (incl. Property)</div>
-          <div style={s.summaryValue}>{formatLKR(mainCPRP)}</div>
-        </div>
+    {/* KPI Cards */}
+    <div style={s.summaryGrid}>
+      <div style={s.summaryCard}>
+        <div style={s.summaryTitle}>Total Budget (incl. Property)</div>
+        <div style={s.summaryValue}>{formatLKR(budgetInclProperty)}</div>
       </div>
+      <div style={s.summaryCard}>
+        <div style={s.summaryTitle}>NGRP (Main Optimization Only)</div>
+        <div style={s.summaryValue}>{safeFx(mainSpotNGRP)}</div>
+      </div>
+      <div style={s.summaryCard}>
+        <div style={s.summaryTitle}>Property NGRP</div>
+        <div style={s.summaryValue}>{safeFx(propertyTotals.ngrp)}</div>
+      </div>
+    </div>
 
-      <div style={s.summaryGrid}>
-        <div style={s.summaryCard}>
-          <div style={s.summaryTitle}>Bonus NGRP</div>
-          <div style={s.summaryValue}>{safeFx(bonusNGRP)}</div>
-        </div>
-        <div style={s.summaryCard}>
-          <div style={s.summaryTitle}>NGRP (incl. Property + Bonus)</div>
-          <div style={s.summaryValue}>{safeFx(combinedNGRP)}</div>
-        </div>
-        <div style={s.summaryCard}>
-          <div style={s.summaryTitle}>CPRP (incl. Property + Bonus)</div>
-          <div style={s.summaryValue}>{formatLKR(combinedCPRP)}</div>
-        </div>
+    <div style={s.summaryGrid}>
+      <div style={s.summaryCard}>
+        <div style={s.summaryTitle}>Bonus NGRP</div>
+        <div style={s.summaryValue}>{safeFx(bonusNGRP)}</div>
       </div>
+      <div style={s.summaryCard}>
+        <div style={s.summaryTitle}>Total NGRP (incl. Property + Bonus)</div>
+        <div style={s.summaryValue}>{safeFx(totalNGRP_InclPropertyBonus)}</div>
+      </div>
+      <div style={s.summaryCard}>
+        <div style={s.summaryTitle}>CPRP (incl. Property + Bonus)</div>
+        <div style={s.summaryValue}>{formatLKR(cprp_InclPropertyBonus)}</div>
+      </div>
+    </div>
 
     {/* Property Program Details */}
     {flatPropertyPrograms.length > 0 && (
@@ -459,8 +542,8 @@ export default function FinalPlan({
                     <td style={{ ...s.td, textAlign: 'left' }}>{r['Com name']}</td>
                     <td style={s.td}>{r.Day}</td>
                     <td style={s.td}>{r.Time}</td>
-                    <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR(r.Budget)}</td>
-                    <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR(r.NCost)}</td>
+                    <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(r.Budget)}</td>
+                    <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(r.NCost)}</td>
                     <td style={{ ...s.td, textAlign: 'right' }}>{Number(r.Duration).toFixed(2)}</td>
                     <td style={{ ...s.td, textAlign: 'right' }}>{Number(r.TVR).toFixed(2)}</td>
                     <td style={{ ...s.td, textAlign: 'right' }}>{Number(r.NTVR).toFixed(2)}</td>
@@ -622,67 +705,46 @@ export default function FinalPlan({
         <div style={{ ...s.commercialSub, color: '#718096' }}>No commercial data available.</div>
       )}
 
-      {/* Channel Summary with Slot Breakdown */}
-      <h3 style={s.sectionTitle}>Channel Summary with Slot Breakdown</h3>
-      <div style={s.summaryCard}>
-        <table style={s.table}>
-          <thead>
-            <tr>
-              <th style={s.th}>Channel</th>
-              <th style={s.th}>Slot</th>
-              <th style={s.th}>Spots</th>
-              <th style={s.th}>Total Cost</th>
-              <th style={s.th}>NGRP (Main)</th>
-              <th style={s.th}>Bonus NGRP</th>
-              <th style={s.th}>Total NGRP (Incl Bonus)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {channelSummaryInclBonus.map((r, i) => (
-              <tr key={i}>
-                <td style={{...s.td, textAlign: 'left'}}>{toStr(r.Channel)}</td>
-                <td style={s.td}>{toStr(r.Slot)}</td>
-                <td style={{ ...s.td, textAlign: 'right' }}>{num(r.Spots)}</td>
-                <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR(num(r.Total_Cost))}</td>
-                <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.NGRP_Main))}</td>
-                <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.NGRP_Bonus))}</td>
-                <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.NGRP_Incl_Bonus))}</td>
+        {/* Channel Summary (Single Table) */}
+        <h3 style={s.sectionTitle}>Channel Summary (Spot + Property + Bonus)</h3>
+        <div style={s.summaryCard}>
+          <table style={s.table}>
+            <thead>
+              <tr>
+                <th style={s.th}>Channel</th>
+                <th style={s.th}>Cost (LKR)</th>
+                <th style={s.th}>Property value (LKR)</th>
+                <th style={s.th}>Total Cost (LKR)</th>
+                <th style={s.th}>NGRP (Spot Buying)</th>
+                <th style={s.th}>NGRP (Property)</th>
+                <th style={s.th}>Bonus NGRP</th>
+                <th style={s.th}>Total NGRP</th>
+                <th style={s.th}>CPRP (LKR)</th>
               </tr>
-            ))}
-            {channelSummaryInclBonus.length === 0 && (
-              <tr><td colSpan={7} style={{ ...s.td, color: '#718096' }}>No summary available.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {combinedChannelRows.map((r, i) => (
+                <tr key={i}>
+                  <td style={{ ...s.td, textAlign: 'left' }}>{r.Channel}</td>
+                  <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(r.Cost_LKR)}</td>
+                  <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(r.Property_LKR)}</td>
+                  <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(r.TotalCost_LKR)}</td>
+                  <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(r.NGRP_Spot)}</td>
+                  <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(r.NGRP_Property)}</td>
+                  <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(r.NGRP_Bonus)}</td>
+                  <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(r.NGRP_Total)}</td>
+                  <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(r.CPRP_LKR)}</td>
+                </tr>
+              ))}
+              {combinedChannelRows.length === 0 && (
+                <tr>
+                  <td colSpan={9} style={{ ...s.td, color: '#718096' }}>No summary available.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
-      {/* Final Summary (Budget unchanged) */}
-      <h3 style={s.sectionTitle}>Final Summary (Budget Unchanged, NGRP Includes Bonus)</h3>
-      <div style={s.summaryCard}>
-        <table style={s.table}>
-          <thead>
-            <tr>
-              <th style={s.th}>Channel</th>
-              <th style={s.th}>Total Budget (Unchanged)</th>
-              <th style={s.th}>NGRP (with Bonus)</th>
-              <th style={s.th}>CPRP</th>
-            </tr>
-          </thead>
-          <tbody>
-            {finalSummaryRows.map((r, i) => (
-              <tr key={i}>
-                <td style={{...s.td, textAlign: 'left'}}>{toStr(r.Channel)}</td>
-                <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR(num(r.Total_Budget))}</td>
-                <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.NGRP_With_Bonus))}</td>
-                <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR(num(r.CPRP))}</td>
-              </tr>
-            ))}
-            {finalSummaryRows.length === 0 && (
-              <tr><td colSpan={4} style={{ ...s.td, color: '#718096' }}>No final summary available.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
 
       {/* Actions */}
       <div style={{marginTop: '24px'}}>
