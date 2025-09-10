@@ -396,48 +396,169 @@ export default function FinalPlan({
     }, [mainCostByCh, mainNGRPByCh, propertyByChannel, bonusNGRPByChannel]);
 
 
-  // ---------- Export ----------
-  const handleExport = () => {
-    const wb = XLSX.utils.book_new();
+    // ---------- Export ----------
+    const handleExport = () => {
+      const wb = XLSX.utils.book_new();
 
-    // 1) KPI cards (6)
-    const kpiRows = [
-      { Metric: 'Total Budget (incl. Property)', Value: budgetInclProperty },
-      { Metric: 'NGRP (incl. Property)', Value: mainNGRP },
-      { Metric: 'CPRP (incl. Property)', Value: mainCPRP },
-      { Metric: 'Bonus NGRP', Value: bonusNGRP },
-      { Metric: 'NGRP (incl. Property + Bonus)', Value: combinedNGRP },
-      { Metric: 'CPRP (incl. Property + Bonus)', Value: combinedCPRP },
-    ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(kpiRows), 'Final KPIs');
+      // --- Helpers ---
+      const safeSheetName = (s) => {
+        const t = String(s || '').replace(/[:\\/?*\[\]]/g, '-');
+        return t.length > 31 ? t.slice(0, 31) : t || 'Sheet';
+      };
+      const addAOA = (ws, aoa) => XLSX.utils.sheet_add_aoa(ws, aoa, { origin: -1 });
 
-    // 2) Main/Bonus raw sheets
-    if (mainByProgram?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mainByProgram), 'Main By Program');
-    if (mainByChannel?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mainByChannel), 'Main By Channel');
-    if (bonusByProgram?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bonusByProgram), 'Bonus Programs');
-    if (bonusByChannel?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bonusByChannel), 'Bonus By Channel');
+      // ---------- Build KPI sheet (aligned with your new KPIs) ----------
+      const mainSpotNGRP = (mainByChannel || []).reduce((a, r) => a + num(r.Total_Rating), 0)
+                          || (mainByProgram || []).reduce((a, r) => a + num(r.Total_Rating), 0);
 
-    // 3) Channel Summary (Incl Bonus)
-    if (channelSummaryInclBonus?.length) {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(channelSummaryInclBonus), 'Channel Summary (Incl Bonus)');
-    }
+      const propertyBudgetTotal = (flatPropertyPrograms || []).reduce((a, r) => a + num(r.Budget), 0);
+      const propertyNGRPTotal   = (flatPropertyPrograms || []).reduce((a, r) => a + num(r.NGRP), 0);
 
-    // 4) Final Summary (Budget unchanged)
-    if (finalSummaryRows?.length) {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(finalSummaryRows), 'Final Summary');
-    }
+      const totalNGRP_InclPropertyBonus = mainSpotNGRP + propertyNGRPTotal + bonusNGRP;
+      const cprp_InclPropertyBonus = totalNGRP_InclPropertyBonus > 0
+        ? budgetInclProperty / totalNGRP_InclPropertyBonus
+        : 0;
 
-    if (flatPropertyPrograms?.length) {
-      XLSX.utils.book_append_sheet(
-      wb,
-      XLSX.utils.json_to_sheet(flatPropertyPrograms),
-       'Property Programs'
-     );
-    }
+      const kpiRows = [
+        { Metric: 'Total Budget (incl. Property)', Value: budgetInclProperty },
+        { Metric: 'NGRP (Main Optimization Only)', Value: mainSpotNGRP },
+        { Metric: 'Property NGRP',                Value: propertyNGRPTotal },
+        { Metric: 'Bonus NGRP',                   Value: bonusNGRP },
+        { Metric: 'Total NGRP (incl. Property + Bonus)', Value: totalNGRP_InclPropertyBonus },
+        { Metric: 'CPRP (incl. Property + Bonus)',       Value: cprp_InclPropertyBonus },
+      ];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(kpiRows), 'Final KPIs');
 
-    const wbout = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
-    saveAs(new Blob([wbout], { type: 'application/octet-stream' }), 'Final_Plan_With_Bonus.xlsx');
-  };
+      // ---------- Channel list ----------
+      const channelSet = new Set([
+        ...(mainByChannel || []).map(r => toStr(r.Channel)),
+        ...(flatPropertyPrograms || []).map(r => toStr(r.Channel)),
+        ...(bonusByProgram || []).map(r => toStr(r.Channel)),
+      ].filter(Boolean));
+      const channelList = Array.from(channelSet).sort((a, b) => a.localeCompare(b));
+
+      // ---------- Headers ----------
+      const propertyHeaders = [
+        'Name of the program','Com name','Day','Time',
+        'Budget (LKR)','NCost (LKR)','Duration','TVR','NTVR','Spots','NGRP'
+      ];
+      const progHeaders = [
+        'Program','Day','Time','Slot',
+        'Cost (LKR)','TVR','NCost (LKR)','NTVR','Total Budget (LKR)','NGRP','Spots'
+      ];
+
+      // ---------- Build per-channel sheets ----------
+      channelList.forEach((ch) => {
+        const sheetTitle = safeSheetName(`Channel - ${ch}`);
+        // Start with an empty AOA sheet
+        const ws = XLSX.utils.aoa_to_sheet([['']]); // placeholder, we’ll append below
+
+        // SECTION 1: Property Programs
+        const propRows = (flatPropertyPrograms || []).filter(r => toStr(r.Channel) === ch);
+        addAOA(ws, [[`Property Programs – ${ch}`]]);
+        addAOA(ws, [propertyHeaders]);
+
+        if (propRows.length > 0) {
+          const propAOA = propRows.map(r => ([
+            toStr(r['Name of the program']),
+            toStr(r['Com name']),
+            toStr(r.Day),
+            toStr(r.Time),
+            Number(num(r.Budget)),
+            Number(num(r.NCost)),
+            Number(num(r.Duration)),
+            Number(num(r.TVR)),
+            Number(num(r.NTVR)),
+            Number(parseInt(r.Spots, 10) || 0),
+            Number(num(r.NGRP)),
+          ]));
+          addAOA(ws, propAOA);
+        } else {
+          addAOA(ws, [['(No property rows)']]);
+        }
+
+        // SECTION 2..N: Commercial program rows (main optimization), by commercial
+        // We’ll include all commercials you have, in sorted order.
+        (allCommercialKeys || []).forEach((commercialKey, idx) => {
+          const programs = (mainCommercialData?.[commercialKey]?.programs || [])
+            .filter(r => toStr(r.Channel) === ch);
+
+          addAOA(ws, [['']]); // spacer row
+          addAOA(ws, [[`Commercial ${idx + 1} Programs – ${ch}`]]);
+          addAOA(ws, [progHeaders]);
+
+          if (programs.length > 0) {
+            const mainAOA = programs.map(r => ([
+              toStr(r.Program),
+              toStr(r.Day ?? r.Date ?? ''),
+              toStr(r.Time ?? ''),
+              toStr(r.Slot ?? 'A'),
+              Number(num(r.Cost ?? r.NCost)),
+              Number(num(r.TVR ?? r.NTVR)),
+              Number(num(r.NCost ?? 0)),
+              Number(num(r.NTVR ?? 0)),
+              Number(num(r.Total_Cost ?? 0)),
+              Number(num(r.Total_Rating ?? r.Total_NTVR ?? 0)),
+              Number(num(r.Spots ?? 0)),
+            ]));
+            addAOA(ws, mainAOA);
+          } else {
+            addAOA(ws, [['(No program rows for this commercial)']]);
+          }
+        });
+
+        // FINAL SECTION: Bonus Programs
+        const bonusRows = (bonusByProgram || []).filter(r => toStr(r.Channel) === ch);
+        addAOA(ws, [['']]); // spacer
+        addAOA(ws, [[`Bonus Programs – ${ch}`]]);
+        addAOA(ws, [progHeaders]);
+
+        if (bonusRows.length > 0) {
+          const bonusAOA = bonusRows.map(r => ([
+            toStr(r.Program),
+            toStr(r.Day ?? r.Date ?? ''),
+            toStr(r.Time ?? ''),
+            'B',
+            Number(num(r.Cost ?? r.NCost)),
+            Number(num(r.TVR ?? r.NTVR)),
+            Number(num(r.NCost ?? 0)),
+            Number(num(r.NTVR ?? 0)),
+            Number(num(r.Total_Cost ?? 0)),
+            Number(num(r.Total_Rating ?? r.Total_NTVR ?? 0)),
+            Number(num(r.Spots ?? 0)),
+          ]));
+          addAOA(ws, bonusAOA);
+        } else {
+          addAOA(ws, [['(No bonus program rows)']]);
+        }
+
+        XLSX.utils.book_append_sheet(wb, ws, sheetTitle);
+      });
+
+      // ---------- Last sheet: Channel Summary (All-In) ----------
+      if (combinedChannelRows?.length) {
+        const exportRows = combinedChannelRows.map((r) => ({
+          Channel: r.Channel,
+          'Cost (LKR)': Number(r.Cost_LKR),
+          'Property value (LKR)': Number(r.Property_LKR),
+          'Total Cost (LKR)': Number(r.TotalCost_LKR),
+          'NGRP (Spot Buying)': Number(r.NGRP_Spot),
+          'NGRP (Property)': Number(r.NGRP_Property),
+          'Bonus NGRP': Number(r.NGRP_Bonus),
+          'Total NGRP': Number(r.NGRP_Total),
+          'CPRP (LKR)': Number(r.CPRP_LKR),
+        }));
+        XLSX.utils.book_append_sheet(
+          wb,
+          XLSX.utils.json_to_sheet(exportRows),
+          'Channel Summary (All-In)'
+        );
+      }
+
+      // ---------- Save ----------
+      const wbout = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+      saveAs(new Blob([wbout], { type: 'application/octet-stream' }), 'Final_Plan_By_Channel.xlsx');
+    };
 
   // ---------- Styles (same as OptimizationResults.jsx) ----------
   const s = {
