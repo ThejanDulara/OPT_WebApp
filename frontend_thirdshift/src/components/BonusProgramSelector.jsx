@@ -21,7 +21,6 @@ export default function BonusProgramSelector({
     r.Program,
     r.Day ?? r.Date ?? '',
     r.Time ?? r.Start_Time ?? r.StartTime ?? '',
-    r.Duration ?? '',
     r.Slot ?? '',
     r.Rate ?? '',
   ].map(toStr).join('||');
@@ -138,28 +137,55 @@ export default function BonusProgramSelector({
     searchRow: { display: 'flex', gap: 8, alignItems: 'center', margin: '8px 0 12px' },
     searchInput: { flex: 1, padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 6 },
     smlBtn: { padding: '6px 10px', borderRadius: 6, background: '#edf2f7', border: '1px solid #cbd5e0', cursor: 'pointer' },
-    tableWrap: { maxHeight: 360, overflow: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 },
-    table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-    th: { position: 'sticky', top: 0, background: '#f7fafc', borderBottom: '1px solid #e2e8f0', padding: '8px 10px', textAlign: 'left' },
+    tableWrap: { maxHeight: 360, overflow: 'auto', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 },
+    table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 ,tableLayout: 'auto' },
+    th: {position: 'sticky',top: 0,background: '#f7fafc',borderBottom: '1px solid #e2e8f0',padding: '8px 10px',textAlign: 'center'},
     td: { borderBottom: '1px solid #edf2f7', padding: '8px 10px', verticalAlign: 'top' },
     actions: { display: 'flex', gap: 12, marginTop: 16 },
     backBtn: { padding: '12px 18px', background: '#edf2f7', border: '1px solid #cbd5e0', borderRadius: 6, cursor: 'pointer' },
     nextBtn: { padding: '12px 18px', background: '#3182ce', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' },
     badge: { background: '#edf2f7', borderRadius: 999, padding: '4px 10px', fontSize: 12, color: '#2d3748' },
+    numTd: { borderBottom: '1px solid #edf2f7', padding: '8px 10px', textAlign: 'right' },
   };
 
   const logoPath = (ch) => `/logos/${ch}.png`;
+
+    const selectAllGlobal = () => {
+      setCheckedByChannel((prev) => {
+        const next = { ...prev };
+        channels.forEach((ch) => {
+          next[ch] = new Set(next[ch] || []);
+          (slotBByChannel[ch] || []).forEach((r) => next[ch].add(rowKey(r)));
+        });
+        return next;
+      });
+    };
+
+    const clearAllGlobal = () => {
+      setCheckedByChannel((prev) => {
+        const next = {};
+        channels.forEach((ch) => {
+          next[ch] = new Set(); // clear all
+        });
+        return next;
+      });
+    };
+
 
   return (
     <div style={styles.page}>
       <div style={styles.header}>
         <div>
           <div style={styles.title}>Bonus Program Selection (Non-Prime, Slot B)</div>
-          <div style={styles.hint}>
-            Showing only Slot B programs. Rates are taken directly from the database (negotiated rates are ignored).
-          </div>
         </div>
-        <div style={styles.badge}>Selected: {totalSelected}</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" onClick={selectAllGlobal} style={styles.smlBtn}>
+            Select All (Global)
+          </button>
+          <button type="button" onClick={clearAllGlobal} style={styles.smlBtn}>
+            Clear All (Global)
+          </button>
+        </div>
       </div>
 
       <div style={styles.grid}>
@@ -179,12 +205,11 @@ export default function BonusProgramSelector({
                   />
                   <span>{ch}</span>
                 </div>
-                <span style={styles.badge}>Visible: {rows.length}</span>
               </div>
 
               <div style={styles.searchRow}>
                 <input
-                  placeholder="Search by program / day / time / duration..."
+                  placeholder="Search by program / day / time..."
                   value={searchTextByChannel[ch] || ''}
                   onChange={(e) =>
                     setSearchTextByChannel((prev) => ({ ...prev, [ch]: e.target.value }))
@@ -203,12 +228,11 @@ export default function BonusProgramSelector({
                 <table style={styles.table}>
                   <thead>
                     <tr>
-                      <th style={styles.th}>✓</th>
+                      <th style={styles.th}>Select</th>
                       <th style={styles.th}>Program</th>
                       <th style={styles.th}>Day</th>
                       <th style={styles.th}>Time</th>
-                      <th style={styles.th}>Dur</th>
-                      <th style={styles.th}>Rate (DB)</th>
+                      <th style={{ ...styles.th, whiteSpace: 'nowrap'}}>RC Rate</th>
                       <th style={styles.th}>TVR</th>
                     </tr>
                   </thead>
@@ -217,7 +241,6 @@ export default function BonusProgramSelector({
                       const k = rowKey(r);
                       const isOn = checked.has(k);
                       const time = r.Time ?? r.Start_Time ?? r.StartTime ?? '';
-                      const dur = r.Duration ?? r.DURATION ?? r.Dur ?? '';
                       const rate = r.Rate ?? r.DB_Rate ?? r.Cost ?? '';
                       const tvr = r.TVR ?? r.Rating ?? r.NTVR ?? '';
                       return (
@@ -229,12 +252,11 @@ export default function BonusProgramSelector({
                               onChange={() => toggleRow(ch, r)}
                             />
                           </td>
-                          <td style={styles.td}>{toStr(r.Program)}</td>
-                          <td style={styles.td}>{toStr(r.Day ?? r.Date ?? '')}</td>
-                          <td style={styles.td}>{toStr(time)}</td>
-                          <td style={styles.td}>{toStr(dur)}</td>
-                          <td style={styles.td}>Rs. {fmt(rate)}</td>
-                          <td style={styles.td}>{toStr(tvr)}</td>
+                          <td style={{ ...styles.td, whiteSpace: 'nowrap'}}>{toStr(r.Program)}</td>
+                          <td style={{ ...styles.td, whiteSpace: 'nowrap'}}>{toStr(r.Day ?? r.Date ?? '')}</td>
+                          <td style={{ ...styles.td, whiteSpace: 'nowrap'}}>{toStr(time)}</td>
+                          <td style={styles.numTd}>{fmt(rate)}</td>
+                          <td style={styles.numTd}>{toStr(tvr)}</td>
                         </tr>
                       );
                     })}

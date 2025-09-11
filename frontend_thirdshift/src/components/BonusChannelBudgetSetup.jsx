@@ -150,9 +150,9 @@ export default function BonusChannelBudgetSetup({
     sectionTitle: { fontSize: 18, fontWeight: 600, color: '#2d3748', marginBottom: 12, borderBottom: '2px solid #e2e8f0', paddingBottom: 8 },
     grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 },
     card: { background: 'white', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
-    row: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' },
+    row: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'nowrap' },
     label: { minWidth: 140, color: '#2d3748', fontWeight: 500, fontSize: 14 },
-    input: { padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 14, minWidth: 90, textAlign: 'right' },
+    input: { padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 14, minWidth: 100, textAlign: 'right' },
     pill: { background: '#edf2f7', padding: '6px 10px', borderRadius: 6, fontSize: 13 },
     channelHeader: { fontWeight: 700, color: '#2d3748', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 },
     smallNote: { fontSize: 12, color: '#718096' },
@@ -160,14 +160,34 @@ export default function BonusChannelBudgetSetup({
     buttons: { display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap' },
     backBtn: { padding: '12px 20px', background: '#edf2f7', color: '#2d3748', border: '1px solid #cbd5e0', borderRadius: 6, fontWeight: 500, cursor: 'pointer' },
     nextBtn: { padding: '12px 20px', background: '#4299e1', color: 'white', border: 'none', borderRadius: 6, fontWeight: 500, cursor: 'pointer' },
-    logo: { height: 34, width: 'auto', objectFit: 'contain', borderRadius: 4 }
+    logo: { height: 34, width: 'auto', objectFit: 'contain', borderRadius: 4 },
+    twoCol: {
+      display: 'grid',
+      gridTemplateColumns: 'minmax(240px,1fr) minmax(240px,1fr)', // prevents narrow wrap
+      gap: 16,
+      alignItems: 'center',
+      marginBottom: 8
+    },
+    formGroup: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      flexWrap: 'nowrap'                // keep label + input on one line
+    },
+    formLabel: {
+      marginBottom: 0,                  // no vertical spacing now
+      fontSize: 14,
+      fontWeight: 500,
+      color: '#2d3748'
+    },
+
   };
 
   const getLogoPath = (channel) => `/logos/${channel}.png`;
 
   return (
     <div style={styles.page}>
-      <h2 style={styles.title}>Bonus Program — Channel Budget Setup</h2>
+      <h2 style={styles.title}>Bonus Program Optimization Setup</h2>
 
       {/* Global commercials setup */}
       <div style={styles.section}>
@@ -182,9 +202,6 @@ export default function BonusChannelBudgetSetup({
             onChange={(e) => handleNumCommercialsChange(e.target.value)}
             style={{ ...styles.input, width: 80, textAlign: 'center' }}
           />
-          <span style={styles.smallNote}>
-            Defaults seeded from Optimization Setup. You can change here for bonus flow.
-          </span>
         </div>
 
         {Array.from({ length: numCommercials }).map((_, i) => (
@@ -192,25 +209,31 @@ export default function BonusChannelBudgetSetup({
             <div style={{ ...styles.row, marginBottom: 6 }}>
               <strong>Commercial {i + 1}</strong>
             </div>
-            <div style={styles.row}>
-              <span style={styles.label}>Duration (sec):</span>
-              <input
-                type="number"
-                min={1}
-                value={durations[i] ?? 0}
-                onChange={(e) => handleDurationChange(i, e.target.value)}
-                style={{ ...styles.input, width: 100 }}
-              />
-            </div>
-            <div style={styles.row}>
-              <span style={styles.label}>Budget %:</span>
-              <input
-                type="number"
-                value={budgetProportions[i] ?? 0}
-                onChange={(e) => handlePctChange(i, e.target.value)}
-                style={{ ...styles.input, width: 100 }}
-              />
-              <span>%</span>
+
+            <div style={styles.twoCol}>
+              <div style={styles.formGroup}>
+                <span style={styles.formLabel}>Duration (sec):</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={durations[i] ?? 0}
+                  onChange={(e) => handleDurationChange(i, e.target.value)}
+                  style={{ ...styles.input, width: 100 }}
+                />
+              </div>
+
+              <div style={styles.formGroup}>
+                <span style={styles.formLabel}>Budget %:</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    type="number"
+                    value={budgetProportions[i] ?? 0}
+                    onChange={(e) => handlePctChange(i, e.target.value)}
+                    style={{ ...styles.input, width: 100 }}
+                  />
+                  <span>%</span>
+                </div>
+              </div>
             </div>
           </div>
         ))}
