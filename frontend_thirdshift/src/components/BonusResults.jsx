@@ -1,5 +1,5 @@
 // src/components/BonusResults.jsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 
 export default function BonusResults({
   channels = [],
@@ -10,12 +10,16 @@ export default function BonusResults({
   timeLimit = 120,
   maxSpots = 20,
   setBonusOptimizationResult = () => {},
-  styles = {},
+  styles = { page: { padding: 0, margin: 0, maxWidth: 'unset' } },
   formatLKR = (v) => v,
   onNext,
   onBack,
   // allow parent (e.g., BonusDfPreview) to inject result directly
   result: externalResult = null,
+  onBackToSetup = () => {},
+  onProceedToFinalPlan = () => {},
+  // NEW: where to scroll when results are ready
+  resultRef = null,
 }) {
   // ---------------- state ----------------
   const [loading, setLoading] = useState(false);
@@ -37,61 +41,17 @@ export default function BonusResults({
   // Prefer parent-supplied result; otherwise use locally-fetched
   const result = externalResult || localResult;
 
-  // Endpoint call
-  const handleOptimize = async () => {
-    if (externalResult) return; // parent already provided results
-
-    setLoading(true);
-    setError('');
-    setNote('');
-    setLocalResult(null);
-
-    try {
-      const payload = {
-        channels,
-        programRows: bonusReadyRows,
-        bonusBudgetsByChannel,
-        bonusCommercialPercentsByChannel,
-        channelAllowPctByChannel: bonusChannelAllowPctByChannel,
-        timeLimitSec: parseInt(timeLimit, 10),
-        maxSpots: parseInt(maxSpots, 10),
-        commercialTolerancePct: 0.05,
-      };
-
-      const res = await fetch('https://optwebapp-production.up.railway.app/optimize-bonus', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || `Request failed with ${res.status}`);
-
-      if (data?.success === false) {
-        setError(data?.message || 'No feasible solution.');
-        setLocalResult(null);
-        setBonusOptimizationResult(null);
-      } else {
-        setLocalResult(data);
-        setBonusOptimizationResult(data);
-        if (data?.note) setNote(data.note);
-      }
-    } catch (e) {
-      setError(e?.message || String(e));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ---------------- styles (kept as-is) ----------------
+  // ---------------- styles ----------------
   const defaultStyles = {
-    page: { padding: 24, maxWidth: 1280, margin: '0 auto' },
+    page: { padding: 40, maxWidth: 1280, margin: '0 auto' },
+
     resultContainer: {
       background: '#ffffff',
       border: '1px solid #e2e8f0',
       borderRadius: 12,
       padding: 20,
       boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
+      marginTop: 10,
     },
     headerRow: {
       display: 'flex',
@@ -110,14 +70,7 @@ export default function BonusResults({
       border: '1px solid #e2e8f0',
     },
     actions: { display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap' },
-    backBtn: {
-      padding: '10px 16px',
-      background: '#edf2f7',
-      border: '1px solid #cbd5e0',
-      borderRadius: 8,
-      cursor: 'pointer',
-      fontWeight: 600,
-    },
+    backBtn: { padding: '12px 18px', background: '#edf2f7', border: '1px solid #cbd5e0', borderRadius: 6, cursor: 'pointer' },
     primaryButton: {
       padding: '10px 16px',
       background: '#2b6cb0',
@@ -127,15 +80,7 @@ export default function BonusResults({
       cursor: 'pointer',
       fontWeight: 600,
     },
-    nextBtn: {
-      padding: '10px 16px',
-      background: '#38a169',
-      color: '#fff',
-      border: 'none',
-      borderRadius: 8,
-      cursor: 'pointer',
-      fontWeight: 600,
-    },
+    nextBtn: { padding: '12px 18px', background: '#3182ce', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' },
     sectionTitle: { marginTop: 16, marginBottom: 10, fontSize: 18, fontWeight: 700, color: '#2d3748' },
     summaryGrid: {
       display: 'grid',
@@ -143,14 +88,9 @@ export default function BonusResults({
       gap: 12,
       marginBottom: 8,
     },
-    summaryCard: {
-      border: '1px solid #e2e8f0',
-      borderRadius: 12,
-      padding: 12,
-      background: '#f9fafb',
-    },
-    summaryTitle: { fontSize: 13, fontWeight: 600, color: '#4a5568', marginBottom: 6 },
-    summaryValue: { fontSize: 18, fontWeight: 500, color: '#1a202c' },
+    summaryCard: { backgroundColor: 'white', borderRadius: '8px', padding: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)' },
+    summaryTitle: { color: '#4a5568', fontSize: '14px', fontWeight: '600', marginBottom: '8px' },
+    summaryValue: { color: '#2d3748', fontSize: '18px', fontWeight: '700' },
     channelBlock: {
       border: '1px solid #e2e8f0',
       borderRadius: 12,
@@ -230,7 +170,6 @@ export default function BonusResults({
   const byChannel = useMemo(() => result?.tables?.by_channel || [], [result]);
   const totals = result?.totals || {};
 
-  // Build lookup from ready rows: by RowId and by composite key
   const { mapById, mapByKey } = useMemo(() => {
     const norm = (x) => toStr(x).trim().toLowerCase();
     const makeKey = (r) =>
@@ -253,7 +192,6 @@ export default function BonusResults({
     return { mapById: _mapById, mapByKey: _mapByKey };
   }, [bonusReadyRows]);
 
-  // Enrichment function for a result row using ready-row metadata
   const enrichRow = (r) => {
     const norm = (x) => toStr(x).trim().toLowerCase();
     const id = r.RowId ?? r.id ?? r._id ?? r.ID ?? r.Id;
@@ -273,12 +211,10 @@ export default function BonusResults({
       src = mapByKey.get(key) || null;
     }
 
-    // Prefer backend numeric fields for totals/spots, fallback to 0
     const Spots = num(r.Spots ?? 0);
     const Total_Cost = num(r.Total_Cost ?? 0);
     const Total_Rating = num(r.Total_Rating ?? r.Total_NTVR ?? 0);
 
-    // Prefer backend fields for base metrics if present; else take from source
     const Program = toStr(r.Program ?? r['Name of the program'] ?? src?.Program ?? src?.['Name of the program'] ?? '');
     const Day = toStr(r.Day ?? r.Date ?? src?.Day ?? src?.Date ?? '');
     const Time = toStr(r.Time ?? src?.Time ?? '');
@@ -302,7 +238,6 @@ export default function BonusResults({
     };
   };
 
-  // Global totals (fallback to summing byProgram if not provided)
   const globalCost = useMemo(() => {
     const provided = num(totals.bonus_total_cost, NaN);
     if (Number.isFinite(provided)) return provided;
@@ -317,7 +252,6 @@ export default function BonusResults({
 
   const globalCPRP = useMemo(() => (globalRating > 0 ? globalCost / globalRating : 0), [globalCost, globalRating]);
 
-  // Build a map: channel -> { cost, rating, rowsGroupedByCommercial: { commercial: rows[] }, totalSpots }
   const channelMap = useMemo(() => {
     const chSet = new Set(
       (byChannel.map(r => toStr(r.Channel)) || []).concat(channels.map(toStr))
@@ -342,7 +276,6 @@ export default function BonusResults({
       base[ch].totalSpots += num(enriched.Spots ?? 0);
     });
 
-    // Sort rows within each commercial (by Total_NTVR desc)
     Object.values(base).forEach((bucket) => {
       Object.keys(bucket.rowsByCommercial).forEach((cKey) => {
         bucket.rowsByCommercial[cKey].sort((a, b) => {
@@ -354,9 +287,8 @@ export default function BonusResults({
     });
 
     return base;
-  }, [byProgram, byChannel, channels]); // enrichRow closes over maps but they come from deps of byProgram/bonusReadyRows
+  }, [byProgram, byChannel, channels]);
 
-  // Build a channel summary (prefer backend by_channel if available)
   const channelSummaryRows = useMemo(() => {
     if (byChannel && byChannel.length > 0) {
       return byChannel.map((r) => {
@@ -385,7 +317,7 @@ export default function BonusResults({
   // ---------------- render ----------------
   return (
     <div style={s.page}>
-      <div style={s.resultContainer}>
+      <div style={s.resultContainer} ref={resultRef} tabIndex={-1}>
         {/* Header */}
         <div style={s.headerRow}>
           <div>
@@ -400,16 +332,7 @@ export default function BonusResults({
               Go Back
             </button>
           )}
-          {!externalResult && (
-            <button
-              type="button"
-              onClick={handleOptimize}
-              style={{ ...s.primaryButton, opacity: loading ? 0.7 : 1 }}
-              disabled={loading || bonusReadyRows.length === 0}
-            >
-              {loading ? 'Optimization is processing…' : 'Start Bonus Optimization'}
-            </button>
-          )}
+          {/* No local optimize button when result is injected */}
           {onNext && result && !error && (
             <button type="button" onClick={onNext} style={s.nextBtn}>
               See Final Plan
@@ -478,7 +401,7 @@ export default function BonusResults({
                     </div>
                   </div>
 
-                  {/* Table grouped by Commercial (with required columns/order) */}
+                  {/* Table grouped by Commercial */}
                   <div style={{ marginTop: 10 }}>
                     <div style={s.tWrap}>
                       <table style={s.table}>
@@ -510,7 +433,7 @@ export default function BonusResults({
                             return (
                               <React.Fragment key={idx}>
                                 {rows.map((raw, i) => {
-                                  const r = enrichRow(raw); // ensure all fields are present
+                                  const r = enrichRow(raw);
                                   const costPerSpot = num(r.Cost ?? r.NCost ?? 0);
                                   const tvrPerSpot = num(r.TVR ?? r.NTVR ?? 0);
                                   const totalCost = num(r.Total_Cost ?? 0);
@@ -543,7 +466,7 @@ export default function BonusResults({
               );
             })}
 
-            {/* ---------------- Channel Summary (left-aligned) ---------------- */}
+            {/* Optimized Channel Summary */}
             <div style={s.sectionTitle}>Optimized Channel Summary</div>
             <div style={s.summaryTableWrap}>
               <table style={s.summaryTable}>
@@ -584,12 +507,30 @@ export default function BonusResults({
               </table>
             </div>
 
-            {result?.solver_status && (
-              <div style={s.info}><strong>Solver Status:</strong> {toStr(result.solver_status)}</div>
-            )}
+
+            {/* Removed the inline "Solver Status: X" box in favor of toast */}
           </>
         )}
+
       </div>
+      <div style={s.actions}>
+              <button
+                type="button"
+                onClick={onBackToSetup}
+                style={s.backBtn}
+              >
+                Go Back
+              </button>
+
+              <button
+                type="button"
+                onClick={onProceedToFinalPlan}
+                style={{ ...s.nextBtn, opacity: result ? 1 : 0.6 }}
+                disabled={!result}
+              >
+                Go to Final Plan
+              </button>
+            </div>
     </div>
   );
 }

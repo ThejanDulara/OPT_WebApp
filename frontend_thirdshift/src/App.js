@@ -330,7 +330,7 @@ function App() {
             setBonusReadyRows={setBonusReadyRows}
             onBack={() => setStep(8)}
             commercialTolerancePct={bonusSharesInput?.commercialTolerancePct ?? 0.05}
-            formatLKR={(n) => `Rs. ${Number(n||0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`}
+            formatLKR={(n) => `${Number(n||0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`}
             onBackToSetup={() => setStep(8)}
             onProceedToFinalPlan={() => setStep(11)}
             setBonusOptimizationResult={handleBonusResultReady}
