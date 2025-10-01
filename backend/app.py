@@ -560,6 +560,8 @@ def optimize_by_benefit_share():
     data = request.get_json()
     df_full = pd.DataFrame(data.get('df_full'))
     budget_shares = data.get('budget_shares') or {}
+    benefit_channels = list(budget_shares.keys())
+    df_full = df_full[df_full['Channel'].isin(benefit_channels)].copy()
     total_budget = float(data.get('budget', 0))
     budget_bound = float(data.get('budget_bound', 0))
     num_commercials = int(data.get('num_commercials', 1))
