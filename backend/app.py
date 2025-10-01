@@ -551,6 +551,165 @@ def optimize_by_budget_share():
         "hit_time_limit": bool(hit_time_limit)
     }), 200
 
+@app.route('/optimize-by-benefit-share', methods=['POST'])
+def optimize_by_benefit_share():
+    """
+    Same as /optimize-by-budget-share, but expects budget_shares built
+    from Commercial Benefit amounts. Constraints and objective are identical.
+    """
+    data = request.get_json()
+    df_full = pd.DataFrame(data.get('df_full'))
+    budget_shares = data.get('budget_shares') or {}
+    total_budget = float(data.get('budget', 0))
+    budget_bound = float(data.get('budget_bound', 0))
+    num_commercials = int(data.get('num_commercials', 1))
+    min_spots = int(data.get('min_spots', 0))
+    max_spots = int(data.get('max_spots', 10))
+    prime_pct_global = float(data.get('prime_pct', 80))
+    nonprime_pct_global = float(data.get('nonprime_pct', 20))
+    time_limit = int(data.get("time_limit", 120))
+
+    prime_map = data.get('channel_prime_pct_map') or {}
+    nonprime_map = data.get('channel_nonprime_pct_map') or {}
+
+    if df_full.empty or not budget_shares:
+        return jsonify({"error": "Missing data"}), 400
+
+    required_cols = {'NCost', 'NTVR', 'Channel', 'Slot'}
+    missing = required_cols - set(df_full.columns)
+    if missing:
+        return jsonify({"error": f"Missing columns in df_full: {sorted(missing)}"}), 400
+
+    # --- Build problem (same as base endpoint) ---
+    prob = LpProblem("Maximize_TVR_CommercialBenefit", LpMaximize)
+    x = {i: LpVariable(f"x_ben_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
+
+    # Objective
+    prob += lpSum(df_full.loc[i, 'NTVR'] * x[i] for i in df_full.index)
+
+    # Budget constraint
+    total_cost_expr = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in df_full.index)
+    prob += total_cost_expr >= total_budget - budget_bound
+    prob += total_cost_expr <= total_budget + budget_bound
+
+    # Commercial-level proportions (optional)
+    budget_proportions = data.get("budget_proportions", [])
+    if budget_proportions and 'Commercial' in df_full.columns:
+        for c in range(min(len(budget_proportions), num_commercials)):
+            indices = df_full[df_full['Commercial'] == c].index
+            if len(indices) == 0:
+                continue
+            commercial_cost = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in indices)
+            share = float(budget_proportions[c]) / 100.0
+            prob += commercial_cost >= (share - 0.05) * total_budget
+            prob += commercial_cost <= (share + 0.05) * total_budget
+
+    # Channel-specific constraints
+    for ch, pct in budget_shares.items():
+        ch_indices = df_full[df_full['Channel'] == ch].index
+        if len(ch_indices) == 0:
+            continue
+
+        ch_budget = (float(pct) / 100.0) * total_budget
+        ch_cost = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in ch_indices)
+
+        prob += ch_cost >= 0.95 * ch_budget
+        prob += ch_cost <= 1.05 * ch_budget
+
+        prime_indices = df_full[(df_full['Channel'] == ch) & (df_full['Slot'] == 'A')].index
+        nonprime_indices = df_full[(df_full['Channel'] == ch) & (df_full['Slot'] == 'B')].index
+
+        prime_cost = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in prime_indices) if len(prime_indices) else 0
+        nonprime_cost = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in nonprime_indices) if len(nonprime_indices) else 0
+
+        ch_prime_pct = float(prime_map.get(ch, prime_pct_global))
+        ch_nonprime_pct = float(nonprime_map.get(ch, nonprime_pct_global))
+        if abs(ch_prime_pct + ch_nonprime_pct - 100.0) > 0.01:
+            ch_prime_pct = prime_pct_global
+            ch_nonprime_pct = nonprime_pct_global
+
+        prob += prime_cost >= ((ch_prime_pct / 100.0) - 0.05) * ch_budget
+        prob += prime_cost <= ((ch_prime_pct / 100.0) + 0.05) * ch_budget
+        prob += nonprime_cost >= ((ch_nonprime_pct / 100.0) - 0.05) * ch_budget
+        prob += nonprime_cost <= ((ch_nonprime_pct / 100.0) + 0.05) * ch_budget
+
+    solver = PULP_CBC_CMD(msg=True, timeLimit=time_limit, keepFiles=True)
+    prob.solve(solver)
+
+    status_str = LpStatus[prob.status]
+    has_solution = any((v.varValue is not None and v.varValue > 0) for v in x.values())
+    is_optimal = status_str == 'Optimal'
+    feasible_but_not_optimal = status_str in ('Not Solved',)
+
+    if status_str in ('Infeasible', 'Unbounded', 'Undefined') or not has_solution:
+        return jsonify({
+            "success": False,
+            "message": f"⚠️ No feasible solution. Solver status: {status_str}",
+            "solver_status": status_str
+        }), 200
+
+    # Results
+    df_full['Spots'] = df_full.index.map(lambda i: int(x[i].varValue) if x[i].varValue else 0)
+    df_full['Total_Cost'] = df_full['Spots'] * df_full['NCost']
+    df_full['Total_Rating'] = df_full['Spots'] * df_full['NTVR']
+
+    cols_to_round = ['Cost', 'TVR', 'NTVR', 'NCost', 'Total_Cost', 'Total_Rating']
+    for c in (set(cols_to_round) & set(df_full.columns)):
+        df_full[c] = df_full[c].astype(float).round(2)
+    df_full = df_full[df_full['Spots'] > 0].copy()
+
+    # Commercials summary
+    commercials_summary = []
+    if 'Commercial' in df_full.columns:
+        for c in range(num_commercials):
+            df_c = df_full[df_full['Commercial'] == c].copy()
+            if df_c.empty: continue
+            total_cost_c = df_c['Total_Cost'].sum()
+            total_rating_c = df_c['Total_Rating'].sum()
+            cprp_c = (total_cost_c / total_rating_c) if total_rating_c else None
+            commercials_summary.append({
+                "commercial_index": c,
+                "total_cost": round(total_cost_c, 2),
+                "total_rating": round(total_rating_c, 2),
+                "cprp": round(cprp_c, 2) if cprp_c else None,
+                "details": df_c.to_dict(orient='records')
+            })
+
+    # Channel summary
+    channel_summary = []
+    total_cost_all = float(df_full['Total_Cost'].sum())
+    total_rating = float(df_full['Total_Rating'].sum())
+    for ch in df_full['Channel'].unique():
+        df_ch = df_full[df_full['Channel'] == ch]
+        ch_cost = float(df_ch['Total_Cost'].sum())
+        ch_rating = float(df_ch['Total_Rating'].sum())
+        ch_prime = df_ch[df_ch['Slot'] == 'A']
+        ch_nonprime = df_ch[df_ch['Slot'] == 'B']
+        channel_summary.append({
+            'Channel': ch,
+            'Total_Cost': round(ch_cost, 2),
+            '% Cost': round((ch_cost / total_cost_all * 100), 2) if total_cost_all else 0,
+            'Total_Rating': round(ch_rating, 2),
+            '% Rating': round((ch_rating / total_rating * 100), 2) if total_rating else 0,
+            'Prime Cost': round(float(ch_prime['Total_Cost'].sum()), 2),
+            'Non-Prime Cost': round(float(ch_nonprime['Total_Cost'].sum()), 2),
+            'Prime Rating': round(float(ch_prime['Total_Rating'].sum()), 2),
+            'Non-Prime Rating': round(float(ch_nonprime['Total_Rating'].sum()), 2),
+        })
+
+    return jsonify({
+        "success": True,
+        "total_cost": float(round(total_cost_all, 2)),
+        "total_rating": float(round(total_rating, 2)),
+        "cprp": float(round(total_cost_all / total_rating, 2)) if total_rating else None,
+        "channel_summary": channel_summary,
+        "commercials_summary": commercials_summary,
+        "df_result": json.loads(df_full.to_json(orient="records")),
+        "is_optimal": bool(is_optimal),
+        "feasible_but_not_optimal": bool(feasible_but_not_optimal),
+        "solver_status": str(status_str)
+    }), 200
+
 @app.route('/optimize-bonus', methods=['POST'])
 def optimize_bonus():
     data = request.get_json()
