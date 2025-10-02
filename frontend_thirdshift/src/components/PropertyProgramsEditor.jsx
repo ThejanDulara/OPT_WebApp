@@ -69,12 +69,23 @@ export default function PropertyProgramsEditor({
     });
   };
 
-  const handleChange = (ch, id, field, value) => {
-    setPropertyPrograms(prev => {
-      const rows = (prev[ch] || []).map(r => r.id === id ? { ...r, [field]: value } : r);
-      return { ...prev, [ch]: rows };
-    });
-  };
+    const handleChange = (ch, id, field, value) => {
+      setPropertyPrograms(prev => {
+        const rows = (prev[ch] || []).map(r => {
+          let newVal = value;
+
+          // Keep everything as string in state
+          if (field === 'budget' || field === 'duration' || field === 'TVR' || field === 'spots') {
+            newVal = value.replace(/^0+/, '');  // strip leading zeros
+          }
+
+          return r.id === id ? { ...r, [field]: newVal } : r;
+        });
+        return { ...prev, [ch]: rows };
+      });
+    };
+
+
 
   const visibleChannels = (channels || []).filter(
     ch => !!hasProperty[ch] && num(propertyAmounts[ch]) > 0
@@ -93,7 +104,17 @@ export default function PropertyProgramsEditor({
         return (
           <div key={ch} style={{ ...styles.summaryCard, marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <h4 style={{ ...styles.summaryTitle, fontSize: 16 }}>{ch}</h4>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <img
+                src={`/logos/${ch}.png`}
+                alt={ch}
+                style={{ height: '40px', width: 'auto', objectFit: 'contain', borderRadius: '4px' }}
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+              <h4 style={{ ...styles.summaryTitle, fontSize: 16, fontWeight: 'bold', color: '#2d3748' }}>
+                {ch}
+              </h4>
+            </div>
               <div style={{ fontSize: 13, color: totals.ok ? '#2d3748' : '#e53e3e' }}>
                 Target: <strong>{formatLKR(totals.target)}</strong> &nbsp;|&nbsp;
                 Entered: <strong>{formatLKR(totals.totalBudget)}</strong> &nbsp;|&nbsp;

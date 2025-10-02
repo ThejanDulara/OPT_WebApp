@@ -23,54 +23,73 @@ export default function ChannelBudgetSetup({
   toNumber, formatLKR, applyGlobalToAllChannels,
   // actions
   onBack, onSubmit, onStop, isProcessing,
-  // validation coming from parent
-  propertyValidation, // { ok: boolean, perChannel?: { [channel]: {target:number, sum:number} } }
+  // validation
+  propertyValidation,
   // styles
-  styles
+  styles,
+  // ✅ NEW: get from parent instead of local
+  propertyPercents, setPropertyPercents
 }) {
   const handleInputChange = (channel, value) => {
     setBudgetShares(prev => ({ ...prev, [channel]: toNumber(value) }));
   };
 
-    // add near the top of the component body
-    const [countdown, setCountdown] = useState(null);
+  // Countdown for processing
+  const [countdown, setCountdown] = useState(null);
+  const formatMMSS = (secs) => {
+    const m = Math.floor(secs / 60).toString().padStart(2, '0');
+    const s = (secs % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
 
-    const formatMMSS = (secs) => {
-      const m = Math.floor(secs / 60).toString().padStart(2, '0');
-      const s = (secs % 60).toString().padStart(2, '0');
-      return `${m}:${s}`;
-    };
-
-    useEffect(() => {
-      let id;
-      if (isProcessing) {
-        setCountdown(parseInt(timeLimit, 10) || 0);
-        id = setInterval(() => {
-          setCountdown(prev => {
-            if (prev == null) return prev;
-            if (prev <= 1) {
-              clearInterval(id);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      } else {
-        setCountdown(null);
-      }
-      return () => { if (id) clearInterval(id); };
-    }, [isProcessing, timeLimit]);
-
+  useEffect(() => {
+    let id;
+    if (isProcessing) {
+      setCountdown(parseInt(timeLimit, 10) || 0);
+      id = setInterval(() => {
+        setCountdown(prev => {
+          if (prev == null) return prev;
+          if (prev <= 1) {
+            clearInterval(id);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      setCountdown(null);
+    }
+    return () => { if (id) clearInterval(id); };
+  }, [isProcessing, timeLimit]);
 
   // disable optimize if property program totals don't match or while processing
   const disableOptimize = isProcessing || (propertyValidation && !propertyValidation.ok);
-
   const anyPropertyOn = Object.values(hasProperty || {}).some(Boolean);
+
+  const handlePercentChange = (ch, which, val) => {
+    let numVal = toNumber(val);
+    if (numVal < 0) numVal = 0;
+    if (numVal > 100) numVal = 100;
+
+    setPropertyPercents(prev => {
+      const current = prev[ch] || { onCostPct: 20, comBenefitPct: 80 };
+      let updated = { ...current, [which]: numVal };
+
+      // Keep total = 100%
+      if (which === 'onCostPct') {
+        updated.comBenefitPct = 100 - numVal;
+      } else {
+        updated.onCostPct = 100 - numVal;
+      }
+
+      return { ...prev, [ch]: updated };
+    });
+  };
 
   // Function to get channel logo path
   const getLogoPath = (channel) => `/logos/${channel}.png`;
 
-  // New styles for the improved layout
+  // Enhanced styles
   const enhancedStyles = {
     ...styles,
     channelCard: {
@@ -118,6 +137,14 @@ export default function ChannelBudgetSetup({
       marginBottom: '8px',
       flexWrap: 'wrap'
     },
+    percentInput: {
+      width: '50px',
+      padding: '4px 6px',
+      border: '1px solid #e2e8f0',
+      borderRadius: '4px',
+      fontSize: '13px',
+      textAlign: 'right'
+    },
     amountRow: {
       display: 'flex',
       flexDirection: 'column',
@@ -139,103 +166,106 @@ export default function ChannelBudgetSetup({
       borderRadius: '4px',
       marginBottom: '8px'
     },
+
     summaryBox: {
-      backgroundColor: '#f8fafc',
+      marginTop: 16,
+      marginBottom: 24,
+      padding: '16px',
+      backgroundColor: 'white',
       border: '1px solid #e2e8f0',
       borderRadius: '8px',
-      padding: '16px',
-      marginBottom: '20px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
       display: 'flex',
       flexDirection: 'column',
       gap: '8px',
-      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-      width: '100%',
-      maxWidth: '555px' // Matches one channel card width
+      width: '46.5%'   // 👈 half width, left corner aligned
     },
+
     summaryRow: {
       display: 'flex',
       justifyContent: 'space-between',
-      alignItems: 'center'
+      alignItems: 'center',
+      fontSize: '14px',
+      color: '#2d3748'
     },
     summaryLabel: {
-      fontWeight: 'bold',
-      color: '#2d3748'
+      fontWeight: 500,
+      color: '#4a5568'
     },
     summaryValue: {
-      fontWeight: 'bold',
+      fontWeight: 700,
       color: '#2d3748'
     },
-      // New styles for the sections you mentioned
-      sectionContainer: {
-        backgroundColor: '#f8fafc',
-        border: '1px solid #e2e8f0',
-        borderRadius: '8px',
-        padding: '20px',
-        marginBottom: '20px',
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
-      },
-      sectionTitle: {
-        fontSize: '18px',
-        fontWeight: '600',
-        color: '#2d3748',
-        marginBottom: '16px',
-        paddingBottom: '8px',
-        borderBottom: '2px solid #e2e8f0'
-      },
-      inputGroup: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px',
-        marginBottom: '16px'
-      },
-      commercialGrid: {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-        gap: '40px',
-        marginBottom: '12px'
-      },
-      commercialInput: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '1px'
-      },
-      totalHint: {
-        backgroundColor: '#edf2f7',
-        padding: '8px 12px',
-        borderRadius: '6px',
-        fontSize: '14px',
-        color: '#4a5568',
-        marginTop: '8px'
-      },
-      overrideInputRow: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        padding: '12px 0',
-        borderBottom: '1px solid #f1f5f9'
-      },
-      overrideLabel: {
-        minWidth: '250px',
-        fontWeight: '500',
-        color: '#2d3748'
-      },
 
-   sideBySideContainer: {
-    display: 'flex',
-    gap: '20px',
-    marginBottom: '20px',
-    flexWrap: 'wrap'
-  },
-  halfWidthSection: {
-    flex: '1',
-    minWidth: '400px',
-    backgroundColor: '#f8fafc',
-    border: '1px solid #e2e8f0',
-    borderRadius: '8px',
-    padding: '20px',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
-  }
-
+    // 🔁 Re-added containers & helpers
+    sectionContainer: {
+      backgroundColor: '#f8fafc',
+      border: '1px solid #e2e8f0',
+      borderRadius: '8px',
+      padding: '20px',
+      marginBottom: '20px',
+      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+    },
+    sectionTitle: {
+      fontSize: '18px',
+      fontWeight: '600',
+      color: '#2d3748',
+      marginBottom: '16px',
+      paddingBottom: '8px',
+      borderBottom: '2px solid #e2e8f0'
+    },
+    inputGroup: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '12px',
+      marginBottom: '16px'
+    },
+    commercialGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+      gap: '40px',
+      marginBottom: '12px'
+    },
+    commercialInput: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '1px'
+    },
+    totalHint: {
+      backgroundColor: '#edf2f7',
+      padding: '8px 12px',
+      borderRadius: '6px',
+      fontSize: '14px',
+      color: '#4a5568',
+      marginTop: '8px'
+    },
+    overrideInputRow: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      padding: '12px 0',
+      borderBottom: '1px solid #f1f5f9'
+    },
+    overrideLabel: {
+      minWidth: '250px',
+      fontWeight: '500',
+      color: '#2d3748'
+    },
+    sideBySideContainer: {
+      display: 'flex',
+      gap: '20px',
+      marginBottom: '20px',
+      flexWrap: 'wrap'
+    },
+    halfWidthSection: {
+      flex: '1',
+      minWidth: '400px',
+      backgroundColor: '#f8fafc',
+      border: '1px solid #e2e8f0',
+      borderRadius: '8px',
+      padding: '20px',
+      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+    }
   };
 
   // Group channels into rows of two
@@ -244,26 +274,25 @@ export default function ChannelBudgetSetup({
     channelRows.push(channels.slice(i, i + 2));
   }
 
-    const handleStartOptimization = () => {
-      // Calculate channelMoneyMap first
-      const channelMoneyMap = {};
-      channels.forEach((ch) => {
-        const pct = Number(budgetShares[ch] || 0);
-        const chAmount = (totalBudget * pct) / 100;
-        const prop = Number(propertyAmounts[ch] || 0);
-        const available = Math.max(0, chAmount - prop);
-        channelMoneyMap[ch] = { chAmount, prop, available };
-      });
+  const handleStartOptimization = () => {
+    const channelMoneyMap = {};
+    channels.forEach((ch) => {
+      const pct = Number(budgetShares[ch] || 0);
+      const chAmount = (totalBudget * pct) / 100;
+      const propTotal = Number(propertyAmounts[ch] || 0);
+      const { onCostPct, comBenefitPct } = propertyPercents[ch] || { onCostPct: 20, comBenefitPct: 80 };
+      const onCost = (propTotal * onCostPct) / 100;
+      const comBenefit = (propTotal * comBenefitPct) / 100;
+      // Available stays = channel budget – property amount
+      const available = Math.max(0, chAmount - propTotal);
 
-      // Create a simple payload with just channelMoney for now
-      const payload = {
-        channelMoney: channelMoneyMap
-      };
+      channelMoneyMap[ch] = { chAmount, prop: propTotal, onCost, comBenefit, available };
+    });
 
-      console.log('Final payload being sent:', payload);
-      onSubmit && onSubmit(payload);
-    };
-
+    const payload = { channelMoney: channelMoneyMap };
+    console.log('Final payload being sent:', payload);
+    onSubmit && onSubmit(payload);
+  };
 
   return (
     <>
@@ -271,10 +300,13 @@ export default function ChannelBudgetSetup({
       <div style={{ marginBottom: '20px' }}>
         {channelRows.map((row, rowIndex) => (
           <div key={rowIndex} style={enhancedStyles.channelRow}>
-            {row.map((ch, idx) => {
+            {row.map((ch) => {
               const chAmount = channelMoney[ch]?.chAmount || 0;
-              const prop = channelMoney[ch]?.prop || 0;
-              const available = channelMoney[ch]?.available || 0;
+              const propTotal = channelMoney[ch]?.prop || 0;
+              const { onCostPct, comBenefitPct } = propertyPercents[ch] || { onCostPct: 20, comBenefitPct: 80 };
+              const onCost = (propTotal * onCostPct) / 100;
+              const comBenefit = (propTotal * comBenefitPct) / 100;
+              const available = Math.max(0, chAmount - propTotal);
 
               const chPrimePct = toNumber(channelSplits[ch]?.prime ?? primePct);
               const chNonPrimePct = toNumber(channelSplits[ch]?.nonprime ?? nonPrimePct);
@@ -323,20 +355,41 @@ export default function ChannelBudgetSetup({
                     <span style={styles.percentSymbol}>%</span>
                   </div>
 
-                  {/* Property amount input */}
+                  {/* Property amount & percentage inputs */}
                   {hasProperty[ch] && (
-                    <div style={enhancedStyles.inputRow}>
-                      <label style={{ ...styles.label, minWidth: '100px' }}>Property Amount:</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={propertyAmounts[ch] ?? 0}
-                        onChange={e => handlePropertyAmount(ch, e.target.value)}
-                        style={{ ...styles.numberInput, width: '120px' }}
-                        min="0"
-                      />
-                      <span>LKR</span>
-                    </div>
+                    <>
+                      <div style={enhancedStyles.inputRow}>
+                        <label style={{ ...styles.label, minWidth: '100px' }}>Property Amount:</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={propertyAmounts[ch] ?? 0}
+                          onChange={e => handlePropertyAmount(ch, e.target.value)}
+                          style={{ ...styles.numberInput, width: '120px' }}
+                          min="0"
+                        />
+                        <span>LKR</span>
+                      </div>
+
+                      <div style={enhancedStyles.inputRow}>
+                        <span>On cost</span>
+                        <input
+                          type="number"
+                          value={onCostPct}
+                          onChange={e => handlePercentChange(ch, 'onCostPct', e.target.value)}
+                          style={enhancedStyles.percentInput}
+                        />
+                        <span>%</span>
+                        <span>Com. Benefit</span>
+                        <input
+                          type="number"
+                          value={comBenefitPct}
+                          onChange={e => handlePercentChange(ch, 'comBenefitPct', e.target.value)}
+                          style={enhancedStyles.percentInput}
+                        />
+                        <span>%</span>
+                      </div>
+                    </>
                   )}
 
                   {/* Calculated amounts */}
@@ -345,8 +398,18 @@ export default function ChannelBudgetSetup({
                       <strong>Channel Budget:</strong> {formatLKR(chAmount)}
                     </div>
                     <div style={enhancedStyles.amountBox}>
-                      <strong>Property:</strong> {formatLKR(prop)}
+                      <strong>Property:</strong> {formatLKR(propTotal)}
                     </div>
+                    {hasProperty[ch] && (
+                      <>
+                        <div style={enhancedStyles.amountBox}>
+                          <strong>Commercial Benefit:</strong> {formatLKR(comBenefit)}
+                        </div>
+                        <div style={enhancedStyles.amountBox}>
+                          <strong>On cost:</strong> {formatLKR(onCost)}
+                        </div>
+                      </>
+                    )}
                     <div style={enhancedStyles.amountBox}>
                       <strong>Available:</strong> {formatLKR(available)}
                     </div>
@@ -394,7 +457,7 @@ export default function ChannelBudgetSetup({
               );
             })}
 
-            {/* Add empty div to maintain layout for odd-numbered rows */}
+            {/* Layout fix for odd row */}
             {row.length === 1 && (
               <div style={{ ...enhancedStyles.channelCard, visibility: 'hidden', height: 0, padding: 16, border: 'none' }}></div>
             )}
@@ -402,7 +465,7 @@ export default function ChannelBudgetSetup({
         ))}
       </div>
 
-      {/* Summary box moved to after channels */}
+      {/* Summary box */}
       <div style={enhancedStyles.summaryBox}>
         <div style={enhancedStyles.summaryRow}>
           <span style={enhancedStyles.summaryLabel}>Entered Channel % Total:</span>
@@ -431,106 +494,111 @@ export default function ChannelBudgetSetup({
         </div>
       </div>
 
-    {/* Global Defaults and Optimization Settings side by side */}
-    <div style={enhancedStyles.sideBySideContainer}>
-      {/* Global Defaults Section */}
-      <div style={enhancedStyles.halfWidthSection}>
-        <h3 style={enhancedStyles.sectionTitle}>Global Defaults</h3>
-        <div style={enhancedStyles.inputGroup}>
-          <div style={enhancedStyles.overrideInputRow}>
-            <label style={enhancedStyles.overrideLabel}>Prime Time % (global default):</label>
-            <input
-              type="number"
-              step="0.01"
-              value={primePct}
-              onChange={e => setPrimePct(parseFloat(e.target.value))}
-              style={styles.numberInput}
-            />
-            <span style={styles.percentSymbol}>%</span>
-          </div>
-          <div style={enhancedStyles.overrideInputRow}>
-            <label style={enhancedStyles.overrideLabel}>Non-Prime Time % (global default):</label>
-            <input
-              type="number"
-              step="0.01"
-              value={nonPrimePct}
-              onChange={e => setNonPrimePct(parseFloat(e.target.value))}
-              style={styles.numberInput}
-            />
-            <span style={styles.percentSymbol}>%</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Optimization Settings Section */}
-      <div style={enhancedStyles.halfWidthSection}>
-        <h3 style={enhancedStyles.sectionTitle}>Optimization Settings</h3>
-        <div style={enhancedStyles.inputGroup}>
-          <div style={enhancedStyles.overrideInputRow}>
-            <label style={enhancedStyles.overrideLabel}>Max Spot Bound (Override):</label>
-            <input
-              type="number"
-              min="1"
-              value={maxSpots}
-              onChange={e => setMaxSpots(parseInt(e.target.value))}
-              style={styles.numberInput}
-            />
-          </div>
-          <div style={enhancedStyles.overrideInputRow}>
-            <label style={enhancedStyles.overrideLabel}>Optimization Time Limit (seconds):</label>
-            <input
-              type="number"
-              min="10"
-              value={timeLimit}
-              onChange={e => setTimeLimit(parseInt(e.target.value))}
-              style={styles.numberInput}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    {/* Commercial Overrides (full width below) */}
-    {optimizationInput.numCommercials > 1 && (
-      <div style={enhancedStyles.sectionContainer}>
-        <h3 style={enhancedStyles.sectionTitle}>Override Budget percentage per Commercial</h3>
-        <div style={enhancedStyles.commercialGrid}>
-          {budgetProportions.map((val, idx) => (
-            <div key={idx} style={enhancedStyles.commercialInput}>
-              <label style={{ ...styles.label, minWidth: '110px' }}>Commercial {idx + 1}:</label>
+      {/* 🔁 RE-ADDED: Global Defaults & Optimization Settings (side-by-side) */}
+      <div style={enhancedStyles.sideBySideContainer}>
+        {/* Global Defaults Section */}
+        <div style={enhancedStyles.halfWidthSection}>
+          <h3 style={enhancedStyles.sectionTitle}>Global Defaults</h3>
+          <div style={enhancedStyles.inputGroup}>
+            <div style={enhancedStyles.overrideInputRow}>
+              <label style={enhancedStyles.overrideLabel}>Prime Time % (global default):</label>
               <input
                 type="number"
                 step="0.01"
-                value={val}
-                onChange={e => handleBudgetProportionChange(idx, e.target.value)}
-                style={{ ...styles.numberInput, width: '80px' }}
+                value={primePct}
+                onChange={e => setPrimePct(parseFloat(e.target.value))}
+                style={styles.numberInput}
               />
               <span style={styles.percentSymbol}>%</span>
             </div>
-          ))}
+            <div style={enhancedStyles.overrideInputRow}>
+              <label style={enhancedStyles.overrideLabel}>Non-Prime Time % (global default):</label>
+              <input
+                type="number"
+                step="0.01"
+                value={nonPrimePct}
+                onChange={e => setNonPrimePct(parseFloat(e.target.value))}
+                style={styles.numberInput}
+              />
+              <span style={styles.percentSymbol}>%</span>
+            </div>
+          </div>
         </div>
-        <p style={enhancedStyles.totalHint}>
-          Total must be 100% — Current:{' '}
-          {budgetProportions.reduce((a, b) => a + (isNaN(parseFloat(b)) ? 0 : parseFloat(b)), 0).toFixed(2)}%
-        </p>
-      </div>
-    )}
 
-      {/* Property programs editor (appears if any channel has property) */}
+        {/* Optimization Settings Section */}
+        <div style={enhancedStyles.halfWidthSection}>
+          <h3 style={enhancedStyles.sectionTitle}>Optimization Settings</h3>
+          <div style={enhancedStyles.inputGroup}>
+            <div style={enhancedStyles.overrideInputRow}>
+              <label style={enhancedStyles.overrideLabel}>Max Spot Bound (Override):</label>
+              <input
+                type="number"
+                min="1"
+                value={maxSpots}
+                onChange={e => setMaxSpots(parseInt(e.target.value))}
+                style={styles.numberInput}
+              />
+            </div>
+            <div style={enhancedStyles.overrideInputRow}>
+              <label style={enhancedStyles.overrideLabel}>Optimization Time Limit (seconds):</label>
+              <input
+                type="number"
+                min="10"
+                value={timeLimit}
+                onChange={e => setTimeLimit(parseInt(e.target.value))}
+                style={styles.numberInput}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 🔁 RE-ADDED: Override Budget percentage per Commercial */}
+      {Number(optimizationInput?.numCommercials) > 1 && (
+        <div style={enhancedStyles.sectionContainer}>
+          <h3 style={enhancedStyles.sectionTitle}>Override Budget percentage per Commercial</h3>
+          <div style={enhancedStyles.commercialGrid}>
+            {budgetProportions.map((val, idx) => (
+              <div key={idx} style={enhancedStyles.commercialInput}>
+                <label style={{ ...styles.label, minWidth: '110px' }}>Commercial {idx + 1}:</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={val}
+                  onChange={e => handleBudgetProportionChange(idx, e.target.value)}
+                  style={{ ...styles.numberInput, width: '80px' }}
+                />
+                <span style={styles.percentSymbol}>%</span>
+              </div>
+            ))}
+          </div>
+          <p style={enhancedStyles.totalHint}>
+            Total must be 100% — Current:{' '}
+            {budgetProportions
+              .reduce((a, b) => a + (isNaN(parseFloat(b)) ? 0 : parseFloat(b)), 0)
+              .toFixed(2)}%
+          </p>
+        </div>
+      )}
+
+      {/* Property Programs Editor (targets use On cost) */}
       {anyPropertyOn && (
-        <>
-          {/* This component enforces: sum(Budget) per channel == Property (LKR) for that channel */}
-          <PropertyProgramsEditor
-            channels={channels}
-            hasProperty={hasProperty}
-            propertyAmounts={propertyAmounts}
-            propertyPrograms={propertyPrograms}
-            setPropertyPrograms={setPropertyPrograms}
-            toNumber={toNumber}
-            formatLKR={formatLKR}
-            styles={styles}
-          />
-        </>
+        <PropertyProgramsEditor
+          channels={channels}
+          hasProperty={hasProperty}
+          propertyAmounts={Object.fromEntries(
+            channels.map(ch => {
+              const propTotal = Number(propertyAmounts[ch] || 0);
+              const { onCostPct } = propertyPercents[ch] || { onCostPct: 20 };
+              return [ch, (propTotal * onCostPct) / 100];
+            })
+          )}
+          propertyPrograms={propertyPrograms}
+          setPropertyPrograms={setPropertyPrograms}
+          toNumber={toNumber}
+          formatLKR={formatLKR}
+          styles={styles}
+        />
       )}
 
       {/* Buttons */}
@@ -545,30 +613,28 @@ export default function ChannelBudgetSetup({
             >
               Start Optimization
             </button>
-
           </>
-            ) : (
-              <>
-                <p style={styles.processingMsg}>
-                  Optimization is processing. Please wait...
-                  {typeof countdown === 'number' && (
-                    <span
-                      style={{
-                        marginLeft: 8,
-                        fontFamily: 'monospace',
-                        fontWeight: 700,
-                        padding: '2px 6px',
-                        borderRadius: 4
-                      }}
-                    >
-                      {formatMMSS(Math.max(0, countdown))}
-                    </span>
-                  )}
-                </p>
-                <button onClick={onStop} style={styles.stopButton}>Stop Optimization</button>
-              </>
-            )}
-
+        ) : (
+          <>
+            <p style={styles.processingMsg}>
+              Optimization is processing. Please wait...
+              {typeof countdown === 'number' && (
+                <span
+                  style={{
+                    marginLeft: 8,
+                    fontFamily: 'monospace',
+                    fontWeight: 700,
+                    padding: '2px 6px',
+                    borderRadius: 4
+                  }}
+                >
+                  {formatMMSS(Math.max(0, countdown))}
+                </span>
+              )}
+            </p>
+            <button onClick={onStop} style={styles.stopButton}>Stop Optimization</button>
+          </>
+        )}
       </div>
     </>
   );

@@ -1,5 +1,5 @@
 // src/components/FinalPlan.jsx
-import React, { useMemo } from 'react';
+import React, { useMemo , useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
@@ -7,6 +7,7 @@ export default function FinalPlan({
   // Accept BOTH naming styles so App.js doesn't have to change
   mainResults: _mainResults,
   bonusResults: _bonusResults,
+  benefitResults: _benefitResults,
   basePlanResult,     // from your current App.js
   bonusResult,        // from your current App.js
   totalBudgetInclProperty, // optional explicit budget (unchanged by bonus)
@@ -21,6 +22,14 @@ export default function FinalPlan({
   // ---- Normalize inputs (support both prop name styles) ----
   const mainResults = _mainResults || basePlanResult || {};
   const bonusResults = _bonusResults || bonusResult || {};
+  const benefitResults = _benefitResults || {};
+
+      useEffect(() => {
+      console.log("🚀 FinalPlan props check");
+      console.log("mainResults", mainResults);
+      console.log("bonusResults", bonusResults);
+      console.log("benefitResults", benefitResults);
+    }, [mainResults, bonusResults, benefitResults]);
 
   // ---------- Helpers ----------
   const num = (v, d = 0) => {
@@ -79,6 +88,56 @@ export default function FinalPlan({
   // Bonus tables
   const bonusByProgram = useMemo(() => bonusResults?.tables?.by_program || [], [bonusResults]);
   const bonusByChannel = useMemo(() => bonusResults?.tables?.by_channel || [], [bonusResults]);
+
+  // Benefit tables
+  const benefitByProgram = useMemo(() => benefitResults?.tables?.by_program || [], [benefitResults]);
+  const benefitByChannel = useMemo(() => benefitResults?.tables?.by_channel || [], [benefitResults]);
+
+    // Group benefit programs by commercial
+    const benefitCommercialData = useMemo(() => {
+      const commercialMap = {};
+
+      const benefitCommSummary =
+        benefitResults?.commercials_summary ||
+        benefitResults?.final?.commercials_summary ||
+        [];
+
+      if (benefitCommSummary.length > 0) {
+        // ✅ Use commercials_summary if present
+        benefitCommSummary.forEach((commercial, index) => {
+          const baseIdx = Number.isFinite(+commercial?.commercial_index)
+            ? +commercial.commercial_index
+            : index;
+          const commercialKey = `COM_${baseIdx + 1}`;
+          commercialMap[commercialKey] = {
+            commercial_index: commercial.commercial_index,
+            total_cost: commercial.total_cost,
+            total_rating: commercial.total_rating,
+            cprp: commercial.cprp,
+            programs: commercial.details || [],
+          };
+        });
+      } else {
+        // fallback: group by_program
+        (benefitResults?.tables?.by_program || []).forEach((r) => {
+          const c = normalizeCommercial(
+            r.Commercial ?? r.commercial ?? r.comName ?? r['Com name'] ?? r['Com Name'] ?? r.ComName ?? 'COM_1',
+            { zeroBasedNumeric: false }
+          );
+          if (!commercialMap[c]) {
+            commercialMap[c] = {
+              programs: [],
+              total_rating: 0,
+            };
+          }
+          commercialMap[c].programs.push(r);
+          commercialMap[c].total_rating += num(r.Total_Rating ?? r.Total_NTVR);
+        });
+      }
+
+      return commercialMap;
+    }, [benefitResults]);
+
 
   // ---------- Budget (unchanged) ----------
   // Prefer prop; else try main totals; else fallback to sum of main channel costs
@@ -161,6 +220,19 @@ export default function FinalPlan({
       const cprp   = ngrp > 0 ? budget / ngrp : 0;
       return { budget, ngrp, cprp };
     }, [flatPropertyPrograms]);
+
+    // Add benefit NGRP into Property NGRP
+    const benefitNGRPTotal = useMemo(() => {
+      return Object.values(benefitCommercialData || {}).reduce(
+        (sum, com) => sum + num(com.total_rating),
+        0
+      );
+    }, [benefitCommercialData]);
+
+    const propertyNGRP_InclBenefit = useMemo(() => {
+      return (propertyTotals?.ngrp || 0) + benefitNGRPTotal;
+    }, [propertyTotals, benefitNGRPTotal]);
+
 
   // ---------- Bonus totals ----------
   const bonusNGRP = useMemo(() => {
@@ -252,6 +324,7 @@ export default function FinalPlan({
   const allCommercialKeys = useMemo(() => {
     const keys = new Set([
       ...Object.keys(mainCommercialData),
+      ...Object.keys(benefitCommercialData),
       ...Object.keys(bonusCommercialData)
     ]);
 
@@ -267,7 +340,33 @@ export default function FinalPlan({
     });
 
     return filtered;
-  }, [mainCommercialData, bonusCommercialData]);
+  }, [mainCommercialData, benefitCommercialData, bonusCommercialData]);
+
+  // After building mainCommercialData / benefitCommercialData / bonusCommercialData
+    useEffect(() => {
+      const inspect = (name, m) => {
+        const keys = Object.keys(m || {});
+        console.log(`[DBG] ${name} keys:`, keys);
+        if (keys[0]) {
+          const first = m[keys[0]];
+          console.log(`[DBG] ${name} sample[${keys[0]}]:`, {
+            programs_len: first?.programs?.length,
+            total_cost: first?.total_cost,
+            total_rating: first?.total_rating,
+          });
+          if (Array.isArray(first?.programs) && first.programs[0]) {
+            const r = first.programs[0];
+            console.log(`[DBG] ${name} sample row fields:`, Object.keys(r));
+          }
+        }
+      };
+
+      inspect('mainCommercialData', mainCommercialData);
+      inspect('benefitCommercialData', benefitCommercialData);
+      inspect('bonusCommercialData', bonusCommercialData);
+      console.log('[DBG] allCommercialKeys:', allCommercialKeys);
+    }, [mainCommercialData, benefitCommercialData, bonusCommercialData, allCommercialKeys]);
+
 
   // ---------- Channel summary incl. bonus ----------
   const bonusNGRPByChannel = useMemo(() => {
@@ -328,9 +427,10 @@ export default function FinalPlan({
 
     // Total NGRP including Property + Bonus
     const totalNGRP_InclPropertyBonus = useMemo(
-      () => mainSpotNGRP + (propertyTotals?.ngrp || 0) + (bonusNGRP || 0),
-      [mainSpotNGRP, propertyTotals, bonusNGRP]
+      () => mainSpotNGRP + propertyNGRP_InclBenefit + (bonusNGRP || 0),
+      [mainSpotNGRP, propertyNGRP_InclBenefit, bonusNGRP]
     );
+
 
     // CPRP using (Budget incl. Property) / (NGRP incl. Property + Bonus)
     const cprp_InclPropertyBonus = useMemo(
@@ -342,13 +442,30 @@ export default function FinalPlan({
     const propertyByChannel = useMemo(() => {
       const budgetByCh = {};
       const ngrpByCh = {};
+
+      // Manual property programs
       (flatPropertyPrograms || []).forEach((r) => {
         const ch = toStr(r.Channel);
         budgetByCh[ch] = (budgetByCh[ch] || 0) + num(r.Budget);
-        ngrpByCh[ch] = (ngrpByCh[ch] || 0) + num(r.NGRP);
+        ngrpByCh[ch]   = (ngrpByCh[ch]   || 0) + num(r.NGRP);
       });
+
+      // ✅ Add benefit programs on top
+      Object.values(benefitCommercialData || {}).forEach((com) => {
+        (com.programs || []).forEach((r) => {
+          const ch = toStr(r.Channel);
+          const cost = num(r.Total_Cost ?? r.Cost ?? r.NCost ?? 0);
+          const ngrp = num(r.Total_Rating ?? r.NGRP ?? r.Total_NTVR ?? 0);
+
+          budgetByCh[ch] = (budgetByCh[ch] || 0) + cost;
+          ngrpByCh[ch]   = (ngrpByCh[ch]   || 0) + ngrp;
+        });
+      });
+
+      console.log("[DBG] propertyByChannel incl. benefit", { budgetByCh, ngrpByCh });
+
       return { budgetByCh, ngrpByCh };
-    }, [flatPropertyPrograms]);
+    }, [flatPropertyPrograms, benefitCommercialData]);
 
     const mainCostByCh = useMemo(() => {
       const m = new Map();
@@ -394,6 +511,115 @@ export default function FinalPlan({
         };
       });
     }, [mainCostByCh, mainNGRPByCh, propertyByChannel, bonusNGRPByChannel]);
+
+    // --- TEMP: console print of Final Plan rows (MAIN + BONUS, excluding property from BONUS only) ---
+    useEffect(() => {
+      // Build a key for property exclusion (no normalization)
+      const keyOf = (r) => [
+        toStr(r.Channel),
+        toStr(r.Program ?? r['Name of the program'] ?? ''),
+        toStr(r.Day ?? r.Date ?? ''),
+        toStr(r.Time ?? r.Start_Time ?? r.StartTime ?? ''),
+      ].join('||').toLowerCase();
+
+      // Property rows -> keys we will use to exclude only from BONUS
+      const propertyKeys = new Set(
+        (flatPropertyPrograms || []).map((r) => [
+          toStr(r.Channel),
+          toStr(r['Name of the program'] ?? r.Program ?? ''),
+          toStr(r.Day ?? ''),
+          toStr(r.Time ?? ''),
+        ].join('||').toLowerCase())
+      );
+
+      // Per-identity counters to guarantee uniqueness even if identical rows appear
+      const counters = new Map();
+      const nextUniq = (k) => {
+        const n = (counters.get(k) ?? 0) + 1;
+        counters.set(k, n);
+        return n;
+      };
+
+      // ---------- MAIN rows (keep ALL; do NOT exclude by property) ----------
+      const mainRows = (mainByProgram || []).map((r) => {
+        // main results usually 0-based -> normalizeCommercial(..., { zeroBasedNumeric: true })
+        const commercial = normalizeCommercial(
+          r.Commercial ?? r.comName ?? r['Com name'] ?? r['Com Name'] ?? r.ComName ?? 'COM_1',
+          { zeroBasedNumeric: true }
+        );
+
+        const identityKey = [
+          'main',
+          commercial,
+          keyOf(r),
+          num(r.Spots ?? 0),
+        ].join('|');
+
+        const uniq = nextUniq(identityKey);
+
+        const id =
+          r.id ?? r._id ?? r.ID ?? r.Id ??
+          r.row_id ?? r.RowId ?? r.rowId ??
+          `${identityKey}#${uniq}`;
+
+        return {
+          id,
+          commercial,
+          channel: toStr(r.Channel),
+          day: toStr(r.Day ?? r.Date ?? ''),
+          time: toStr(r.Time ?? r.Start_Time ?? r.StartTime ?? ''),
+          spots: num(r.Spots ?? 0),
+          source: 'main',
+        };
+      });
+
+      // ---------- BONUS rows (exclude property overlaps) ----------
+      const bonusRows = (bonusByProgram || [])
+        .filter((r) => !propertyKeys.has(keyOf(r)))
+        .map((r) => {
+          // bonus often 1-based in UI/files -> normalizeCommercial(..., { zeroBasedNumeric: false })
+          const commercial = normalizeCommercial(
+            r.Commercial ?? r.comName ?? r['Com name'] ?? r['Com Name'] ?? r.ComName ?? 'COM_1',
+            { zeroBasedNumeric: false }
+          );
+
+          const identityKey = [
+            'bonus',
+            commercial,
+            keyOf(r),
+            num(r.Spots ?? 0),
+          ].join('|');
+
+          const uniq = nextUniq(identityKey);
+
+          const id =
+            r.id ?? r._id ?? r.ID ?? r.Id ??
+            r.row_id ?? r.RowId ?? r.rowId ??
+            `${identityKey}#${uniq}`;
+
+          return {
+            id,
+            commercial,
+            channel: toStr(r.Channel),
+            day: toStr(r.Day ?? r.Date ?? ''),
+            time: toStr(r.Time ?? r.Start_Time ?? r.StartTime ?? ''),
+            spots: num(r.Spots ?? 0),
+            source: 'bonus',
+          };
+        });
+
+      const out = [...mainRows, ...bonusRows];
+
+      console.log('Final Plan rows (MAIN + BONUS, property excluded from BONUS only):', out);
+      console.table(out, ['id', 'commercial', 'channel', 'day', 'time', 'spots', 'source']);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+      // fixed-size deps: re-run when counts change (e.g., bonus arrives)
+      (mainByProgram || []).length,
+      (bonusByProgram || []).length,
+      (flatPropertyPrograms || []).length,
+    ]);
+
 
 
     // ---------- Export ----------
@@ -447,6 +673,63 @@ export default function FinalPlan({
         'Cost (LKR)','TVR','NCost (LKR)','NTVR','Total Budget (LKR)','NGRP','Spots'
       ];
 
+      // Merge helper for export (always merge benefit into main)
+      const mergeProgramsForExport = (mainRows, benefitRows) => {
+        const subKey = (r) => [
+          toStr(r.Program),
+          toStr(r.Day ?? r.Date ?? ''),
+          toStr(r.Time ?? r.Start_Time ?? r.StartTime ?? ''),
+          toStr(r.Slot ?? 'A')
+        ].join('||').toLowerCase();
+
+        const mainMap = new Map();
+        mainRows.forEach(r => {
+          const k = subKey(r);
+          mainMap.set(k, (mainMap.get(k) || []).concat(r));
+        });
+
+        const unmatchedBenefit = [];
+        benefitRows.forEach(r => {
+          const k = subKey(r);
+          if (mainMap.has(k)) {
+            mainMap.set(k, mainMap.get(k).concat(r));
+          } else {
+            unmatchedBenefit.push(r);
+          }
+        });
+
+        const mergedMainRows = [];
+        mainMap.forEach((rows, k) => {
+          if (rows.length === 1) {
+            mergedMainRows.push(rows[0]);
+          } else {
+            const first = rows[0];
+            const spots = rows.reduce((a, rr) => a + num(rr.Spots ?? 0), 0);
+            const totalCost = rows.reduce((a, rr) => a + num(rr.Total_Cost ?? 0), 0);
+            const totalRating = rows.reduce((a, rr) => a + num(rr.Total_Rating ?? rr.Total_NTVR ?? 0), 0);
+            const merged = {
+              ...first,
+              Spots: spots,
+              Total_Cost: totalCost,
+              Total_Rating: totalRating,
+            };
+            mergedMainRows.push(merged);
+          }
+        });
+
+        // Combine merged main + unmatched benefit, then sort by Slot (A before B)
+        const allNonBonusRows = [...mergedMainRows, ...unmatchedBenefit];
+        allNonBonusRows.sort((a, b) => {
+          const slotA = toStr(a.Slot ?? 'A').toUpperCase();
+          const slotB = toStr(b.Slot ?? 'A').toUpperCase();
+          if (slotA === 'A' && slotB === 'B') return -1;
+          if (slotA === 'B' && slotB === 'A') return 1;
+          return 0; // same slot or fallback
+        });
+
+        return allNonBonusRows;
+      };
+
       // ---------- Build per-channel sheets ----------
       channelList.forEach((ch) => {
         const sheetTitle = safeSheetName(`Channel - ${ch}`);
@@ -477,18 +760,23 @@ export default function FinalPlan({
           addAOA(ws, [['(No property rows)']]);
         }
 
-        // SECTION 2..N: Commercial program rows (main optimization), by commercial
+        // SECTION 2..N: Commercial program rows (main + merged benefit), by commercial
         // We’ll include all commercials you have, in sorted order.
         (allCommercialKeys || []).forEach((commercialKey, idx) => {
-          const programs = (mainCommercialData?.[commercialKey]?.programs || [])
+          const mainPrograms = (mainCommercialData?.[commercialKey]?.programs || [])
+            .filter(r => toStr(r.Channel) === ch);
+          const benefitPrograms = (benefitCommercialData?.[commercialKey]?.programs || [])
             .filter(r => toStr(r.Channel) === ch);
 
+          // Always merge for export
+          const mergedPrograms = mergeProgramsForExport(mainPrograms, benefitPrograms);
+
           addAOA(ws, [['']]); // spacer row
-          addAOA(ws, [[`Commercial ${idx + 1} Programs – ${ch}`]]);
+          addAOA(ws, [[`Commercial ${idx + 1} Programs (incl. Merged Benefit) – ${ch}`]]);
           addAOA(ws, [progHeaders]);
 
-          if (programs.length > 0) {
-            const mainAOA = programs.map(r => ([
+          if (mergedPrograms.length > 0) {
+            const mainAOA = mergedPrograms.map(r => ([
               toStr(r.Program),
               toStr(r.Day ?? r.Date ?? ''),
               toStr(r.Time ?? ''),
@@ -577,6 +865,7 @@ export default function FinalPlan({
     backHomeButton: { padding: '12px 24px', backgroundColor: '#edf2f7', color: '#2d3748', border: '1px solid #cbd5e0', borderRadius: '6px', fontSize: '16px', fontWeight: '500', cursor: 'pointer', marginTop: '16px', marginRight: '20px' },
     primaryButton: { padding: '12px 24px', backgroundColor: '#4299e1', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', fontWeight: '500', cursor: 'pointer' },
     label: { color: '#4a5568', fontWeight: '500', fontSize: '14px' },
+    benefitRow: { background: '#ECEDE6' },
 
     // Commercial header
     commercialHeader: { fontWeight: '800', marginTop: '20px', marginBottom: '16px', color: '#2d3748', fontSize: '18px' },
@@ -597,6 +886,9 @@ export default function FinalPlan({
     return val;
   };
 
+  // NEW: State for merging benefit into main
+  const [mergeBenefit, setMergeBenefit] = useState(false);
+
   // ---------- Render ----------
   return (
     <div style={s.container}>
@@ -613,7 +905,7 @@ export default function FinalPlan({
       </div>
       <div style={s.summaryCard}>
         <div style={s.summaryTitle}>Property NGRP</div>
-        <div style={s.summaryValue}>{safeFx(propertyTotals.ngrp)}</div>
+        <div style={s.summaryValue}>{safeFx(propertyNGRP_InclBenefit)}</div>
       </div>
     </div>
 
@@ -685,12 +977,19 @@ export default function FinalPlan({
       <div style={{...s.commercialSub, marginBottom: '20px'}}>
         Shows main optimization results followed by bonus programs (shaded in light blue) for each commercial.
       </div>
+      <div style={{marginBottom: '16px'}}>
+        <label>
+          <input type="checkbox" checked={mergeBenefit} onChange={e => setMergeBenefit(e.target.checked)} />
+          Merge matching benefit programs into main (sum spots)
+        </label>
+      </div>
 
       {allCommercialKeys.map((commercialKey) => {
         const mainData = mainCommercialData[commercialKey] || {};
         const bonusData = bonusCommercialData[commercialKey] || {};
 
         const mainPrograms = mainData.programs || [];
+        const benefitPrograms = (benefitCommercialData[commercialKey]?.programs) || [];
         const bonusPrograms = bonusData.programs || [];
 
         const mainBudget = num(mainData.total_cost);
@@ -702,7 +1001,8 @@ export default function FinalPlan({
         const combinedCprp = totalNgrp > 0 ? mainBudget / totalNgrp : 0;
 
         // Skip if no programs in either main or bonus
-        if (mainPrograms.length === 0 && bonusPrograms.length === 0) {
+        // Skip only if no programs at all (main, benefit, bonus)
+        if (mainPrograms.length === 0 && benefitPrograms.length === 0 && bonusPrograms.length === 0) {
           return null;
         }
 
@@ -735,6 +1035,7 @@ export default function FinalPlan({
                   <th style={s.th}>Spots</th>
                 </tr>
               </thead>
+
                 <tbody>
                   {(() => {
                     // group helpers
@@ -748,15 +1049,19 @@ export default function FinalPlan({
                       return m;
                     };
 
-                    const mainByCh  = groupByChannel(mainPrograms);
-                    const bonusByCh = groupByChannel(bonusPrograms);
+                    const mainByCh    = groupByChannel(mainPrograms);
+                    const benefitByCh = groupByChannel(benefitPrograms); // ✅ added
+                    const bonusByCh   = groupByChannel(bonusPrograms);
 
                     // union of channels (sorted)
                     const allChannels = Array.from(
-                      new Set([...Object.keys(mainByCh), ...Object.keys(bonusByCh)])
+                      new Set([
+                        ...Object.keys(mainByCh),
+                        ...Object.keys(benefitByCh),  // ✅ include CB
+                        ...Object.keys(bonusByCh),
+                      ])
                     ).sort((a, b) => a.localeCompare(b));
 
-                    // nothing to render case
                     if (allChannels.length === 0) {
                       return (
                         <tr>
@@ -767,27 +1072,11 @@ export default function FinalPlan({
                       );
                     }
 
-                    // render channel-wise: main rows first, then bonus rows
+                    // render channel-wise: main → benefit → bonus
                     return allChannels.flatMap((ch, chIdx) => {
-                      const mainRows  = mainByCh[ch]  || [];
-                      const bonusRows = bonusByCh[ch] || [];
-
-                      const mainRendered = mainRows.map((r, i) => (
-                        <tr key={`main-${ch}-${i}`}>
-                          <td style={{ ...s.td, textAlign: 'left' }}>{toStr(r.Channel)}</td>
-                          <td style={{ ...s.td, textAlign: 'left' }}>{toStr(r.Program)}</td>
-                          <td style={{ ...s.td, textAlign: 'left' }}>{toStr(r.Day ?? r.Date ?? '')}</td>
-                          <td style={s.tdNowrap}>{toStr(r.Time ?? '')}</td>
-                          <td style={s.td}>{toStr(r.Slot ?? 'A')}</td>
-                          <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(num(r.Cost ?? r.NCost))}</td>
-                          <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.TVR ?? r.NTVR))}</td>
-                          <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(num(r.NCost ?? 0))}</td>
-                          <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.NTVR ?? 0))}</td>
-                          <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(num(r.Total_Cost ?? 0))}</td>
-                          <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.Total_Rating ?? r.Total_NTVR ?? 0))}</td>
-                          <td style={s.td}>{num(r.Spots ?? 0)}</td>
-                        </tr>
-                      ));
+                      const mainRows    = mainByCh[ch]    || [];
+                      const benefitRows = benefitByCh[ch] || [];
+                      const bonusRows   = bonusByCh[ch]   || [];
 
                       const bonusRendered = bonusRows.map((r, i) => (
                         <tr key={`bonus-${ch}-${i}`} style={s.bonusRow}>
@@ -806,14 +1095,127 @@ export default function FinalPlan({
                         </tr>
                       ));
 
-                      // optional: add a thin separator between channels (visual only)
                       const sepRow = (
                         <tr key={`sep-${ch}-${chIdx}`}>
                           <td colSpan={12} style={{ padding: 0, border: 'none', height: 10 }} />
                         </tr>
                       );
 
-                      return [...mainRendered, ...bonusRendered, sepRow];
+                      if (!mergeBenefit) {
+                        const mainRendered = mainRows.map((r, i) => (
+                          <tr key={`main-${ch}-${i}`}>
+                            <td style={{ ...s.td, textAlign: 'left' }}>{toStr(r.Channel)}</td>
+                            <td style={{ ...s.td, textAlign: 'left' }}>{toStr(r.Program)}</td>
+                            <td style={{ ...s.td, textAlign: 'left' }}>{toStr(r.Day ?? r.Date ?? '')}</td>
+                            <td style={s.tdNowrap}>{toStr(r.Time ?? '')}</td>
+                            <td style={s.td}>{toStr(r.Slot ?? 'A')}</td>
+                            <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(num(r.Cost ?? r.NCost))}</td>
+                            <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.TVR ?? r.NTVR))}</td>
+                            <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(num(r.NCost ?? 0))}</td>
+                            <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.NTVR ?? 0))}</td>
+                            <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(num(r.Total_Cost ?? 0))}</td>
+                            <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.Total_Rating ?? r.Total_NTVR ?? 0))}</td>
+                            <td style={s.td}>{num(r.Spots ?? 0)}</td>
+                          </tr>
+                        ));
+
+                        const benefitRendered = benefitRows.map((r, i) => (
+                          <tr key={`benefit-${ch}-${i}`}>
+                            <td style={{ ...s.td, ...s.benefitRow, textAlign: 'left' }}>{toStr(r.Channel)}</td>
+                            <td style={{ ...s.td, ...s.benefitRow, textAlign: 'left' }}>{toStr(r.Program)}</td>
+                            <td style={{ ...s.td, ...s.benefitRow, textAlign: 'left' }}>{toStr(r.Day ?? r.Date ?? '')}</td>
+                            <td style={{ ...s.td, ...s.benefitRow }}>{toStr(r.Time ?? '')}</td>
+                            <td style={{ ...s.td, ...s.benefitRow }}>{toStr(r.Slot ?? 'A')}</td>
+                            <td style={{ ...s.td, ...s.benefitRow, textAlign: 'right' }}>{formatLKR_1(num(r.Cost ?? r.NCost))}</td>
+                            <td style={{ ...s.td, ...s.benefitRow, textAlign: 'right' }}>{safeFx(num(r.TVR ?? r.NTVR))}</td>
+                            <td style={{ ...s.td, ...s.benefitRow, textAlign: 'right' }}>{formatLKR_1(num(r.NCost ?? 0))}</td>
+                            <td style={{ ...s.td, ...s.benefitRow, textAlign: 'right' }}>{safeFx(num(r.NTVR ?? 0))}</td>
+                            <td style={{ ...s.td, ...s.benefitRow, textAlign: 'right' }}>{formatLKR_1(num(r.Total_Cost ?? 0))}</td>
+                            <td style={{ ...s.td, ...s.benefitRow, textAlign: 'right' }}>{safeFx(num(r.Total_Rating ?? r.Total_NTVR ?? 0))}</td>
+                            <td style={{ ...s.td, ...s.benefitRow }}>{num(r.Spots ?? 0)}</td>
+                          </tr>
+                        ));
+
+                        return [...mainRendered, ...benefitRendered, ...bonusRendered, sepRow];
+                      } else {
+                        // Merge logic: merge matching benefit into main, then sort all non-bonus rows by Slot (A before B)
+                        const subKey = (r) => [
+                          toStr(r.Program),
+                          toStr(r.Day ?? r.Date ?? ''),
+                          toStr(r.Time ?? r.Start_Time ?? r.StartTime ?? ''),
+                          toStr(r.Slot ?? 'A')
+                        ].join('||').toLowerCase();
+
+                        const mainMap = new Map();
+                        mainRows.forEach(r => {
+                          const k = subKey(r);
+                          mainMap.set(k, (mainMap.get(k) || []).concat(r));
+                        });
+
+                        const unmatchedBenefit = [];
+                        benefitRows.forEach(r => {
+                          const k = subKey(r);
+                          if (mainMap.has(k)) {
+                            mainMap.set(k, mainMap.get(k).concat(r));
+                          } else {
+                            unmatchedBenefit.push(r);
+                          }
+                        });
+
+                        const mergedMainRows = [];
+                        mainMap.forEach((rows, k) => {
+                          if (rows.length === 1) {
+                            mergedMainRows.push(rows[0]);
+                          } else {
+                            const first = rows[0];
+                            const spots = rows.reduce((a, rr) => a + num(rr.Spots ?? 0), 0);
+                            const totalCost = rows.reduce((a, rr) => a + num(rr.Total_Cost ?? 0), 0);
+                            const totalRating = rows.reduce((a, rr) => a + num(rr.Total_Rating ?? rr.Total_NTVR ?? 0), 0);
+                            const merged = {
+                              ...first,
+                              Spots: spots,
+                              Total_Cost: totalCost,
+                              Total_Rating: totalRating,
+                            };
+                            mergedMainRows.push(merged);
+                          }
+                        });
+
+                        // Combine merged main + unmatched benefit, then sort by Slot (A=0, B=1)
+                        const allNonBonusRows = [...mergedMainRows, ...unmatchedBenefit];
+                        allNonBonusRows.sort((a, b) => {
+                          const slotA = toStr(a.Slot ?? 'A').toUpperCase();
+                          const slotB = toStr(b.Slot ?? 'A').toUpperCase();
+                          if (slotA === 'A' && slotB === 'B') return -1;
+                          if (slotA === 'B' && slotB === 'A') return 1;
+                          return 0; // same slot or fallback
+                        });
+
+                        // Render sorted non-bonus rows (all white for merged/main/unmatched benefit)
+                        const sortedNonBonusRendered = allNonBonusRows.map((r, i) => {
+                          const key = `merged-${ch}-${i}`;
+                          const rowStyle = {}; // Always white for non-bonus rows when merged
+
+                          return (
+                            <tr key={key} style={rowStyle}>
+                              <td style={{ ...s.td, textAlign: 'left' }}>{toStr(r.Channel)}</td>
+                              <td style={{ ...s.td, textAlign: 'left' }}>{toStr(r.Program)}</td>
+                              <td style={{ ...s.td, textAlign: 'left' }}>{toStr(r.Day ?? r.Date ?? '')}</td>
+                              <td style={s.tdNowrap}>{toStr(r.Time ?? '')}</td>
+                              <td style={s.td}>{toStr(r.Slot ?? 'A')}</td>
+                              <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(num(r.Cost ?? r.NCost))}</td>
+                              <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.TVR ?? r.NTVR))}</td>
+                              <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(num(r.NCost ?? 0))}</td>
+                              <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.NTVR ?? 0))}</td>
+                              <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(num(r.Total_Cost ?? 0))}</td>
+                              <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.Total_Rating ?? r.Total_NTVR ?? 0))}</td>
+                              <td style={s.td}>{num(r.Spots ?? 0)}</td>
+                            </tr>
+                          );
+                        });
+
+                        return [...sortedNonBonusRendered, ...bonusRendered, sepRow];
+                      }
                     });
                   })()}
                 </tbody>

@@ -22,7 +22,8 @@ export default function OptimizationResults({
   timeLimit,
   allDbPrograms,
   propertyRunSummary,
-  setMainOptimizationResult
+  setMainOptimizationResult,
+  proceedLabel = "Proceed to Bonus Program Optimization" // 👈 default
 }) {
   // Define styles within the component
   const styles = {
@@ -281,11 +282,13 @@ export default function OptimizationResults({
         <button onClick={onHome} style={styles.backHomeButton}>
           Go Back to Home
         </button>
-
-        <button type="button" onClick={handleProceedToBonus} disabled={!onProceedToBonus}
+        <button
+          type="button"
+          onClick={handleProceedToBonus}
+          disabled={!onProceedToBonus}
           style={{ ...styles.primaryButton, opacity: onProceedToBonus ? 1 : 0.6 }}
         >
-          Proceed to Bonus Program Optimization
+          {proceedLabel}
         </button>
       </div>
     </div>
