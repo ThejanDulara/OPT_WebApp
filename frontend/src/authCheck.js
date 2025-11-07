@@ -6,7 +6,7 @@ export async function checkAuth() {
   // 🧠 API base (Flask backend)
   const apiBase = isLocal
     ? "http://localhost:8000/api"
-    : "https://https://mtmbackend-production.up.railway.app/api";
+    : "https://mtmbackend-production.up.railway.app/api";
 
   // 🧠 Main portal base for login
   const portalBase = isLocal
