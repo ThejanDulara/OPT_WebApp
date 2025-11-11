@@ -23,7 +23,7 @@ document.body.innerHTML = `
     Authorization Processing...
   </div>
 `;
-
+//
 // 🚀 Run auth check before rendering
 async function startApp() {
   const authorized = await checkAuth();
