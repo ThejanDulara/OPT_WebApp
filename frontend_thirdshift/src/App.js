@@ -105,44 +105,6 @@ function App() {
 
 
   // -------- Helper: derive IDs for BonusDfPreview from selected rows --------
-  const extractIdsFromSelected = (selectedByChannel, fullRows) => {
-    const ids = [];
-    if (!selectedByChannel || !fullRows) return ids;
-
-    // Build a quick index on dfFull by a composite key of common fields
-    const keyOf = (r) => {
-      const toStr = (v) => (v === null || v === undefined ? '' : String(v));
-      return [
-        toStr(r.Channel),
-        toStr(r.Program),
-        toStr(r.Day ?? r.Date ?? ''),
-        toStr(r.Time ?? r.Start_Time ?? r.StartTime ?? ''),
-        toStr(r.Duration ?? r.DURATION ?? r.Dur ?? ''),
-        toStr(r.Slot ?? '')
-      ].join('||');
-    };
-
-    const indexByKey = new Map();
-    fullRows.forEach((r, idx) => indexByKey.set(keyOf(r), idx)); // use index as fallback id
-
-    Object.values(selectedByChannel).forEach((rows = []) => {
-      rows.forEach((r) => {
-        // Prefer explicit IDs if present
-        const explicitId = r.id ?? r._id ?? r.ID ?? r.Id;
-        if (explicitId !== undefined && explicitId !== null) {
-          ids.push(explicitId);
-          return;
-        }
-        // Fallback: map to first matching dfFull index via composite key
-        const k = keyOf(r);
-        if (indexByKey.has(k)) {
-          ids.push(indexByKey.get(k));
-        }
-      });
-    });
-
-    return ids;
-  };
 
   // -------- Bonus handlers --------
   // Called by the button inside OptimizationResults.jsx
@@ -152,14 +114,9 @@ function App() {
     setShowResults(false); // Hide results when moving to bonus
   };
 
-  // If a component still gives us IDs directly, keep this path
-  const handleBonusProgramSubmit = (ids) => {
-    setStep(8); // go to BonusChannelBudgetSetup
-  };
 
   // Used when the selector finishes (it calls onNext, not onSubmit)
   const handleBonusProgramSubmitFromRows = () => {
-    const ids = extractIdsFromSelected(selectedBonusPrograms, dfFull);
     setStep(8);
   };
 
@@ -168,9 +125,6 @@ function App() {
     setStep(9); // build bonus-ready table
   };
 
-  const handleBonusDfReady = (df) => {
-    setStep(10); // bonus optimization results
-  };
 
   const handleBonusResultReady = (res) => {
     const safe = res || { total_cost: 0, total_rating: 0, rows: [] };
