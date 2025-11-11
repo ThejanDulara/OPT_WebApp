@@ -10,7 +10,6 @@ import json
 import time
 from collections import defaultdict
 
-
 app = Flask(__name__)
 CORS(app)  # Enable CORS for communication with React frontend
 
@@ -143,6 +142,80 @@ def generate_df():
 
     return jsonify({"df_full": json.loads(df_full.to_json(orient='records'))})
 
+@app.route('/generate-bonus-df', methods=['POST'])
+def generate_bonus_df():
+    """
+    Generate the bonus optimization-ready DataFrame
+    using the same normalization logic as /generate-df.
+    Avoids duplicates and ensures consistent scaling.
+    """
+    data = request.get_json()
+
+    # Selected program IDs for Slot B
+    program_ids = data.get('program_ids', [])
+    durations = data.get('durations', [])
+    num_commercials = len(durations)
+    negotiated_rates = data.get('negotiated_rates', {})
+    channel_discounts = data.get('channel_discounts', {})
+
+    if not program_ids or not durations:
+        return jsonify({"error": "Missing program_ids or durations"}), 400
+
+    # 🔁 Reuse existing generate_df logic (inline version)
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    fmt = ','.join(['%s'] * len(program_ids))
+    cursor.execute(f"SELECT id, channel, day, time, program, cost, tvr, slot FROM programs WHERE id IN ({fmt})", tuple(program_ids))
+    rows = cursor.fetchall()
+    conn.close()
+    if not rows:
+        return jsonify({"error": "No programs found for given IDs"}), 400
+
+    df = pd.DataFrame(rows)
+    df.rename(columns={
+        'id': 'Id',
+        'channel': 'Channel',
+        'day': 'Day',
+        'time': 'Time',
+        'program': 'Program',
+        'cost': 'Cost',
+        'tvr': 'TVR',
+        'slot': 'Slot'
+    }, inplace=True)
+
+    df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce').fillna(0.0)
+    df['TVR'] = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
+
+    def effective_cost(row):
+        pid = row['Id']
+        ch = row['Channel']
+        base = float(row['Cost'])
+        if pid in negotiated_rates:
+            return float(negotiated_rates[pid])
+        disc_pct = float(channel_discounts.get(ch, 30.0))
+        return round(base * (1.0 - disc_pct / 100.0), 2)
+
+    df['Negotiated_Rate'] = df.apply(effective_cost, axis=1)
+
+    df_list = []
+    for c in range(num_commercials):
+        temp = df.copy()
+        temp['Commercial'] = f"com_{c+1}"
+        dur = float(durations[c])
+        temp['Duration'] = dur
+        temp['NTVR'] = (temp['TVR'] / 30.0) * dur
+        temp['NCost'] = (temp['Negotiated_Rate'] / 30.0) * dur
+        temp['Slot'] = 'B'
+        df_list.append(temp)
+
+    df_full = pd.concat(df_list, ignore_index=True)
+    df_full = df_full.drop_duplicates(subset=['Channel', 'Program', 'Day', 'Time', 'Commercial'])
+
+    cols_to_round = ['Cost', 'TVR', 'Negotiated_Rate', 'NTVR', 'NCost']
+    for col in cols_to_round:
+        df_full[col] = pd.to_numeric(df_full[col], errors='coerce').fillna(0.0).round(2)
+
+    return jsonify({"success": True, "df_full": json.loads(df_full.to_json(orient='records'))})
 
 
 @app.route('/optimize', methods=['POST'])
