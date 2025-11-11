@@ -11,3 +11,6 @@ frontend/dist/
 .DS_Store
 .env
 *.pyc
+".idea/" 
+"*.log" 
+"*.db" 
