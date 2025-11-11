@@ -21,7 +21,6 @@ import BonusResults from './components/BonusResults';
 import FinalPlan from './components/FinalPlan';
 
 import CommercialBenefitSetup from './components/CommercialBenefitSetup';
-import CommercialBenefitResults from './components/CommercialBenefitResults';
 
 function App() {
   // -------- Global step --------
@@ -34,7 +33,6 @@ function App() {
 
   // NEW: Commercial Benefit route + result cache (optional)
     const [benefitResult, setBenefitResult] = useState(null);
-    const [benefitSetupCache, setBenefitSetupCache] = useState(null); // optional, if you want to persist edits
 
     // Is there any channel with Com. Benefit > 0?
     const hasAnyComBenefit = useMemo(
@@ -62,11 +60,9 @@ function App() {
   const [propertyProgramsForFinal, setPropertyProgramsForFinal] = useState({});
 
   // Bonus flow state
-  const [bonusSelectedIds, setBonusSelectedIds] = useState([]);   // consumed by BonusDfPreview
+  //const [bonusSelectedIds, setBonusSelectedIds] = useState([]);   // consumed by BonusDfPreview
   const [bonusSharesInput, setBonusSharesInput] = useState(null);
-  const [bonusDfFull, setBonusDfFull] = useState([]);
   const [bonusResult, setBonusResult] = useState(null);
-  const [channelBudgetData, setChannelBudgetData] = useState({});
   const [bonusReadyRows, setBonusReadyRows] = useState([]);
 
   // NEW: selector uses rows by channel; we keep them and later derive IDs for your existing pipeline
@@ -150,8 +146,7 @@ function App() {
 
   // -------- Bonus handlers --------
   // Called by the button inside OptimizationResults.jsx
-  const handleProceedToBonusSelector = () => {
-    setBonusSelectedIds([]);            // fresh selection for bonus
+  const handleProceedToBonusSelector = () => {          // fresh selection for bonus
     setSelectedBonusPrograms({});       // clear any prior row selections
     setStep(7);
     setShowResults(false); // Hide results when moving to bonus
@@ -159,14 +154,12 @@ function App() {
 
   // If a component still gives us IDs directly, keep this path
   const handleBonusProgramSubmit = (ids) => {
-    setBonusSelectedIds(ids || []);
     setStep(8); // go to BonusChannelBudgetSetup
   };
 
   // Used when the selector finishes (it calls onNext, not onSubmit)
   const handleBonusProgramSubmitFromRows = () => {
     const ids = extractIdsFromSelected(selectedBonusPrograms, dfFull);
-    setBonusSelectedIds(ids);
     setStep(8);
   };
 
@@ -176,7 +169,6 @@ function App() {
   };
 
   const handleBonusDfReady = (df) => {
-    setBonusDfFull(df || []);
     setStep(10); // bonus optimization results
   };
 
