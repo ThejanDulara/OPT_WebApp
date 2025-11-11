@@ -26,35 +26,42 @@ export default function BonusProgramSelector({
   ].map(toStr).join('||');
 
   // Only Slot B (non-prime) rows, group by channel
-  const slotBByChannel = useMemo(() => {
-    const out = {};
-    channels.forEach((ch) => (out[ch] = []));
-    (allDbPrograms || []).forEach((r) => {
-      const ch = r.Channel;
-      if (!ch || !channels.includes(ch)) return;
-      if (normSlot(r.Slot) !== 'B') return; // enforce non-prime
-      out[ch].push(r);
-    });
-    // sort each channel's rows (stable order)
-    channels.forEach((ch) => {
-      out[ch].sort((a, b) => toStr(a.Program).localeCompare(toStr(b.Program)));
-    });
-    return out;
-  }, [allDbPrograms, channels]);
+    const slotBByChannel = useMemo(() => {
+      const out = {};
+      channels.forEach((ch) => (out[ch] = []));
+      const seen = new Set();
+
+      (allDbPrograms || []).forEach((r) => {
+        const ch = r.Channel;
+        if (!ch || !channels.includes(ch)) return;
+        if (normSlot(r.Slot) !== 'B') return;
+
+        const key = [ch, r.Program, r.Day ?? r.Date ?? '', r.Time ?? r.Start_Time ?? r.StartTime ?? ''].join('||');
+        if (seen.has(key)) return; // skip duplicate
+        seen.add(key);
+
+        out[ch].push(r);
+      });
+      return out;
+    }, [allDbPrograms, channels]);
 
   // Local UI state: search text per channel, and checkbox state per channel
   const [searchTextByChannel, setSearchTextByChannel] = useState({});
   const [checkedByChannel, setCheckedByChannel] = useState({}); // {ch: Set(rowKey)}
 
   // Seed from any previously saved selection
-  useEffect(() => {
-    const seeded = {};
-    channels.forEach((ch) => {
-      const arr = selectedBonusPrograms?.[ch] || [];
-      seeded[ch] = new Set(arr.map(rowKey));
-    });
-    setCheckedByChannel(seeded);
-  }, [channels]); // intentionally only when channel list changes
+    useEffect(() => {
+      const seeded = {};
+      channels.forEach((ch) => {
+        const allRows = slotBByChannel[ch] || [];
+        // ✅ If previous selections exist, use them; otherwise select everything
+        const arr = selectedBonusPrograms?.[ch]?.length
+          ? selectedBonusPrograms[ch]
+          : allRows;
+        seeded[ch] = new Set(arr.map(rowKey));
+      });
+      setCheckedByChannel(seeded);
+    }, [channels, slotBByChannel]);
 
   const filteredRowsByChannel = useMemo(() => {
     const out = {};

@@ -116,6 +116,7 @@ export default function BonusDfPreview({
   }, [channels, bonusBudgetsByChannel, percMap, commercialKeys]);
 
   // Build ready rows
+  // Build ready rows (same logic, cleaned)
   const readyRowsUnsorted = useMemo(() => {
     let rid = 1;
     const rows = [];
@@ -124,13 +125,13 @@ export default function BonusDfPreview({
       const comKeys = commercialKeys;
       chosen.forEach((raw) => {
         const baseRate = pickRate(raw);
-        const baseTVR  = pickTVR(raw);
-        const baseDur  = Math.max(1, pickDur(raw));
+        const baseTVR = pickTVR(raw);
+        const baseDur = Math.max(1, pickDur(raw));
         comKeys.forEach((ck) => {
           const durSel = Math.max(1, num(durMap?.[ch]?.[ck], 30));
-          const scale  = durSel / baseDur;
-          const ncost  = baseRate * scale;
-          const ntvr   = baseTVR * scale;
+          const scale = durSel / baseDur;
+          const ncost = baseRate * scale;
+          const ntvr = baseTVR * scale;
           rows.push({
             RowId: rid++,
             Channel: ch,
@@ -148,27 +149,43 @@ export default function BonusDfPreview({
         });
       });
     });
+    const seen = new Set();
+    const unique = [];
+    rows.forEach((r) => {
+      const key = `${r.Channel}|${r.Program}|${r.Commercial}|${r.Day}|${r.Time}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(r);
+      }
+    });
+    return unique;
     return rows;
   }, [channels, selectedBonusPrograms, commercialKeys, durMap]);
 
+
   // Sorted rows
-  const readyRows = useMemo(() => {
-    const safe = [...readyRowsUnsorted];
-    const valOr = (v, d = '') => (v === null || v === undefined ? d : v);
-    safe.sort((a, b) => {
-      const chCmp = String(a.Channel).localeCompare(String(b.Channel));
-      if (chCmp !== 0) return chCmp;
-      const ai = num(commercialOrder[a.Commercial], 1e9);
-      const bi = num(commercialOrder[b.Commercial], 1e9);
-      if (ai !== bi) return ai - bi;
-      const dCmp = String(valOr(a.Day)).localeCompare(String(valOr(b.Day)));
-      if (dCmp !== 0) return dCmp;
-      const tCmp = String(valOr(a.Time)).localeCompare(String(valOr(b.Time)));
-      if (tCmp !== 0) return tCmp;
-      return String(valOr(a.Program)).localeCompare(String(valOr(b.Program)));
-    });
-    return safe;
-  }, [readyRowsUnsorted, commercialOrder]);
+    const readyRows = useMemo(() => {
+      const safe = [...readyRowsUnsorted];
+      const valOr = (v, d = '') => (v === null || v === undefined ? d : v);
+      safe.sort((a, b) => {
+        // 🧩 1️⃣ Sort by Commercial first (com_1, com_2, ...)
+        const ai = num(commercialOrder[a.Commercial], 1e9);
+        const bi = num(commercialOrder[b.Commercial], 1e9);
+        if (ai !== bi) return ai - bi;
+
+        // 🧩 2️⃣ Then sort by Channel
+        const chCmp = String(a.Channel).localeCompare(String(b.Channel));
+        if (chCmp !== 0) return chCmp;
+
+        // 🧩 3️⃣ Then by Day, Time, Program
+        const dCmp = String(valOr(a.Day)).localeCompare(String(valOr(b.Day)));
+        if (dCmp !== 0) return dCmp;
+        const tCmp = String(valOr(a.Time)).localeCompare(String(valOr(b.Time)));
+        if (tCmp !== 0) return tCmp;
+        return String(valOr(a.Program)).localeCompare(String(valOr(b.Program)));
+      });
+      return safe;
+    }, [readyRowsUnsorted, commercialOrder]);
 
   useEffect(() => {
     setBonusReadyRows(readyRows);

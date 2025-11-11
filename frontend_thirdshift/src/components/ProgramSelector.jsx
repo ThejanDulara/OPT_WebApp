@@ -5,18 +5,24 @@ function ProgramSelector({ onSubmit, onBack, negotiatedRates }) {
   const [programsByChannel, setProgramsByChannel] = useState({});
   const [selectedPrograms, setSelectedPrograms] = useState({});
 
-  useEffect(() => {
-    fetch('https://optwebapp-production.up.railway.app/all-programs')
-      .then(res => res.json())
-      .then(data => {
-        const grouped = {};
-        data.programs.forEach(p => {
-          if (!grouped[p.channel]) grouped[p.channel] = [];
-          grouped[p.channel].push(p);
+    useEffect(() => {
+      fetch('https://optwebapp-production.up.railway.app/all-programs')
+        .then(res => res.json())
+        .then(data => {
+          const grouped = {};
+          const allSelected = {};
+
+          data.programs.forEach(p => {
+            if (!grouped[p.channel]) grouped[p.channel] = [];
+            grouped[p.channel].push(p);
+            allSelected[p.id] = true; // ✅ mark all programs as selected by default
+          });
+
+          setProgramsByChannel(grouped);
+          setSelectedPrograms(allSelected); // ✅ pre-select all
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         });
-        setProgramsByChannel(grouped);
-      });
-  }, []);
+    }, []);
 
   const handleCheckboxChange = (programId) => {
     setSelectedPrograms(prev => ({
