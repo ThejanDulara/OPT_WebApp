@@ -557,7 +557,7 @@ def optimize_by_budget_share():
         df_ch = df_full[df_full['Channel'] == ch]
         ch_cost = float(df_ch['Total_Cost'].sum())
         ch_rating = float(df_ch['Total_Rating'].sum())
-        ch_prime = df_ch[df_ch['Slot'] == 'A']
+        ch_prime = df_ch[df_ch['Slot'].str.startswith('A', na=False)]
         ch_nonprime = df_ch[df_ch['Slot'] == 'B']
         prime_cost_val = float(ch_prime['Total_Cost'].sum())
         nonprime_cost_val = float(ch_nonprime['Total_Cost'].sum())
