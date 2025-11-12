@@ -28,10 +28,24 @@ export default function CommercialBenefitSetup({
 
   const [result, setResult] = useState(null);
 
-  // Per-channel PT/NPT (default 80/20)
+  // Per-channel splits
   const [channelSplits, setChannelSplits] = useState(() => {
     const seed = {};
-    (channels || []).forEach(ch => (seed[ch] = { prime: 80, nonprime: 20 }));
+    (channels || []).forEach(ch => {
+      if (ch === 'HIRU TV') {
+        const avgPrime = 80 / 5;
+        seed[ch] = {
+          A1: avgPrime,
+          A2: avgPrime,
+          A3: avgPrime,
+          A4: avgPrime,
+          A5: avgPrime,
+          B: 20
+        };
+      } else {
+        seed[ch] = { prime: 80, nonprime: 20 };
+      }
+    });
     return seed;
   });
 
@@ -50,12 +64,12 @@ export default function CommercialBenefitSetup({
   const perChannelSplitErrors = useMemo(() => {
     const errs = {};
     benefitChannels.forEach(ch => {
-      const p = toNum(channelSplits[ch]?.prime ?? primePct);
-      const np = toNum(channelSplits[ch]?.nonprime ?? nonPrimePct);
-      if (Math.abs(p + np - 100) > 0.01) errs[ch] = true;
+      const splits = channelSplits[ch] || {};
+      const sum = Object.values(splits).reduce((a, v) => a + toNum(v), 0);
+      if (Math.abs(sum - 100) > 0.01) errs[ch] = true;
     });
     return errs;
-  }, [benefitChannels, channelSplits, primePct, nonPrimePct]);
+  }, [benefitChannels, channelSplits]);
 
   // Small countdown indicator (same UX feel)
   const [countdown, setCountdown] = useState(null);
@@ -84,7 +98,19 @@ export default function CommercialBenefitSetup({
   const applyGlobalToAllChannels = () => {
     const next = {};
     benefitChannels.forEach(ch => {
-      next[ch] = { prime: toNum(primePct), nonprime: toNum(nonPrimePct) };
+      if (ch === 'HIRU TV') {
+        const avgPrime = toNum(primePct) / 5;
+        next[ch] = {
+          A1: avgPrime,
+          A2: avgPrime,
+          A3: avgPrime,
+          A4: avgPrime,
+          A5: avgPrime,
+          B: toNum(nonPrimePct)
+        };
+      } else {
+        next[ch] = { prime: toNum(primePct), nonprime: toNum(nonPrimePct) };
+      }
     });
     setChannelSplits(next);
     toast.info('Applied global PT/NPT split to all channels (Commercial Benefit)');
@@ -92,9 +118,8 @@ export default function CommercialBenefitSetup({
 
   const handleChannelSplitChange = (ch, which, value) => {
     setChannelSplits(prev => {
-      const prime = which === 'prime' ? value : prev[ch]?.prime ?? primePct;
-      const nonprime = which === 'nonprime' ? value : prev[ch]?.nonprime ?? nonPrimePct;
-      return { ...prev, [ch]: { prime: toNum(prime), nonprime: toNum(nonprime) } };
+      const current = prev[ch] || {};
+      return { ...prev, [ch]: { ...current, [which]: toNum(value) } };
     });
   };
 
@@ -142,7 +167,7 @@ export default function CommercialBenefitSetup({
       return;
     }
     if (Object.keys(perChannelSplitErrors).length > 0) {
-      alert("Each channel's PT% + NPT% must equal 100%.");
+      alert("Each channel's split % must equal 100%.");
       return;
     }
     if (optimizationInput?.numCommercials > 1) {
@@ -168,11 +193,25 @@ export default function CommercialBenefitSetup({
       budget_shares[ch] = (b / totalComBenefit) * 100.0;
     });
 
-    const channel_prime_pct_map = {};
-    const channel_nonprime_pct_map = {};
+    // Build channel_slot_pct_map
+    const channel_slot_pct_map = {};
     benefitChannels.forEach(ch => {
-      channel_prime_pct_map[ch] = toNum(channelSplits[ch]?.prime ?? primePct);
-      channel_nonprime_pct_map[ch] = toNum(channelSplits[ch]?.nonprime ?? nonPrimePct);
+      const splits = channelSplits[ch] || {};
+      if (ch !== 'HIRU TV') {
+        channel_slot_pct_map[ch] = {
+          A: toNum(splits.prime ?? primePct),
+          B: toNum(splits.nonprime ?? nonPrimePct)
+        };
+      } else {
+        channel_slot_pct_map[ch] = {
+          A1: toNum(splits.A1 ?? (primePct / 5)),
+          A2: toNum(splits.A2 ?? (primePct / 5)),
+          A3: toNum(splits.A3 ?? (primePct / 5)),
+          A4: toNum(splits.A4 ?? (primePct / 5)),
+          A5: toNum(splits.A5 ?? (primePct / 5)),
+          B: toNum(splits.B ?? nonPrimePct)
+        };
+      }
     });
 
     const payload = {
@@ -186,8 +225,7 @@ export default function CommercialBenefitSetup({
       time_limit: timeLimit,
       prime_pct: primePct,
       nonprime_pct: nonPrimePct,
-      channel_prime_pct_map,
-      channel_nonprime_pct_map,
+      channel_slot_pct_map,
       budget_proportions: budgetProportions.map(p => parseFloat(p))
     };
 
@@ -270,10 +308,8 @@ export default function CommercialBenefitSetup({
         {benefitChannels.map((ch) => {
           const chAmount = toNum(channelMoney?.[ch]?.chAmount);
           const comBenefit = toNum(channelMoney?.[ch]?.comBenefit);
-          const chPrimePct = toNum(channelSplits[ch]?.prime ?? primePct);
-          const chNonPrimePct = toNum(channelSplits[ch]?.nonprime ?? nonPrimePct);
-          const chPrimeAmount = (comBenefit * chPrimePct) / 100;
-          const chNonPrimeAmount = (comBenefit * chNonPrimePct) / 100;
+          const splits = channelSplits[ch] || {};
+          const isHiru = ch === 'HIRU TV';
           const hasErr = perChannelSplitErrors[ch];
 
           return (
@@ -289,49 +325,83 @@ export default function CommercialBenefitSetup({
               <div style={styles.amountBox}><strong>Commercial Benefit:</strong> {formatLKR(comBenefit)}</div>
 
               <div style={styles.splitWrap}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                  <span style={{ ...styles.label, minWidth: 90 }}>Prime Time:</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={chPrimePct}
-                    onChange={e => handleChannelSplitChange(ch, 'prime', e.target.value)}
-                    style={{ ...styles.numberInput, width: 70, borderColor: hasErr ? '#e53e3e' : '#e2e8f0' }}
-                  />
-                  <span style={styles.percentSymbol}>%</span>
-                  <span style={styles.amountBox}>{formatLKR(chPrimeAmount)}</span>
-                </div>
+                {!isHiru ? (
+                  <>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                      <span style={{ ...styles.label, minWidth: 90 }}>Prime Time:</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={toNum(splits.prime ?? primePct)}
+                        onChange={e => handleChannelSplitChange(ch, 'prime', e.target.value)}
+                        style={{ ...styles.numberInput, width: 70, borderColor: hasErr ? '#e53e3e' : '#e2e8f0' }}
+                      />
+                      <span style={styles.percentSymbol}>%</span>
+                      <span style={styles.amountBox}>{formatLKR((comBenefit * toNum(splits.prime ?? primePct)) / 100)}</span>
+                    </div>
 
-                <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                  <span style={{ ...styles.label, minWidth: 90 }}>Non-Prime:</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={chNonPrimePct}
-                    onChange={e => handleChannelSplitChange(ch, 'nonprime', e.target.value)}
-                    style={{ ...styles.numberInput, width: 70, borderColor: hasErr ? '#e53e3e' : '#e2e8f0' }}
-                  />
-                  <span style={styles.percentSymbol}>%</span>
-                  <span style={styles.amountBox}>{formatLKR(chNonPrimeAmount)}</span>
-                </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                      <span style={{ ...styles.label, minWidth: 90 }}>Non-Prime:</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={toNum(splits.nonprime ?? nonPrimePct)}
+                        onChange={e => handleChannelSplitChange(ch, 'nonprime', e.target.value)}
+                        style={{ ...styles.numberInput, width: 70, borderColor: hasErr ? '#e53e3e' : '#e2e8f0' }}
+                      />
+                      <span style={styles.percentSymbol}>%</span>
+                      <span style={styles.amountBox}>{formatLKR((comBenefit * toNum(splits.nonprime ?? nonPrimePct)) / 100)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {['A1', 'A2', 'A3', 'A4', 'A5', 'B'].map(slot => {
+                      const slotLabels = {
+                        A1: 'A1 - 6.55 News',
+                        A2: 'A2 - 9.55 news',
+                        A3: 'A3 - PT WD Prog',
+                        A4: 'A4 - PT WE Prog',
+                        A5: 'A5 - PT B',
+                        B: 'B - NPT'
+                      };
+                      const defaultPct = slot === 'B' ? nonPrimePct : (primePct / 5);
+                      const pct = toNum(splits[slot] ?? defaultPct);
+                      const amount = (comBenefit * pct) / 100;
 
-                {hasErr && <div style={styles.error}>Prime + Non-Prime must total 100%</div>}
+                      return (
+                        <div key={slot} style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                          <span style={{ ...styles.label, minWidth: 120 }}>{slotLabels[slot]}:</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={pct}
+                            onChange={e => handleChannelSplitChange(ch, slot, e.target.value)}
+                            style={{ ...styles.numberInput, width: 70, borderColor: hasErr ? '#e53e3e' : '#e2e8f0' }}
+                          />
+                          <span style={styles.percentSymbol}>%</span>
+                          <span style={styles.amountBox}>{formatLKR(amount)}</span>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+                {hasErr && <div style={styles.error}>Splits must total 100%</div>}
               </div>
             </div>
           );
         })}
-          {benefitChannels.length === 1 && (
-            <div
-              style={{
-                ...styles.card,
-                visibility: 'hidden',
-                height: 0,
-                padding: 16,
-                border: 'none'
-              }}
-            />
-          )}
-        </div>
+        {benefitChannels.length === 1 && (
+          <div
+            style={{
+              ...styles.card,
+              visibility: 'hidden',
+              height: 0,
+              padding: 16,
+              border: 'none'
+            }}
+          />
+        )}
+      </div>
 
       {/* Summary + controls */}
       <div className="side" style={styles.side}>
