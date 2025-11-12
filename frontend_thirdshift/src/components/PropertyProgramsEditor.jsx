@@ -87,9 +87,9 @@ export default function PropertyProgramsEditor({
 
 
 
-  const visibleChannels = (channels || []).filter(
-    ch => !!hasProperty[ch] && num(propertyAmounts[ch]) > 0
-  );
+    const visibleChannels = (channels || []).filter(
+      ch => !!hasProperty[ch]
+    );
 
   if (visibleChannels.length === 0) return null;
 
