@@ -441,7 +441,7 @@ def optimize_by_budget_share():
         prob += ch_cost <= 1.05 * ch_budget
 
         # PT / NPT sets
-        prime_indices = df_full[(df_full['Channel'] == ch) & (df_full['Slot'] == 'A')].index
+        prime_indices = df_full[(df_full['Channel'] == ch) & (df_full['Slot'].str.startswith('A', na=False))].index
         nonprime_indices = df_full[(df_full['Channel'] == ch) & (df_full['Slot'] == 'B')].index
 
         prime_cost = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in prime_indices) if len(prime_indices) else 0
