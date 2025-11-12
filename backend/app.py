@@ -754,32 +754,52 @@ def optimize_by_benefit_share():
                 "details": df_c.to_dict(orient='records')
             })
 
-    # Channel summary
+    # Channel summary with detailed slot breakdown
     channel_summary = []
     total_cost_all = float(df_full['Total_Cost'].sum())
     total_rating = float(df_full['Total_Rating'].sum())
+
     for ch in df_full['Channel'].unique():
         df_ch = df_full[df_full['Channel'] == ch]
         ch_cost = float(df_ch['Total_Cost'].sum())
         ch_rating = float(df_ch['Total_Rating'].sum())
+
+        # Default slots
+        prime_cost = nonprime_cost = 0
+        a1_cost = a2_cost = a3_cost = a4_cost = a5_cost = b_cost = 0
+
         if ch == 'HIRU TV':
-            prime_slots = ['A1', 'A2', 'A3', 'A4', 'A5']
-            nonprime_slots = ['B']
+            a1_cost = float(df_ch[df_ch['Slot'] == 'A1']['Total_Cost'].sum())
+            a2_cost = float(df_ch[df_ch['Slot'] == 'A2']['Total_Cost'].sum())
+            a3_cost = float(df_ch[df_ch['Slot'] == 'A3']['Total_Cost'].sum())
+            a4_cost = float(df_ch[df_ch['Slot'] == 'A4']['Total_Cost'].sum())
+            a5_cost = float(df_ch[df_ch['Slot'] == 'A5']['Total_Cost'].sum())
+            b_cost = float(df_ch[df_ch['Slot'] == 'B']['Total_Cost'].sum())
+            prime_cost = a1_cost + a2_cost + a3_cost + a4_cost + a5_cost
+            nonprime_cost = b_cost
         else:
-            prime_slots = ['A']
-            nonprime_slots = ['B']
-        ch_prime = df_ch[df_ch['Slot'].isin(prime_slots)]
-        ch_nonprime = df_ch[df_ch['Slot'].isin(nonprime_slots)]
+            prime_cost = float(df_ch[df_ch['Slot'] == 'A']['Total_Cost'].sum())
+            nonprime_cost = float(df_ch[df_ch['Slot'] == 'B']['Total_Cost'].sum())
+
         channel_summary.append({
             'Channel': ch,
             'Total_Cost': round(ch_cost, 2),
             '% Cost': round((ch_cost / total_cost_all * 100), 2) if total_cost_all else 0,
             'Total_Rating': round(ch_rating, 2),
             '% Rating': round((ch_rating / total_rating * 100), 2) if total_rating else 0,
-            'Prime Cost': round(float(ch_prime['Total_Cost'].sum()), 2),
-            'Non-Prime Cost': round(float(ch_nonprime['Total_Cost'].sum()), 2),
-            'Prime Rating': round(float(ch_prime['Total_Rating'].sum()), 2),
-            'Non-Prime Rating': round(float(ch_nonprime['Total_Rating'].sum()), 2),
+            'Prime Cost': round(prime_cost, 2),
+            'Non-Prime Cost': round(nonprime_cost, 2),
+            'Prime Rating': round(
+                float(df_ch[df_ch['Slot'].isin(['A', 'A1', 'A2', 'A3', 'A4', 'A5'])]['Total_Rating'].sum()), 2),
+            'Non-Prime Rating': round(float(df_ch[df_ch['Slot'] == 'B']['Total_Rating'].sum()), 2),
+
+            # NEW: HIRU TV sub-slots
+            'A1 Cost': round(a1_cost, 2),
+            'A2 Cost': round(a2_cost, 2),
+            'A3 Cost': round(a3_cost, 2),
+            'A4 Cost': round(a4_cost, 2),
+            'A5 Cost': round(a5_cost, 2),
+            'B Cost': round(b_cost, 2),
         })
 
     return jsonify({
