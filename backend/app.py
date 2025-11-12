@@ -644,8 +644,7 @@ def optimize_by_benefit_share():
     nonprime_pct_global = float(data.get('nonprime_pct', 20))
     time_limit = int(data.get("time_limit", 120))
 
-    prime_map = data.get('channel_prime_pct_map') or {}
-    nonprime_map = data.get('channel_nonprime_pct_map') or {}
+    channel_slot_pct_map = data.get('channel_slot_pct_map') or {}
 
     if df_full.empty or not budget_shares:
         return jsonify({"error": "Missing data"}), 400
@@ -679,6 +678,8 @@ def optimize_by_benefit_share():
             prob += commercial_cost >= (share - 0.05) * total_budget
             prob += commercial_cost <= (share + 0.05) * total_budget
 
+    from collections import defaultdict
+
     # Channel-specific constraints
     for ch, pct in budget_shares.items():
         ch_indices = df_full[df_full['Channel'] == ch].index
@@ -691,22 +692,25 @@ def optimize_by_benefit_share():
         prob += ch_cost >= 0.95 * ch_budget
         prob += ch_cost <= 1.05 * ch_budget
 
-        prime_indices = df_full[(df_full['Channel'] == ch) & (df_full['Slot'] == 'A')].index
-        nonprime_indices = df_full[(df_full['Channel'] == ch) & (df_full['Slot'] == 'B')].index
+        ch_slot_pcts = channel_slot_pct_map.get(ch, {'A': prime_pct_global, 'B': nonprime_pct_global})
 
-        prime_cost = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in prime_indices) if len(prime_indices) else 0
-        nonprime_cost = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in nonprime_indices) if len(nonprime_indices) else 0
+        # Group by slot
+        slot_indices = defaultdict(list)
+        for i in ch_indices:
+            slot = df_full.loc[i, 'Slot']
+            slot_indices[slot].append(i)
 
-        ch_prime_pct = float(prime_map.get(ch, prime_pct_global))
-        ch_nonprime_pct = float(nonprime_map.get(ch, nonprime_pct_global))
-        if abs(ch_prime_pct + ch_nonprime_pct - 100.0) > 0.01:
-            ch_prime_pct = prime_pct_global
-            ch_nonprime_pct = nonprime_pct_global
-
-        prob += prime_cost >= ((ch_prime_pct / 100.0) - 0.05) * ch_budget
-        prob += prime_cost <= ((ch_prime_pct / 100.0) + 0.05) * ch_budget
-        prob += nonprime_cost >= ((ch_nonprime_pct / 100.0) - 0.05) * ch_budget
-        prob += nonprime_cost <= ((ch_nonprime_pct / 100.0) + 0.05) * ch_budget
+        for slot, indices in slot_indices.items():
+            if not indices:
+                continue
+            slot_pct = float(ch_slot_pcts.get(slot, 0))
+            if slot_pct == 0:
+                continue
+            slot_cost = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in indices)
+            lower = (slot_pct / 100.0) - 0.05
+            upper = (slot_pct / 100.0) + 0.05
+            prob += slot_cost >= lower * ch_budget
+            prob += slot_cost <= upper * ch_budget
 
     solver = PULP_CBC_CMD(msg=True, timeLimit=time_limit, keepFiles=True)
     prob.solve(solver)
@@ -758,8 +762,14 @@ def optimize_by_benefit_share():
         df_ch = df_full[df_full['Channel'] == ch]
         ch_cost = float(df_ch['Total_Cost'].sum())
         ch_rating = float(df_ch['Total_Rating'].sum())
-        ch_prime = df_ch[df_ch['Slot'] == 'A']
-        ch_nonprime = df_ch[df_ch['Slot'] == 'B']
+        if ch == 'HIRU TV':
+            prime_slots = ['A1', 'A2', 'A3', 'A4', 'A5']
+            nonprime_slots = ['B']
+        else:
+            prime_slots = ['A']
+            nonprime_slots = ['B']
+        ch_prime = df_ch[df_ch['Slot'].isin(prime_slots)]
+        ch_nonprime = df_ch[df_ch['Slot'].isin(nonprime_slots)]
         channel_summary.append({
             'Channel': ch,
             'Total_Cost': round(ch_cost, 2),
@@ -784,6 +794,7 @@ def optimize_by_benefit_share():
         "feasible_but_not_optimal": bool(feasible_but_not_optimal),
         "solver_status": str(status_str)
     }), 200
+
 
 @app.route('/optimize-bonus', methods=['POST'])
 def optimize_bonus():
