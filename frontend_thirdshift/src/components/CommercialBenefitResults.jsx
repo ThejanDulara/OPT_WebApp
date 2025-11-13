@@ -28,27 +28,25 @@ export default function CommercialBenefitResults({
   // DEBUG
   console.log("Channel Summary Data:", channelSummary);
 
+  // Define styles similar to OptimizationResults
   const styles = {
-    container: { padding: '32px', background: '#f8fafc', borderRadius: 12 },
-    title: { color: '#2d3748', fontSize: '28px', fontWeight: 700, marginBottom: 24, textAlign: 'center' },
-    section: { marginTop: 32, background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' },
-    sectionTitle: { fontSize: 22, fontWeight: 600, color: '#2d3748', marginBottom: 16, paddingBottom: 8, borderBottom: '2px solid #4299e1' },
-    kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20, marginBottom: 32 },
-    kpiCard: { background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: 20, borderRadius: 10, textAlign: 'center' },
-    kpiLabel: { fontSize: 14, opacity: 0.9 },
-    kpiValue: { fontSize: 28, fontWeight: 700, marginTop: 8 },
-    tableContainer: { overflowX: 'auto', borderRadius: 8, marginTop: 16 },
-    table: { width: '100%', borderCollapse: 'collapse', fontSize: 14 },
-    th: { background: '#f8fafc', padding: '14px 12px', textAlign: 'center', fontWeight: 600, borderBottom: '2px solid #4299e1', color: '#2d3748' },
-    td: { padding: '12px', borderBottom: '1px solid #e2e8f0', textAlign: 'center' },
+    container: { marginTop: '24px', padding: '32px', maxWidth: '1200px', margin: '0 auto', backgroundColor: '#d5e9f7', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0, 0, 0, 0.05)' },
+    title: { color: '#2d3748', fontSize: '24px', fontWeight: '600', marginBottom: '24px' },
+    sectionTitle: { color: '#2d3748', fontSize: '20px', fontWeight: '600', marginBottom: '24px' },
+    summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' },
+    summaryCard: { marginBottom: '24px', backgroundColor: 'white', borderRadius: '8px', padding: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)' },
+    summaryTitle: { color: '#4a5568', fontSize: '14px', fontWeight: '600', marginBottom: '8px' },
+    summaryValue: { color: '#2d3748', fontSize: '18px', fontWeight: '700' },
+    table: { width: '100%', borderCollapse: 'collapse', marginTop: '16px' , backgroundColor: 'white'},
+    th: { border: '1px solid #ccc', padding: '8px', background: '#f7fafc', fontWeight: '600' },
+    td: { border: '1px solid #eee', padding: '8px', textAlign: 'center',background: 'white' },
+    exportButton: { padding: '12px 24px', backgroundColor: '#38a169', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', fontWeight: '500', cursor: 'pointer', transition: 'all 0.2s ease', marginTop: '24px', marginRight: '20px' },
+    backHomeButton: { padding: '12px 24px', backgroundColor: '#edf2f7', color: '#2d3748', border: '1px solid #cbd5e0', borderRadius: '6px', fontSize: '16px', fontWeight: '500', cursor: 'pointer', marginTop: '16px', marginRight: '20px' },
+    primaryButton: { padding: '12px 24px', backgroundColor: '#4299e1', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', fontWeight: '500', cursor: 'pointer' },
+    label: { color: '#4a5568', fontWeight: '500', fontSize: '14px' },
+    tableContainer: { overflowX: 'auto', borderRadius: '8px', marginTop: '0 table:' },
     deviationWarning: { background: '#fff5f5', color: '#c53030' },
-    buttonRow: { display: 'flex', justifyContent: 'center', gap: 16, marginTop: 40, flexWrap: 'wrap' },
-    primaryButton: { padding: '14px 32px', background: '#4299e1', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(66,153,225,0.3)' },
-    successButton: { padding: '14px 32px', background: '#38a169', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: 'pointer' },
-    secondaryButton: { padding: '14px 32px', background: '#edf2f7', color: '#2d3748', border: '1px solid #cbd5e0', borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: 'pointer' },
-    note: { fontSize: 13, color: '#666', marginTop: 12, fontStyle: 'italic', textAlign: 'center' },
-    summaryCard: { marginBottom: 24, padding: 16, border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff' },
-    summaryTitle: { fontSize: 18, fontWeight: 600, color: '#4299e1', marginBottom: 8 }
+    note: { fontSize: '13px', color: '#666', marginTop: '12px', fontStyle: 'italic', textAlign: 'center' }
   };
 
   // Helper for deviation styling
@@ -56,6 +54,16 @@ export default function CommercialBenefitResults({
     if (!target || actual === 0) return {};
     const diff = Math.abs(actual - target);
     return diff > 5 ? styles.deviationWarning : {};
+  };
+
+  // Helper function for numeric formatting
+  const toFixedOrInt = (key, val) => {
+    const numericCols = ['Cost','TVR','NCost','NTVR','Total_Cost','Total_Rating'];
+    const isNumeric = numericCols.includes(key);
+    const isCount = key === 'Spots';
+    if (isCount) return parseInt(val);
+    if (isNumeric) return Number(val).toFixed(2);
+    return val;
   };
 
   // Export to Excel
@@ -90,38 +98,27 @@ export default function CommercialBenefitResults({
     saveAs(blob, 'Commercial_Benefit_Optimization_Results.xlsx');
   };
 
-  // Display order for commercial detail tables
-  const displayOrder = [
-    'Channel',
-    'Program',
-    'Slot',
-    'Spots',
-    'Total_Cost',
-    'Total_Rating'
-  ];
-
   return (
-    <div style={styles.container}>
-      <h2 style={styles.title}>Commercial Benefit Optimization Results</h2>
+    <div id="commercial-benefit-summary" >
+        <h3 style={styles.sectionTitle}>Commercial Benefit Optimization Results</h3>
 
-      {/* KPI Cards */}
-      <div style={styles.kpiGrid}>
-        <div style={styles.kpiCard}>
-          <div style={styles.kpiLabel}>Total Budget Used</div>
-          <div style={styles.kpiValue}>{formatLKR(totalCost)}</div>
+        {/* KPI Cards */}
+        <div style={styles.summaryGrid}>
+          <div style={styles.summaryCard}>
+            <h4 style={styles.summaryTitle}>Total Budget Used</h4>
+            <p style={styles.summaryValue}>{formatLKR(totalCost)}</p>
+          </div>
+          <div style={styles.summaryCard}>
+            <h4 style={styles.summaryTitle}>Total NGRP</h4>
+            <p style={styles.summaryValue}>{totalRating.toFixed(2)}</p>
+          </div>
+          <div style={styles.summaryCard}>
+            <h4 style={styles.summaryTitle}>CPRP</h4>
+            <p style={styles.summaryValue}>{formatLKR(cprp.toFixed(2))}</p>
+          </div>
         </div>
-        <div style={styles.kpiCard}>
-          <div style={styles.kpiLabel}>Total NGRP</div>
-          <div style={styles.kpiValue}>{totalRating.toFixed(2)}</div>
-        </div>
-        <div style={styles.kpiCard}>
-          <div style={styles.kpiLabel}>CPRP</div>
-          <div style={styles.kpiValue}>{formatLKR(cprp.toFixed(2))}</div>
-        </div>
-      </div>
 
-      {/* Channel Summary */}
-      <div style={styles.section}>
+        {/* Channel Summary */}
         <h3 style={styles.sectionTitle}>Channel Summary with Slot Breakdown</h3>
         <div style={styles.tableContainer}>
           <table style={styles.table}>
@@ -171,17 +168,8 @@ export default function CommercialBenefitResults({
                   };
 
                 return (
-                  <tr
-                    key={i}
-                    style={{ background: i % 2 === 0 ? '#fdfdfe' : '#fff' }}
-                  >
-                    <td
-                      style={{
-                        ...styles.td,
-                        fontWeight: 600,
-                        background: isHiru ? '#e6f7ff' : '#f8fafc',
-                      }}
-                    >
+                  <tr key={i}>
+                    <td style={{ ...styles.td, fontWeight: 600, background: isHiru ? '#e6f7ff' : '#f8fafc' }}>
                       {row.Channel}
                     </td>
                     <td style={{ ...styles.td, fontWeight: 600 }}>
@@ -240,133 +228,93 @@ export default function CommercialBenefitResults({
           Red background = deviation > ±5% from target. A1–A5 breakdown shown
           only for HIRU TV.
         </div>
-      </div>
 
-{/* ✅ Restored Commercial-wise Allocation with detail tables */}
-{commercialsSummary.length > 0 && (
-  <div style={{ background: '#e7f1fb', borderRadius: 8, padding: 24, marginTop: 32 }}>
-    <h3 style={{ fontSize: 20, fontWeight: 600, color: '#2d3748', marginBottom: 16 }}>
-      Commercial-wise Allocation
-    </h3>
-
-    {commercialsSummary.map((c, idx) => (
-      <div
-        key={idx}
-        style={{
-          background: 'white',
-          borderRadius: 8,
-          padding: 20,
-          marginBottom: 24,
-          boxShadow: '0 1px 4px rgba(0,0,0,0.1)'
-        }}
-      >
-        <h4 style={{ fontSize: 16, fontWeight: 600, color: '#2b6cb0', marginBottom: 8 }}>
-          Commercial {c.commercial_index + 1}
-        </h4>
-        <p style={{ margin: '4px 0', color: '#2d3748' }}>
-          <strong>Total Budget:</strong> {formatLKR(c.total_cost)}
-        </p>
-        <p style={{ margin: '4px 0', color: '#2d3748' }}>
-          <strong>NGRP:</strong> {Number(c.total_rating).toFixed(2)}
-        </p>
-        <p style={{ margin: '4px 0', color: '#2d3748', marginBottom: 12 }}>
-          <strong>CPRP:</strong> {Number(c.cprp).toFixed(2)}
-        </p>
-
-        {(c.details || []).length > 0 && (
-          <div style={{ overflowX: 'auto' }}>
-            <table
-              style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                marginTop: 8,
-                fontSize: 14,
-              }}
-            >
-              <thead>
-                <tr style={{ background: '#f1f5f9' }}>
-                  {[
-                    'Channel',
-                    'Program',
-                    'Day',
-                    'Time',
-                    'Slot',
-                    'Cost',
-                    'TVR',
-                    'NCost',
-                    'NTVR',
-                    'Total Budget',
-                    'NGRP',
-                    'Spots'
-                  ].map((h, i) => (
-                    <th
-                      key={i}
-                      style={{
-                        border: '1px solid #e2e8f0',
-                        padding: '8px',
-                        fontWeight: 600,
-                        textAlign: 'center',
-                        color: '#2d3748'
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {c.details.map((row, i) => (
-                  <tr key={i} style={{ background: i % 2 === 0 ? '#fdfdfd' : '#ffffff' }}>
-                    <td style={{ border: '1px solid #edf2f7', padding: '6px 8px' }}>{row.Channel}</td>
-                    <td style={{ border: '1px solid #edf2f7', padding: '6px 8px', textAlign: 'left' }}>{row.Program}</td>
-                    <td style={{ border: '1px solid #edf2f7', padding: '6px 8px' }}>{row.Day}</td>
-                    <td style={{ border: '1px solid #edf2f7', padding: '6px 8px' }}>{row.Time}</td>
-                    <td style={{ border: '1px solid #edf2f7', padding: '6px 8px', textAlign: 'center' }}>{row.Slot}</td>
-                    <td style={{ border: '1px solid #edf2f7', padding: '6px 8px', textAlign: 'right' }}>
-                      {Number(row.Cost).toFixed(2)}
-                    </td>
-                    <td style={{ border: '1px solid #edf2f7', padding: '6px 8px', textAlign: 'right' }}>
-                      {Number(row.TVR).toFixed(2)}
-                    </td>
-                    <td style={{ border: '1px solid #edf2f7', padding: '6px 8px', textAlign: 'right' }}>
-                      {Number(row.NCost).toFixed(2)}
-                    </td>
-                    <td style={{ border: '1px solid #edf2f7', padding: '6px 8px', textAlign: 'right' }}>
-                      {Number(row.NTVR).toFixed(2)}
-                    </td>
-                    <td style={{ border: '1px solid #edf2f7', padding: '6px 8px', textAlign: 'right' }}>
-                      {Number(row.Total_Cost).toFixed(2)}
-                    </td>
-                    <td style={{ border: '1px solid #edf2f7', padding: '6px 8px', textAlign: 'right' }}>
-                      {Number(row.Total_Rating).toFixed(2)}
-                    </td>
-                    <td style={{ border: '1px solid #edf2f7', padding: '6px 8px', textAlign: 'center' }}>
-                      {parseInt(row.Spots || 0)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {/* Commercial-wise Allocation */}
+        {commercialsSummary.length > 0 && (
+          <>
+            <h3 style={styles.sectionTitle}>Commercial-wise Allocation</h3>
+            {commercialsSummary.map((c, idx) => (
+              <div key={idx} style={styles.summaryCard}>
+                <h4 style={styles.label}>Commercial {c.commercial_index + 1}</h4>
+                <p>Total Budget: {formatLKR(c.total_cost)}</p>
+                <p>NGRP: {Number(c.total_rating).toFixed(2)}</p>
+                <p>CPRP: {Number(c.cprp).toFixed(2)}</p>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      {[
+                        'Channel',
+                        'Program',
+                        'Day',
+                        'Time',
+                        'Slot',
+                        'Cost',
+                        'TVR',
+                        'NCost',
+                        'NTVR',
+                        'Total_Cost',
+                        'Total_Rating',
+                        'Spots'
+                      ].map((key, i) => (
+                        <th key={i} style={styles.th}>{key}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(c.details || []).map((row, i) => (
+                      <tr key={i}>
+                        {[
+                          'Channel',
+                          'Program',
+                          'Day',
+                          'Time',
+                          'Slot',
+                          'Cost',
+                          'TVR',
+                          'NCost',
+                          'NTVR',
+                          'Total_Cost',
+                          'Total_Rating',
+                          'Spots'
+                        ].map((key, j) => (
+                          <td
+                            key={j}
+                            style={{
+                              ...styles.td,
+                              textAlign: ['Spots','Slot'].includes(key)
+                                ? 'center'
+                                : ['Cost','TVR','NCost','NTVR','Total_Cost','Total_Rating'].includes(key)
+                                ? 'right'
+                                : 'left'
+                            }}
+                          >
+                            {toFixedOrInt(key, row[key])}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </>
         )}
-      </div>
-    ))}
-  </div>
-)}
 
-
-      {/* Action Buttons */}
-      <div style={styles.buttonRow}>
-        <button onClick={handleExportToExcel} style={styles.successButton}>
+        {/* Action Buttons */}
+        <button onClick={handleExportToExcel} style={styles.exportButton}>
           Export to Excel
         </button>
-        <button onClick={onHome} style={styles.secondaryButton}>
-          Back to Home
+
+        <button onClick={onHome} style={styles.backHomeButton}>
+          Go Back to Home
         </button>
-        <button onClick={onProceedToBonus} style={styles.primaryButton}>
+
+        <button
+          onClick={onProceedToBonus}
+          style={styles.primaryButton}
+        >
           Proceed to Bonus Optimization
         </button>
-      </div>
     </div>
   );
 }

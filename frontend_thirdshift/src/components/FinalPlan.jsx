@@ -638,7 +638,7 @@ export default function FinalPlan({
                           || (mainByProgram || []).reduce((a, r) => a + num(r.Total_Rating), 0);
 
       const propertyBudgetTotal = (flatPropertyPrograms || []).reduce((a, r) => a + num(r.Budget), 0);
-      const propertyNGRPTotal   = (flatPropertyPrograms || []).reduce((a, r) => a + num(r.NGRP), 0);
+      const propertyNGRPTotal = propertyNGRP_InclBenefit;
 
       const totalNGRP_InclPropertyBonus = mainSpotNGRP + propertyNGRPTotal + bonusNGRP;
       const cprp_InclPropertyBonus = totalNGRP_InclPropertyBonus > 0

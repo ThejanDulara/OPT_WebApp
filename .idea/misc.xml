@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.10 (OPT_WebApp)" project-jdk-type="Python SDK" />
+  <component name="Black">
+    <option name="sdkName" value="Python 3.14 virtualenv at D:\OneDrive\Shift Integrated Pvt. Ltd\Ravinda - Common Share - TSM\17) Thejan\Other\Web interface\OPT_WebApp\backend\venv" />
+  </component>
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.14 virtualenv at D:\OneDrive\Shift Integrated Pvt. Ltd\Ravinda - Common Share - TSM\17) Thejan\Other\Web interface\OPT_WebApp\backend\venv" project-jdk-type="Python SDK" />
   <component name="PyCharmProfessionalAdvertiser">
     <option name="shown" value="true" />
   </component>

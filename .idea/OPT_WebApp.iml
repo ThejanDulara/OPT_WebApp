@@ -6,8 +6,9 @@
       <sourceFolder url="file://$MODULE_DIR$/frontend/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/venv" />
       <excludeFolder url="file://$MODULE_DIR$/frontend/node_modules" />
+      <excludeFolder url="file://$MODULE_DIR$/backend/venv" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.10 (OPT_WebApp)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.14 virtualenv at D:\OneDrive\Shift Integrated Pvt. Ltd\Ravinda - Common Share - TSM\17) Thejan\Other\Web interface\OPT_WebApp\backend\venv" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PyDocumentationSettings">
