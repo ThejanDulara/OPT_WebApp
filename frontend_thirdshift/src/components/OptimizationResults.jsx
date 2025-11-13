@@ -245,7 +245,7 @@ export default function OptimizationResults({
           </div>
         ))}
 
-        <h3 style={styles.sectionTitle}>Channel Summary with Slot Breakdown</h3>
+        <h3 style={styles.sectionTitle}>Channel wise Summary</h3>
         <table style={{...styles.table, ...styles.summaryCard}}>
           <thead>
             <tr>

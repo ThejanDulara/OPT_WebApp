@@ -646,12 +646,12 @@ export default function FinalPlan({
         : 0;
 
       const kpiRows = [
-        { Metric: 'Total Budget (incl. Property)', Value: budgetInclProperty },
-        { Metric: 'NGRP (Main Optimization Only)', Value: mainSpotNGRP },
-        { Metric: 'Property NGRP',                Value: propertyNGRPTotal },
-        { Metric: 'Bonus NGRP',                   Value: bonusNGRP },
-        { Metric: 'Total NGRP (incl. Property + Bonus)', Value: totalNGRP_InclPropertyBonus },
-        { Metric: 'CPRP (incl. Property + Bonus)',       Value: cprp_InclPropertyBonus },
+        { Metric: 'Total Budget', Value: budgetInclProperty },
+        { Metric: 'NGRP (Spot buying)', Value: mainSpotNGRP },
+        { Metric: 'NGRP (Property)',                Value: propertyNGRPTotal },
+        { Metric: 'NGRP (Bonus )',                   Value: bonusNGRP },
+        { Metric: 'Total NGRP', Value: totalNGRP_InclPropertyBonus },
+        { Metric: 'CPRP',       Value: cprp_InclPropertyBonus },
       ];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(kpiRows), 'Final KPIs');
 
@@ -738,7 +738,7 @@ export default function FinalPlan({
 
         // SECTION 1: Property Programs
         const propRows = (flatPropertyPrograms || []).filter(r => toStr(r.Channel) === ch);
-        addAOA(ws, [[`Property Programs – ${ch}`]]);
+        addAOA(ws, [[`Property Benefits – ${ch}`]]);
         addAOA(ws, [propertyHeaders]);
 
         if (propRows.length > 0) {
@@ -772,7 +772,7 @@ export default function FinalPlan({
           const mergedPrograms = mergeProgramsForExport(mainPrograms, benefitPrograms);
 
           addAOA(ws, [['']]); // spacer row
-          addAOA(ws, [[`Commercial ${idx + 1} Programs (incl. Merged Benefit) – ${ch}`]]);
+          addAOA(ws, [[`Commercial ${idx + 1} Programs – ${ch}`]]);
           addAOA(ws, [progHeaders]);
 
           if (mergedPrograms.length > 0) {
@@ -900,7 +900,7 @@ export default function FinalPlan({
         <div style={s.summaryValue}>{formatLKR(budgetInclProperty)}</div>
       </div>
       <div style={s.summaryCard}>
-        <div style={s.summaryTitle}>NGRP (Main Optimization Only)</div>
+        <div style={s.summaryTitle}>NGRP (Spot Buying)</div>
         <div style={s.summaryValue}>{safeFx(mainSpotNGRP)}</div>
       </div>
       <div style={s.summaryCard}>
@@ -973,7 +973,7 @@ export default function FinalPlan({
 
 
       {/* Commercial-wise Allocation (Combined Main + Bonus) */}
-      <h3 style={s.sectionTitle}>Commercial-wise Allocation (Main + Bonus)</h3>
+      <h3 style={s.sectionTitle}>Commercial-wise Allocation (Paid + Bonus)</h3>
       <div style={{...s.commercialSub, marginBottom: '20px'}}>
         Shows main optimization results followed by bonus programs (shaded in light blue) for each commercial.
       </div>
@@ -1229,7 +1229,7 @@ export default function FinalPlan({
       )}
 
         {/* Channel Summary (Single Table) */}
-        <h3 style={s.sectionTitle}>Channel Summary (Spot + Property + Bonus)</h3>
+        <h3 style={s.sectionTitle}>Channel Summary (Spot Buying + Property + Bonus)</h3>
         <div style={s.summaryCard}>
           <table style={s.table}>
             <thead>

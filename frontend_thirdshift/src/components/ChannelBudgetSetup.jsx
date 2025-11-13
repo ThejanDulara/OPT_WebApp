@@ -398,7 +398,7 @@ export default function ChannelBudgetSetup({
                       <strong>Channel Budget:</strong> {formatLKR(chAmount)}
                     </div>
                     <div style={enhancedStyles.amountBox}>
-                      <strong>Property:</strong> {formatLKR(propTotal)}
+                      <strong>Property Cost:</strong> {formatLKR(propTotal)}
                     </div>
                     {hasProperty[ch] && (
                       <>
@@ -406,12 +406,12 @@ export default function ChannelBudgetSetup({
                           <strong>Commercial Benefit:</strong> {formatLKR(comBenefit)}
                         </div>
                         <div style={enhancedStyles.amountBox}>
-                          <strong>On cost:</strong> {formatLKR(onCost)}
+                          <strong>Property On cost:</strong> {formatLKR(onCost)}
                         </div>
                       </>
                     )}
                     <div style={enhancedStyles.amountBox}>
-                      <strong>Available:</strong> {formatLKR(available)}
+                      <strong>Spot Buying:</strong> {formatLKR(available)}
                     </div>
                   </div>
 

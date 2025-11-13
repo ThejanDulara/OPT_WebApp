@@ -122,8 +122,8 @@ function ProgramSelector({ onSubmit, onBack, negotiatedRates }) {
                     <th style={styles.tableHeader}>Day</th>
                     <th style={styles.tableHeader}>Time</th>
                     <th style={styles.tableHeader}>Program</th>
-                    <th style={styles.tableHeader}>Rate card Rate</th>
-                    <th style={styles.tableHeader}>Negotiated Rate</th>
+                    <th style={styles.tableHeader}>Rate card (30 Sec)</th>
+                    <th style={styles.tableHeader}>Neg. Rate (30 Sec)</th>
                     <th style={styles.tableHeader}>TVR</th>
                     <th style={styles.tableHeader}>Slot</th>
                   </tr>

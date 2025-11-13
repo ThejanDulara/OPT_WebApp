@@ -311,8 +311,8 @@ function NegotiatedRates({
               <th style={styles.th}>Time</th>
               <th style={styles.th}>Program</th>
               <th style={styles.th}>Rate (30 Sec)</th>
-              <th style={styles.th}>TVR (30 Sec)</th>
-              <th style={styles.th}>Slot (PT[A]/NPT[B])</th>
+              <th style={styles.th}>TVR</th>
+              <th style={styles.th}>Slot ([A]PT/[B]NPT)</th>
               <th style={styles.th}>Negotiated Rate</th>
               <th style={styles.th}>Action</th>
             </tr>

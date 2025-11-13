@@ -119,7 +119,7 @@ export default function CommercialBenefitResults({
         </div>
 
         {/* Channel Summary */}
-        <h3 style={styles.sectionTitle}>Channel Summary with Slot Breakdown</h3>
+        <h3 style={styles.sectionTitle}>Channel wise PT/NPT Breakdown</h3>
         <div style={styles.tableContainer}>
           <table style={styles.table}>
             <thead>

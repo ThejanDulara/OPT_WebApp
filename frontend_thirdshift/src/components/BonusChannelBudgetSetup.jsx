@@ -259,7 +259,7 @@ export default function BonusChannelBudgetSetup({
                 </div>
 
                 <div style={styles.row}>
-                  <span style={styles.label}>Channel Budget (base):</span>
+                  <span style={styles.label}>Channel Budget:</span>
                   <span style={styles.pill}>{fmtLKR(base)}</span>
                 </div>
 

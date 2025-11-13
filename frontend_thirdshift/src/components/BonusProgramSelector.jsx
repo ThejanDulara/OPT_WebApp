@@ -183,7 +183,7 @@ export default function BonusProgramSelector({
     <div style={styles.page}>
       <div style={styles.header}>
         <div>
-          <div style={styles.title}>Bonus Program Selection (Non-Prime, Slot B)</div>
+          <div style={styles.title}>Bonus Program Selection (Non-Prime)</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="button" onClick={selectAllGlobal} style={styles.smlBtn}>

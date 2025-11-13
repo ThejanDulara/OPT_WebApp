@@ -95,7 +95,7 @@ export default function PropertyProgramsEditor({
 
   return (
     <div style={{ marginTop: 16 }}>
-      <h3 style={styles.sectionTitle}>Property program breakdown (per channel)</h3>
+      <h3 style={styles.sectionTitle}>Property breakdown (per channel)</h3>
 
       {visibleChannels.map((ch) => {
         const rows = propertyPrograms[ch] || [];
@@ -130,7 +130,7 @@ export default function PropertyProgramsEditor({
                     <th style={styles.th}>Com name</th>
                     <th style={styles.th}>Day</th>
                     <th style={styles.th}>Time</th>
-                    <th style={styles.th}>Budget</th>
+                    <th style={styles.th}>On Cost</th>
                     <th style={styles.th}>NCost</th>
                     <th style={styles.th}>Duration</th>
                     <th style={styles.th}>TVR</th>

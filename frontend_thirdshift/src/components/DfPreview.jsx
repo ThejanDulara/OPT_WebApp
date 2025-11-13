@@ -19,8 +19,8 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
   const channelSummaryOrder = ['Channel', 'Total_Cost', '% of Total'];
 
   const columnNameMappings_1 = {
-    'Cost': 'Rate card Rate',
-   'Negotiated_Rate': 'Negotiated Rate',
+    'Cost': 'Rate card (30 Sec)',
+   'Negotiated_Rate': 'Neg. Rate (30 Sec)',
    };
 
   const columnNameMappings_2 = {
