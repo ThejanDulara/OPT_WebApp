@@ -21,11 +21,13 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
   const columnNameMappings_1 = {
     'Cost': 'Rate card (30 Sec)',
    'Negotiated_Rate': 'Neg. Rate (30 Sec)',
+   'Slot': 'PT [A] / NPT [B]'
    };
 
   const columnNameMappings_2 = {
     'Total_Cost': 'Total Budget',
     'Total_Rating': 'NGRP',
+    'Slot': 'PT [A] / NPT [B]'
   };
 
   const columnNameMappings = {

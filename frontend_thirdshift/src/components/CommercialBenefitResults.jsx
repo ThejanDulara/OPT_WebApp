@@ -39,8 +39,8 @@ export default function CommercialBenefitResults({
     container: { marginTop: '24px', padding: '32px', maxWidth: '1200px', margin: '0 auto', backgroundColor: '#d5e9f7', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0, 0, 0, 0.05)' },
     title: { color: '#2d3748', fontSize: '24px', fontWeight: '600', marginBottom: '24px' },
     sectionTitle: { color: '#2d3748', fontSize: '20px', fontWeight: '600', marginBottom: '24px' },
-    summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' },
-    summaryCard: { marginBottom: '24px', backgroundColor: 'white', borderRadius: '8px', padding: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)' },
+    summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '20px' },
+    summaryCard: { marginBottom: '24px', backgroundColor: 'white', borderRadius: '8px', padding: '10px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)' },
     summaryTitle: { color: '#4a5568', fontSize: '14px', fontWeight: '600', marginBottom: '8px' },
     summaryValue: { color: '#2d3748', fontSize: '18px', fontWeight: '700' },
     table: { width: '100%', borderCollapse: 'collapse', marginTop: '16px' , backgroundColor: 'white'},
@@ -278,10 +278,15 @@ export default function CommercialBenefitResults({
             {commercialsSummary.map((c, idx) => (
               <div key={idx} style={styles.summaryCard}>
                 <h4 style={styles.label}>Commercial {c.commercial_index + 1}</h4>
-                <p>Total Budget: {formatLKR(c.total_cost)}</p>
-                <p>GRP: {(c.details || []).reduce((s, r) => s + Number(r.TVR || 0) * Number(r.Spots || 0), 0).toFixed(2)}</p>
-                <p>NGRP: {Number(c.total_rating).toFixed(2)}</p>
-                <p>CPRP: {Number(c.cprp).toFixed(2)}</p>
+                <div style={{
+                  marginBottom: '12px',
+                  fontSize: '16px'
+                }}>
+                  <strong>Total Budget:</strong> {formatLKR(c.total_cost)} &nbsp;  &nbsp;
+                  <strong>GRP:</strong> {(c.details || []).reduce((s, r) => s + Number(r.TVR || 0) * Number(r.Spots || 0), 0).toFixed(2)} &nbsp;  &nbsp;
+                  <strong>NGRP:</strong> {Number(c.total_rating).toFixed(2)} &nbsp;  &nbsp;
+                  <strong>CPRP:</strong> {Number(c.cprp).toFixed(2)}
+                </div>
                 <table style={styles.table}>
                   <thead>
                     <tr>
@@ -299,9 +304,15 @@ export default function CommercialBenefitResults({
                         'GRP',
                         'Total_Rating',
                         'Spots'
-                      ].map((key, i) => (
-                        <th key={i} style={styles.th}>{key}</th>
-                      ))}
+                    ].map((key, i) => {
+                      const headerNames = {
+                        Slot: 'PT [A] / NPT [B]',
+                        Total_Cost: 'Budget',
+                        Total_Rating: 'NGRP'
+                      };
+                      const displayName = headerNames[key] || key;
+                      return <th key={i} style={styles.th}>{displayName}</th>;
+                    })}
                     </tr>
                   </thead>
                   <tbody>

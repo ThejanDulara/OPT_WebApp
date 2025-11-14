@@ -246,15 +246,23 @@ export default function OptimizationResults({
         {(result.commercials_summary || []).map((c, idx) => (
           <div key={idx} style={styles.summaryCard}>
             <h4 style={styles.label}>Commercial {c.commercial_index + 1}</h4>
-            <p>Total Budget: {formatLKR(c.total_cost)}</p>
-            <p>GRP: {(c.details || []).reduce((s, r) => s + (Number(r.Spots) * Number(r.TVR)), 0).toFixed(2)}</p>
-            <p>NGRP: {Number(c.total_rating).toFixed(2)}</p>
-            <p>CPRP: {Number(c.cprp).toFixed(2)}</p>
+            <div style={{
+              marginBottom: '12px',
+              fontSize: '16px',
+            }}>
+              <strong>Total Budget:</strong> {formatLKR(c.total_cost)}
+              &nbsp;   &nbsp;
+              <strong>GRP:</strong> {(c.details || []).reduce((s, r) => s + (Number(r.Spots) * Number(r.TVR)), 0).toFixed(2)}
+              &nbsp;   &nbsp;
+              <strong>NGRP:</strong> {Number(c.total_rating).toFixed(2)}
+              &nbsp;  &nbsp;
+              <strong>CPRP:</strong> {Number(c.cprp).toFixed(2)}
+            </div>
             <table style={styles.table}>
               <thead>
                 <tr>
                   {displayOrder.map((key, i) => {
-                    const headerMap = { 'Total_Rating': 'NGRP', 'Total_Cost': 'Total Budget' };
+                    const headerMap = { 'Total_Rating': 'NGRP', 'Total_Cost': 'Total Budget' ,'Slot': 'PT [A] / NPT [B]'  };
                     return <th key={i} style={styles.th}>{headerMap[key] || key}</th>;
                   })}
                 </tr>

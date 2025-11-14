@@ -730,7 +730,7 @@ export default function FinalPlan({
           'Budget (LKR)','NCost (LKR)','Duration','TVR','NTVR','Spots','GRP','NGRP'
         ];
         const progHeaders = [
-          'Program','Day','Time','Slot',
+          'Program','Day','Time','PT [A] / NPT [B]',
           'Cost (LKR)','TVR','NCost (LKR)','NTVR',
           'Total Budget (LKR)','GRP','NGRP','Spots'
         ];
@@ -1146,7 +1146,7 @@ export default function FinalPlan({
                   <th style={s.th}>Program</th>
                   <th style={s.th}>Day</th>
                   <th style={{ ...s.th, whiteSpace: 'nowrap' }}>Time</th>
-                  <th style={s.th}>Slot</th>
+                  <th style={s.th}>PT [A] / NPT [B]</th>
                   <th style={s.th}>Cost</th>
                   <th style={s.th}>TVR</th>
                   <th style={s.th}>NCost</th>
