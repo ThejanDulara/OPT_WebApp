@@ -28,8 +28,9 @@ function computeComputed(row) {
   const NTVR = (TVR / 30) * duration;      // NTVR = TVR/30*Duration
   const NCost = spots > 0 ? budget / spots : 0; // NCost = Budget/Spots
   const NGRP = NTVR * spots;               // NGRP = NTVR * Spots
+  const GRP = TVR * spots;
 
-  return { NTVR, NCost, NGRP };
+  return { NTVR, NCost, NGRP, GRP  };
 }
 
 export default function PropertyProgramsEditor({
@@ -136,13 +137,14 @@ export default function PropertyProgramsEditor({
                     <th style={styles.th}>TVR</th>
                     <th style={styles.th}>NTVR</th>
                     <th style={styles.th}>Spots</th>
+                    <th style={styles.th}>GRP</th>
                     <th style={styles.th}>NGRP</th>
                     <th style={styles.th}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((r) => {
-                    const { NTVR, NCost, NGRP } = computeComputed(r);
+                    const { NTVR, NCost, NGRP ,GRP} = computeComputed(r);
                     return (
                       <tr key={r.id}>
                         <td style={styles.td}>
@@ -222,6 +224,9 @@ export default function PropertyProgramsEditor({
                             onChange={e => handleChange(ch, r.id, 'spots', e.target.value)}
                             style={{ ...styles.numberInput, width: 80, textAlign: 'right' }}
                           />
+                        </td>
+                        <td style={{ ...styles.td, textAlign: 'right' }}>
+                          {fmt2(GRP)}             {/* ⭐ NEW */}
                         </td>
                         <td style={{ ...styles.td, textAlign: 'right' }}>
                           {fmt2(NGRP)}

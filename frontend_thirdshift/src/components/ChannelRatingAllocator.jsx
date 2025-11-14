@@ -217,6 +217,7 @@ function ChannelRatingAllocator({
     'Channel',
     'Total_Cost',
     '% Cost',
+    'GRP', 'GRP %',
     'Total_Rating',
     '% Rating',
     'Prime Cost',

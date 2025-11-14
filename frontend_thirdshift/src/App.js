@@ -216,10 +216,10 @@ function App() {
                       result={basePlanResult}
                       displayOrder={[
                         'Channel','Program','Day','Time','Slot','Cost','TVR',
-                        'NCost','NTVR','Total_Cost','Total_Rating','Spots'
+                        'NCost','NTVR','Total_Cost','GRP','Total_Rating','Spots'
                       ]}
                       summaryOrder={[
-                        'Channel','Total_Cost','% Cost','Total_Rating','% Rating',
+                        'Channel','Total_Cost','% Cost','GRP','GRP %','Total_Rating','% Rating',
                         'Prime Cost','Prime Cost %','Non-Prime Cost','Non-Prime Cost %',
                         'Prime Rating','Non-Prime Rating'
                       ]}
@@ -230,7 +230,7 @@ function App() {
                       }
                       inclusiveTotals={basePlanInclusiveTotals}
                       channels={channels}
-                      propertyPrograms={[]}
+                      propertyPrograms={propertyProgramsForFinal}
                       onProceedToBonus={() =>
                         hasAnyComBenefit
                           ? navigate('/commercial-benefit')

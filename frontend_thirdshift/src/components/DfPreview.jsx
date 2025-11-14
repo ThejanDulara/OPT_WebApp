@@ -15,7 +15,7 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
 
   // Define column orders and name mappings
   const previewOrder = ['Commercial','Channel', 'Day', 'Time', 'Program', 'Cost', 'Negotiated_Rate', 'TVR', 'Slot','NCost', 'NTVR'];
-  const displayOrder = ['Channel', 'Program', 'Day', 'Time', 'Slot','Cost', 'TVR', 'NCost', 'NTVR', 'Total_Cost', 'Total_Rating', 'Spots'];
+  const displayOrder = ['Channel', 'Program', 'Day', 'Time', 'Slot','Cost', 'TVR', 'NCost', 'NTVR', 'Total_Cost','GRP','Total_Rating', 'Spots'];
   const channelSummaryOrder = ['Channel', 'Total_Cost', '% of Total'];
 
   const columnNameMappings_1 = {
@@ -169,6 +169,10 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
   if (loading) return <div style={styles.loading}>Loading optimization table...</div>;
   if (error) return <div style={styles.error}>{error}</div>;
 
+    const totalGRP = (result?.commercials_summary || [])
+      .flatMap(c => c.details || [])
+      .reduce((sum, row) => sum + ((row.Spots || 0) * (row.TVR || 0)), 0);
+
   return (
     <div style={styles.container}>
       <ToastContainer position="top-right" autoClose={3000} />
@@ -263,6 +267,10 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
               <p style={styles.summaryValue}>LKR {result.total_cost.toLocaleString()}</p>
             </div>
             <div style={styles.summaryCard}>
+              <h4 style={styles.summaryTitle}>Total GRP</h4>
+              <p style={styles.summaryValue}>{totalGRP.toFixed(2)}</p>
+            </div>
+            <div style={styles.summaryCard}>
               <h4 style={styles.summaryTitle}>NGRP</h4>
               <p style={styles.summaryValue}>{result.total_rating.toFixed(2)}</p>
             </div>
@@ -278,6 +286,7 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
               <h4 style={styles.commercialTitle}>Commercial {c.commercial_index + 1}</h4>
               <div style={styles.commercialSummary}>
                 <p>Total Budget: LKR {c.total_cost.toLocaleString()}</p>
+                <p>GRP: {c.details.reduce((s, r) => s + r.Spots * r.TVR, 0).toFixed(2)}</p>
                 <p>NGRP: {c.total_rating.toFixed(2)}</p>
                 <p>CPRP: {c.cprp.toFixed(2)}</p>
               </div>
@@ -296,8 +305,11 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
                   {c.details.map((row, i) => (
                     <tr key={i} style={i % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
                       {displayOrder.map((key, j) => {
-                        const isNumeric = ['Cost', 'TVR', 'NCost', 'NTVR','Total_Cost' , 'Total_Rating',].includes(key);
-                        const val = isNumeric && typeof row[key] === 'number'
+                        const isNumeric = ['Cost', 'TVR', 'NCost', 'NTVR','Total_Cost' , 'Total_Rating','GRP'].includes(key);
+                        const val =
+                         key === 'GRP'
+                         ? (row.Spots * row.TVR).toFixed(2)
+                         : isNumeric && typeof row[key] === 'number'
                           ? row[key].toFixed(2)
                           : row[key];
                         return (

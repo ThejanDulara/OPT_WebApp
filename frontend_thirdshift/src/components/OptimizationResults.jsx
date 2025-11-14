@@ -159,6 +159,36 @@ export default function OptimizationResults({
     saveAs(fileData, 'optimized_schedule.xlsx');
   };
 
+    // ---- COMPUTE EXCLUSIVE GRP (without property) ----
+    const totalGRP_excl = (result?.commercials_summary || [])
+      .flatMap(c => c.details || [])
+      .reduce((s, r) => s + (Number(r.Spots || 0) * Number(r.TVR || 0)), 0);
+
+    // ---- COMPUTE INCLUSIVE GRP (includes property GRP) ----
+    const totalPropertyGRP = Object.keys(propertyPrograms || {}).reduce((sum, ch) => {
+      return sum + (propertyPrograms[ch] || []).reduce((s, r) => {
+        const tvr = parseFloat(r.TVR) || 0;
+        const spots = parseInt(r.spots) || 0;
+        return s + (tvr * spots);
+      }, 0);
+    }, 0);
+
+    const totalGRP_incl = totalGRP_excl + totalPropertyGRP;
+
+    // ---- GROUP PROGRAM ROWS BY CHANNEL FOR GRP ----
+    const programRows = result?.df_result || [];
+
+    const grpByChannel = programRows.reduce((m, r) => {
+      const grp = Number(r.Spots || 0) * Number(r.TVR || 0);
+      m[r.Channel] = (m[r.Channel] || 0) + grp;
+      return m;
+    }, {});
+
+    // Total GRP for GRP %
+    const totalGRPAllChannels = Object.values(grpByChannel)
+      .reduce((a, b) => a + b, 0);
+
+
   return (
     <div id="optimization-summary" style={styles.container}>
       <div style={styles.resultContainer}>
@@ -172,6 +202,10 @@ export default function OptimizationResults({
           <div style={styles.summaryCard}>
             <h4 style={styles.summaryTitle}>NGRP (excl. Property)</h4>
             <p style={styles.summaryValue}>{Number(result.total_rating).toFixed(2)}</p>
+          </div>
+          <div style={styles.summaryCard}>
+              <h4 style={styles.summaryTitle}>GRP (excl. Property)</h4>
+              <p style={styles.summaryValue}>{totalGRP_excl.toFixed(2)}</p>
           </div>
           <div style={styles.summaryCard}>
             <h4 style={styles.summaryTitle}>CPRP (excl. Property)</h4>
@@ -195,6 +229,10 @@ export default function OptimizationResults({
               {Number(inclusiveTotals?.totalNGRPIncl || result.total_rating).toFixed(2)}
             </p>
           </div>
+          <div style={styles.summaryCard}>
+              <h4 style={styles.summaryTitle}>GRP (incl. Property)</h4>
+              <p style={styles.summaryValue}>{totalGRP_incl.toFixed(2)}</p>
+            </div>
 
           <div style={styles.summaryCard}>
             <h4 style={styles.summaryTitle}>CPRP (incl. Property)</h4>
@@ -209,6 +247,7 @@ export default function OptimizationResults({
           <div key={idx} style={styles.summaryCard}>
             <h4 style={styles.label}>Commercial {c.commercial_index + 1}</h4>
             <p>Total Budget: {formatLKR(c.total_cost)}</p>
+            <p>GRP: {(c.details || []).reduce((s, r) => s + (Number(r.Spots) * Number(r.TVR)), 0).toFixed(2)}</p>
             <p>NGRP: {Number(c.total_rating).toFixed(2)}</p>
             <p>CPRP: {Number(c.cprp).toFixed(2)}</p>
             <table style={styles.table}>
@@ -230,12 +269,15 @@ export default function OptimizationResults({
                           ...styles.td,
                           textAlign: ['Spots','Slot'].includes(key)
                             ? 'center'
-                            : ['Cost','TVR','NCost','NTVR','Total_Cost','Total_Rating'].includes(key)
+                            : ['Cost','TVR','NCost','NTVR','Total_Cost','GRP','Total_Rating'].includes(key)
                             ? 'right'
                             : 'left'
                         }}
                       >
-                        {toFixedOrInt(key, row[key])}
+                        {key === 'GRP'
+                          ? (Number(row.Spots) * Number(row.TVR)).toFixed(2)
+                          : toFixedOrInt(key, row[key])
+                        }
                       </td>
                     ))}
                   </tr>
@@ -246,6 +288,7 @@ export default function OptimizationResults({
         ))}
 
         <h3 style={styles.sectionTitle}>Channel wise Summary</h3>
+
         <table style={{...styles.table, ...styles.summaryCard}}>
           <thead>
             <tr>
@@ -264,9 +307,22 @@ export default function OptimizationResults({
               <tr key={i}>
                 {summaryOrder.map((key, j) => {
                   const isNumeric = typeof row[key] === 'number';
+                    const channelGRP = grpByChannel[row.Channel] || 0;
+
+                    const totalGRPForPercent = totalGRP_excl + totalPropertyGRP;
+                    const channelGRPpct = totalGRPForPercent > 0
+                      ? (channelGRP / totalGRPForPercent) * 100
+                      : 0;
                   return (
                     <td key={j} style={{ ...styles.td, textAlign: isNumeric ? 'right' : 'left' }}>
-                      {isNumeric ? Number(row[key]).toFixed(2) : row[key]}
+                     {key === 'GRP'
+                      ? channelGRP.toFixed(2)
+                      : key === 'GRP %'
+                      ? channelGRPpct.toFixed(2) + '%'
+                      : isNumeric
+                      ? Number(row[key]).toFixed(2)
+                      : row[key]
+                    }
                     </td>
                   );
                 })}

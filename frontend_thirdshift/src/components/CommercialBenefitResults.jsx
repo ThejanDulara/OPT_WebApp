@@ -20,6 +20,12 @@ export default function CommercialBenefitResults({
     result?.total_rating ||
     result?.totals?.total_rating ||
     0;
+
+        // ---- TOTAL GRP ----
+    const totalGRP = (result?.commercials_summary || [])
+      .flatMap(c => c.details || [])
+      .reduce((sum, r) => sum + (Number(r.TVR || 0) * Number(r.Spots || 0)), 0);
+
   const cprp = totalRating > 0 ? totalCost / totalRating : 0;
 
   const channelSummary = result?.tables?.by_channel || [];
@@ -98,6 +104,27 @@ export default function CommercialBenefitResults({
     saveAs(blob, 'Commercial_Benefit_Optimization_Results.xlsx');
   };
 
+    // ---- GRP PER CHANNEL ----
+    const grpByChannel = channelSummary.reduce((acc, row) => {
+      const channel = row.Channel;
+      const details = (result?.commercials_summary || [])
+        .flatMap(c => c.details || [])
+        .filter(r => r.Channel === channel);
+
+      const grp = details.reduce(
+        (s, r) => s + Number(r.TVR || 0) * Number(r.Spots || 0),
+        0
+      );
+
+      acc[channel] = grp;
+      return acc;
+    }, {});
+
+    // Total for GRP%
+    const totalGRPForPct = Object.values(grpByChannel)
+      .reduce((a, b) => a + b, 0);
+
+
   return (
     <div id="commercial-benefit-summary" >
         <h3 style={styles.sectionTitle}>Commercial Benefit Optimization Results</h3>
@@ -105,9 +132,13 @@ export default function CommercialBenefitResults({
         {/* KPI Cards */}
         <div style={styles.summaryGrid}>
           <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>Total Budget Used</h4>
+            <h4 style={styles.summaryTitle}>Total Budget </h4>
             <p style={styles.summaryValue}>{formatLKR(totalCost)}</p>
           </div>
+             <div style={styles.summaryCard}>
+              <h4 style={styles.summaryTitle}>Total GRP</h4>
+              <p style={styles.summaryValue}>{totalGRP.toFixed(2)}</p>
+            </div>
           <div style={styles.summaryCard}>
             <h4 style={styles.summaryTitle}>Total NGRP</h4>
             <p style={styles.summaryValue}>{totalRating.toFixed(2)}</p>
@@ -127,6 +158,8 @@ export default function CommercialBenefitResults({
                 <th style={styles.th}>Channel</th>
                 <th style={styles.th}>Total Budget</th>
                 <th style={styles.th}>Budget %</th>
+                <th style={styles.th}>GRP</th>
+                <th style={styles.th}>GRP %</th>
                 <th style={styles.th}>NGRP</th>
                 <th style={styles.th}>NGRP %</th>
                 <th style={styles.th}>A1 %</th>
@@ -177,6 +210,15 @@ export default function CommercialBenefitResults({
                     </td>
                     <td style={styles.td}>
                       {row['% Cost']?.toFixed(2) || '0.00'}%
+                    </td>
+                    <td style={styles.td}>
+                      {grpByChannel[row.Channel]?.toFixed(2) || '0.00'}
+                    </td>
+
+                    <td style={styles.td}>
+                      {totalGRPForPct > 0
+                        ? ((grpByChannel[row.Channel] / totalGRPForPct) * 100).toFixed(2)
+                        : '0.00'}%
                     </td>
                     <td style={styles.td}>
                       {row.Total_Rating?.toFixed(2) || '0.00'}
@@ -237,6 +279,7 @@ export default function CommercialBenefitResults({
               <div key={idx} style={styles.summaryCard}>
                 <h4 style={styles.label}>Commercial {c.commercial_index + 1}</h4>
                 <p>Total Budget: {formatLKR(c.total_cost)}</p>
+                <p>GRP: {(c.details || []).reduce((s, r) => s + Number(r.TVR || 0) * Number(r.Spots || 0), 0).toFixed(2)}</p>
                 <p>NGRP: {Number(c.total_rating).toFixed(2)}</p>
                 <p>CPRP: {Number(c.cprp).toFixed(2)}</p>
                 <table style={styles.table}>
@@ -253,6 +296,7 @@ export default function CommercialBenefitResults({
                         'NCost',
                         'NTVR',
                         'Total_Cost',
+                        'GRP',
                         'Total_Rating',
                         'Spots'
                       ].map((key, i) => (
@@ -274,22 +318,26 @@ export default function CommercialBenefitResults({
                           'NCost',
                           'NTVR',
                           'Total_Cost',
+                          'GRP',
                           'Total_Rating',
                           'Spots'
                         ].map((key, j) => (
-                          <td
-                            key={j}
-                            style={{
-                              ...styles.td,
-                              textAlign: ['Spots','Slot'].includes(key)
-                                ? 'center'
-                                : ['Cost','TVR','NCost','NTVR','Total_Cost','Total_Rating'].includes(key)
-                                ? 'right'
-                                : 'left'
-                            }}
-                          >
-                            {toFixedOrInt(key, row[key])}
-                          </td>
+                            <td
+                              key={j}
+                              style={{
+                                ...styles.td,
+                                textAlign: ['Spots','Slot'].includes(key)
+                                  ? 'center'
+                                  : ['Cost','TVR','NCost','NTVR','Total_Cost','Total_Rating','GRP'].includes(key)
+                                  ? 'right'
+                                  : 'left'
+                              }}
+                            >
+                              {key === 'GRP'
+                                ? (Number(row.TVR || 0) * Number(row.Spots || 0)).toFixed(2)
+                                : toFixedOrInt(key, row[key])
+                              }
+                            </td>
                         ))}
                       </tr>
                     ))}

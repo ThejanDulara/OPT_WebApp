@@ -431,12 +431,49 @@ export default function FinalPlan({
       [mainSpotNGRP, propertyNGRP_InclBenefit, bonusNGRP]
     );
 
+    // === NEW: GRP calculations ===
+
+    // Spot-only GRP (TVR * Spots from main optimization)
+    const mainSpotGRP = useMemo(() => {
+      return (mainByProgram || []).reduce((a, r) => {
+        const tvr = num(r.TVR ?? r.NTVR ?? 0);
+        const spots = num(r.Spots ?? 0);
+        return a + tvr * spots;
+      }, 0);
+    }, [mainByProgram]);
+
+    // Property GRP
+    const propertyGRPTotal = useMemo(() => {
+      return (flatPropertyPrograms || []).reduce((a, r) => {
+        const tvr = num(r.TVR ?? 0);
+        const spots = num(r.Spots ?? 0);
+        return a + tvr * spots;
+      }, 0);
+    }, [flatPropertyPrograms]);
+
+    // Bonus GRP
+    const bonusGRP = useMemo(() => {
+      return (bonusByProgram || []).reduce((a, r) => {
+        const tvr = num(r.TVR ?? r.NTVR ?? 0);
+        const spots = num(r.Spots ?? 0);
+        return a + tvr * spots;
+      }, 0);
+    }, [bonusByProgram]);
+
+    // Total GRP (spot + property + bonus)
+    const totalGRP_InclPropertyBonus = useMemo(
+      () => mainSpotGRP + propertyGRPTotal + bonusGRP,
+      [mainSpotGRP, propertyGRPTotal, bonusGRP]
+    );
+
+
 
     // CPRP using (Budget incl. Property) / (NGRP incl. Property + Bonus)
     const cprp_InclPropertyBonus = useMemo(
       () => (totalNGRP_InclPropertyBonus > 0 ? budgetInclProperty / totalNGRP_InclPropertyBonus : 0),
       [budgetInclProperty, totalNGRP_InclPropertyBonus]
     );
+
 
         // ---------- Per-channel Property & Combined summary ----------
     const propertyByChannel = useMemo(() => {
@@ -498,6 +535,22 @@ export default function FinalPlan({
 
         const cprp        = ngrpTotal > 0 ? totalCost / ngrpTotal : 0;                // CPRP (LKR)
 
+        // --- NEW GRP calculations per channel ---
+        const grpSpot = (mainByProgram || [])
+          .filter(r => toStr(r.Channel) === ch)
+          .reduce((a, r) => a + num(r.TVR ?? 0) * num(r.Spots ?? 0), 0);
+
+        const grpProperty = (flatPropertyPrograms || [])
+          .filter(r => toStr(r.Channel) === ch)
+          .reduce((a, r) => a + num(r.TVR ?? 0) * num(r.Spots ?? 0), 0);
+
+        const grpBonus = (bonusByProgram || [])
+          .filter(r => toStr(r.Channel) === ch)
+          .reduce((a, r) => a + num(r.TVR ?? 0) * num(r.Spots ?? 0), 0);
+
+        const grpTotal = grpSpot + grpProperty + grpBonus;
+
+        // return object
         return {
           Channel: ch,
           Cost_LKR: costSpot,
@@ -507,6 +560,7 @@ export default function FinalPlan({
           NGRP_Property: ngrpProp,
           NGRP_Bonus: ngrpBonus,
           NGRP_Total: ngrpTotal,
+          GRP_Total: grpTotal,        // ✅ NEW FIELD
           CPRP_LKR: cprp,
         };
       });
@@ -645,14 +699,21 @@ export default function FinalPlan({
         ? budgetInclProperty / totalNGRP_InclPropertyBonus
         : 0;
 
-      const kpiRows = [
-        { Metric: 'Total Budget', Value: budgetInclProperty },
-        { Metric: 'NGRP (Spot buying)', Value: mainSpotNGRP },
-        { Metric: 'NGRP (Property)',                Value: propertyNGRPTotal },
-        { Metric: 'NGRP (Bonus )',                   Value: bonusNGRP },
-        { Metric: 'Total NGRP', Value: totalNGRP_InclPropertyBonus },
-        { Metric: 'CPRP',       Value: cprp_InclPropertyBonus },
-      ];
+    const kpiRows = [
+      { Metric: 'Total Budget (incl. Property)', Value: budgetInclProperty },
+
+      { Metric: 'Spot Buying GRP', Value: mainSpotGRP },
+      { Metric: 'Property GRP', Value: propertyGRPTotal },
+      { Metric: 'Bonus GRP', Value: bonusGRP },
+      { Metric: 'Total GRP (incl. Property + Bonus)', Value: totalGRP_InclPropertyBonus },
+
+      { Metric: 'NGRP (Spot Buying)', Value: mainSpotNGRP },
+      { Metric: 'NGRP (Property)', Value: propertyNGRP_InclBenefit },
+      { Metric: 'Bonus NGRP', Value: bonusNGRP },
+      { Metric: 'Total NGRP (incl. Property + Bonus)', Value: totalNGRP_InclPropertyBonus },
+
+      { Metric: 'CPRP (incl. Property + Bonus)', Value: cprp_InclPropertyBonus },
+    ];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(kpiRows), 'Final KPIs');
 
       // ---------- Channel list ----------
@@ -664,14 +725,15 @@ export default function FinalPlan({
       const channelList = Array.from(channelSet).sort((a, b) => a.localeCompare(b));
 
       // ---------- Headers ----------
-      const propertyHeaders = [
-        'Name of the program','Com name','Day','Time',
-        'Budget (LKR)','NCost (LKR)','Duration','TVR','NTVR','Spots','NGRP'
-      ];
-      const progHeaders = [
-        'Program','Day','Time','Slot',
-        'Cost (LKR)','TVR','NCost (LKR)','NTVR','Total Budget (LKR)','NGRP','Spots'
-      ];
+        const propertyHeaders = [
+          'Name of the program','Com name','Day','Time',
+          'Budget (LKR)','NCost (LKR)','Duration','TVR','NTVR','Spots','GRP','NGRP'
+        ];
+        const progHeaders = [
+          'Program','Day','Time','Slot',
+          'Cost (LKR)','TVR','NCost (LKR)','NTVR',
+          'Total Budget (LKR)','GRP','NGRP','Spots'
+        ];
 
       // Merge helper for export (always merge benefit into main)
       const mergeProgramsForExport = (mainRows, benefitRows) => {
@@ -742,19 +804,20 @@ export default function FinalPlan({
         addAOA(ws, [propertyHeaders]);
 
         if (propRows.length > 0) {
-          const propAOA = propRows.map(r => ([
-            toStr(r['Name of the program']),
-            toStr(r['Com name']),
-            toStr(r.Day),
-            toStr(r.Time),
-            Number(num(r.Budget)),
-            Number(num(r.NCost)),
-            Number(num(r.Duration)),
-            Number(num(r.TVR)),
-            Number(num(r.NTVR)),
-            Number(parseInt(r.Spots, 10) || 0),
-            Number(num(r.NGRP)),
-          ]));
+        const propAOA = propRows.map(r => ([
+          toStr(r['Name of the program']),
+          toStr(r['Com name']),
+          toStr(r.Day),
+          toStr(r.Time),
+          Number(num(r.Budget)),
+          Number(num(r.NCost)),
+          Number(num(r.Duration)),
+          Number(num(r.TVR)),
+          Number(num(r.NTVR)),
+          Number(num(r.Spots)),
+          Number(num(r.TVR) * num(r.Spots)),   // <-- GRP (added)
+          Number(num(r.NGRP)),                 // <-- NGRP
+        ]));
           addAOA(ws, propAOA);
         } else {
           addAOA(ws, [['(No property rows)']]);
@@ -776,19 +839,20 @@ export default function FinalPlan({
           addAOA(ws, [progHeaders]);
 
           if (mergedPrograms.length > 0) {
-            const mainAOA = mergedPrograms.map(r => ([
-              toStr(r.Program),
-              toStr(r.Day ?? r.Date ?? ''),
-              toStr(r.Time ?? ''),
-              toStr(r.Slot ?? 'A'),
-              Number(num(r.Cost ?? r.NCost)),
-              Number(num(r.TVR ?? r.NTVR)),
-              Number(num(r.NCost ?? 0)),
-              Number(num(r.NTVR ?? 0)),
-              Number(num(r.Total_Cost ?? 0)),
-              Number(num(r.Total_Rating ?? r.Total_NTVR ?? 0)),
-              Number(num(r.Spots ?? 0)),
-            ]));
+                const mainAOA = mergedPrograms.map(r => ([
+                  toStr(r.Program),
+                  toStr(r.Day ?? r.Date ?? ''),
+                  toStr(r.Time ?? ''),
+                  toStr(r.Slot ?? 'A'),
+                  Number(num(r.Cost ?? r.NCost)),
+                  Number(num(r.TVR ?? r.NTVR)),
+                  Number(num(r.NCost ?? 0)),
+                  Number(num(r.NTVR ?? 0)),
+                  Number(num(r.Total_Cost ?? 0)),
+                  Number(num(r.TVR ?? r.NTVR) * num(r.Spots)), // <-- GRP
+                  Number(num(r.Total_Rating ?? r.Total_NTVR ?? 0)), // NGRP
+                  Number(num(r.Spots ?? 0)),
+                ]));
             addAOA(ws, mainAOA);
           } else {
             addAOA(ws, [['(No program rows for this commercial)']]);
@@ -802,19 +866,20 @@ export default function FinalPlan({
         addAOA(ws, [progHeaders]);
 
         if (bonusRows.length > 0) {
-          const bonusAOA = bonusRows.map(r => ([
-            toStr(r.Program),
-            toStr(r.Day ?? r.Date ?? ''),
-            toStr(r.Time ?? ''),
-            'B',
-            Number(num(r.Cost ?? r.NCost)),
-            Number(num(r.TVR ?? r.NTVR)),
-            Number(num(r.NCost ?? 0)),
-            Number(num(r.NTVR ?? 0)),
-            Number(num(r.Total_Cost ?? 0)),
-            Number(num(r.Total_Rating ?? r.Total_NTVR ?? 0)),
-            Number(num(r.Spots ?? 0)),
-          ]));
+        const bonusAOA = bonusRows.map(r => ([
+          toStr(r.Program),
+          toStr(r.Day ?? r.Date ?? ''),
+          toStr(r.Time ?? ''),
+          'B',
+          Number(num(r.Cost ?? r.NCost)),
+          Number(num(r.TVR ?? r.NTVR)),
+          Number(num(r.NCost ?? 0)),
+          Number(num(r.NTVR ?? 0)),
+          Number(num(r.Total_Cost ?? 0)),
+          Number(num(r.TVR ?? r.NTVR) * num(r.Spots)),   // <-- GRP ADDED
+          Number(num(r.Total_Rating ?? r.Total_NTVR ?? 0)), // <-- NGRP
+          Number(num(r.Spots ?? 0)),
+        ]));
           addAOA(ws, bonusAOA);
         } else {
           addAOA(ws, [['(No bonus program rows)']]);
@@ -825,17 +890,40 @@ export default function FinalPlan({
 
       // ---------- Last sheet: Channel Summary (All-In) ----------
       if (combinedChannelRows?.length) {
-        const exportRows = combinedChannelRows.map((r) => ({
-          Channel: r.Channel,
-          'Cost (LKR)': Number(r.Cost_LKR),
-          'Property value (LKR)': Number(r.Property_LKR),
-          'Total Cost (LKR)': Number(r.TotalCost_LKR),
-          'NGRP (Spot Buying)': Number(r.NGRP_Spot),
-          'NGRP (Property)': Number(r.NGRP_Property),
-          'Bonus NGRP': Number(r.NGRP_Bonus),
-          'Total NGRP': Number(r.NGRP_Total),
-          'CPRP (LKR)': Number(r.CPRP_LKR),
-        }));
+    const exportRows = combinedChannelRows.map((r) => ({
+      Channel: r.Channel,
+
+      'Cost (LKR)': Number(r.Cost_LKR),
+      'Property value (LKR)': Number(r.Property_LKR),
+      'Total Cost (LKR)': Number(r.TotalCost_LKR),
+
+      'GRP (Spot Buying)': Number(
+        (mainByProgram || [])
+          .filter(p => toStr(p.Channel) === r.Channel)
+          .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
+      ),
+
+      'Property GRP': Number(
+        (flatPropertyPrograms || [])
+          .filter(p => toStr(p.Channel) === r.Channel)
+          .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
+      ),
+
+      'Bonus GRP': Number(
+        (bonusByProgram || [])
+          .filter(p => toStr(p.Channel) === r.Channel)
+          .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
+      ),
+
+      'Total GRP': Number(r.GRP_Total),
+
+      'NGRP (Spot Buying)': Number(r.NGRP_Spot),
+      'NGRP (Property)': Number(r.NGRP_Property),
+      'Bonus NGRP': Number(r.NGRP_Bonus),
+      'Total NGRP': Number(r.NGRP_Total),
+
+      'CPRP (LKR)': Number(r.CPRP_LKR),
+    }));
         XLSX.utils.book_append_sheet(
           wb,
           XLSX.utils.json_to_sheet(exportRows),
@@ -875,6 +963,20 @@ export default function FinalPlan({
     bonusRow: { background: '#deeffa' }, // light ash
   };
   s.tdNowrap = { ...s.td, whiteSpace: 'nowrap' };
+    const normalizeRow = (r) => ({
+      Channel: toStr(r.Channel),
+      Program: toStr(r.Program),
+      Day: toStr(r.Day ?? r.Date ?? ''),
+      Time: toStr(r.Time ?? r.Start_Time ?? r.StartTime ?? ''),
+      Slot: toStr(r.Slot ?? 'A'),
+      Cost: num(r.Cost ?? r.NCost ?? r.Total_Cost ?? 0),
+      TVR: num(r.TVR ?? r.NTVR ?? 0),
+      NCost: num(r.NCost ?? r.Cost ?? 0),
+      NTVR: num(r.NTVR ?? r.TVR ?? 0),
+      Total_Cost: num(r.Total_Cost ?? r.Cost ?? 0),
+      Total_Rating: num(r.Total_Rating ?? r.Total_NTVR ?? 0),
+      Spots: num(r.Spots ?? 0),
+    });
 
   // Helper for formatting numbers in table
   const toFixedOrInt = (key, val) => {
@@ -900,6 +1002,25 @@ export default function FinalPlan({
         <div style={s.summaryValue}>{formatLKR(budgetInclProperty)}</div>
       </div>
       <div style={s.summaryCard}>
+      <div style={s.summaryTitle}>GRP (Spot Buying)</div>
+      <div style={s.summaryValue}>{safeFx(mainSpotGRP)}</div>
+    </div>
+    <div style={s.summaryCard}>
+      <div style={s.summaryTitle}>Property GRP</div>
+      <div style={s.summaryValue}>{safeFx(propertyGRPTotal)}</div>
+    </div>
+    <div style={s.summaryCard}>
+      <div style={s.summaryTitle}>Bonus GRP</div>
+      <div style={s.summaryValue}>{safeFx(bonusGRP)}</div>
+    </div>
+    <div style={s.summaryCard}>
+      <div style={s.summaryTitle}>Total GRP (incl. Property + Bonus)</div>
+      <div style={s.summaryValue}>{safeFx(totalGRP_InclPropertyBonus)}</div>
+    </div>
+    </div>
+
+    <div style={s.summaryGrid}>
+        <div style={s.summaryCard}>
         <div style={s.summaryTitle}>NGRP (Spot Buying)</div>
         <div style={s.summaryValue}>{safeFx(mainSpotNGRP)}</div>
       </div>
@@ -907,9 +1028,6 @@ export default function FinalPlan({
         <div style={s.summaryTitle}>Property NGRP</div>
         <div style={s.summaryValue}>{safeFx(propertyNGRP_InclBenefit)}</div>
       </div>
-    </div>
-
-    <div style={s.summaryGrid}>
       <div style={s.summaryCard}>
         <div style={s.summaryTitle}>Bonus NGRP</div>
         <div style={s.summaryValue}>{safeFx(bonusNGRP)}</div>
@@ -944,7 +1062,9 @@ export default function FinalPlan({
                   <th style={s.th}>TVR</th>
                   <th style={s.th}>NTVR</th>
                   <th style={s.th}>Spots</th>
+                  <th style={s.th}>GRP</th>
                   <th style={s.th}>NGRP</th>
+
                 </tr>
               </thead>
               <tbody>
@@ -961,6 +1081,7 @@ export default function FinalPlan({
                     <td style={{ ...s.td, textAlign: 'right' }}>{Number(r.TVR).toFixed(2)}</td>
                     <td style={{ ...s.td, textAlign: 'right' }}>{Number(r.NTVR).toFixed(2)}</td>
                     <td style={{ ...s.td, textAlign: 'right' }}>{parseInt(r.Spots, 10)}</td>
+                    <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.TVR) * num(r.Spots))}</td>
                     <td style={{ ...s.td, textAlign: 'right' }}>{Number(r.NGRP).toFixed(2)}</td>
                   </tr>
                 ))}
@@ -975,7 +1096,7 @@ export default function FinalPlan({
       {/* Commercial-wise Allocation (Combined Main + Bonus) */}
       <h3 style={s.sectionTitle}>Commercial-wise Allocation (Paid + Bonus)</h3>
       <div style={{...s.commercialSub, marginBottom: '20px'}}>
-        Shows main optimization results followed by bonus programs (shaded in light blue) for each commercial.
+        Shows spot buying results (in white) and commercial benefit results (in light brown), followed by bonus program results (shaded in light blue) for each commercial.
       </div>
       <div style={{marginBottom: '16px'}}>
         <label>
@@ -1031,6 +1152,7 @@ export default function FinalPlan({
                   <th style={s.th}>NCost</th>
                   <th style={s.th}>NTVR</th>
                   <th style={s.th}>Total Budget</th>
+                  <th style={s.th}>GRP</th>
                   <th style={s.th}>NGRP</th>
                   <th style={s.th}>Spots</th>
                 </tr>
@@ -1090,6 +1212,7 @@ export default function FinalPlan({
                           <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(num(r.NCost ?? 0))}</td>
                           <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.NTVR ?? 0))}</td>
                           <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(num(r.Total_Cost ?? 0))}</td>
+                          <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.TVR ?? r.NTVR) * num(r.Spots))}</td>
                           <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.Total_Rating ?? r.Total_NTVR ?? 0))}</td>
                           <td style={s.td}>{num(r.Spots ?? 0)}</td>
                         </tr>
@@ -1114,6 +1237,7 @@ export default function FinalPlan({
                             <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(num(r.NCost ?? 0))}</td>
                             <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.NTVR ?? 0))}</td>
                             <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(num(r.Total_Cost ?? 0))}</td>
+                            <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.TVR ?? r.NTVR) * num(r.Spots))}</td>
                             <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.Total_Rating ?? r.Total_NTVR ?? 0))}</td>
                             <td style={s.td}>{num(r.Spots ?? 0)}</td>
                           </tr>
@@ -1131,6 +1255,7 @@ export default function FinalPlan({
                             <td style={{ ...s.td, ...s.benefitRow, textAlign: 'right' }}>{formatLKR_1(num(r.NCost ?? 0))}</td>
                             <td style={{ ...s.td, ...s.benefitRow, textAlign: 'right' }}>{safeFx(num(r.NTVR ?? 0))}</td>
                             <td style={{ ...s.td, ...s.benefitRow, textAlign: 'right' }}>{formatLKR_1(num(r.Total_Cost ?? 0))}</td>
+                            <td style={{ ...s.td, ...s.benefitRow, textAlign: 'right' }}>{safeFx(num(r.TVR ?? r.NTVR) * num(r.Spots))}</td>
                             <td style={{ ...s.td, ...s.benefitRow, textAlign: 'right' }}>{safeFx(num(r.Total_Rating ?? r.Total_NTVR ?? 0))}</td>
                             <td style={{ ...s.td, ...s.benefitRow }}>{num(r.Spots ?? 0)}</td>
                           </tr>
@@ -1148,12 +1273,14 @@ export default function FinalPlan({
 
                         const mainMap = new Map();
                         mainRows.forEach(r => {
+                          r = normalizeRow(r);
                           const k = subKey(r);
                           mainMap.set(k, (mainMap.get(k) || []).concat(r));
                         });
 
                         const unmatchedBenefit = [];
                         benefitRows.forEach(r => {
+                          r = normalizeRow(r);
                           const k = subKey(r);
                           if (mainMap.has(k)) {
                             mainMap.set(k, mainMap.get(k).concat(r));
@@ -1208,6 +1335,7 @@ export default function FinalPlan({
                               <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(num(r.NCost ?? 0))}</td>
                               <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.NTVR ?? 0))}</td>
                               <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(num(r.Total_Cost ?? 0))}</td>
+                              <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.TVR ?? r.NTVR) * num(r.Spots))}</td>
                               <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.Total_Rating ?? r.Total_NTVR ?? 0))}</td>
                               <td style={s.td}>{num(r.Spots ?? 0)}</td>
                             </tr>
@@ -1242,6 +1370,7 @@ export default function FinalPlan({
                 <th style={s.th}>NGRP (Property)</th>
                 <th style={s.th}>Bonus NGRP</th>
                 <th style={s.th}>Total NGRP</th>
+                <th style={s.th}>Total GRP</th>
                 <th style={s.th}>CPRP (LKR)</th>
               </tr>
             </thead>
@@ -1256,6 +1385,7 @@ export default function FinalPlan({
                   <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(r.NGRP_Property)}</td>
                   <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(r.NGRP_Bonus)}</td>
                   <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(r.NGRP_Total)}</td>
+                  <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(r.GRP_Total)}</td>
                   <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(r.CPRP_LKR)}</td>
                 </tr>
               ))}

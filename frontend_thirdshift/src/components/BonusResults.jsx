@@ -84,7 +84,7 @@ export default function BonusResults({
     sectionTitle: { marginTop: 16, marginBottom: 10, fontSize: 18, fontWeight: 700, color: '#2d3748' },
     summaryGrid: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+      gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
       gap: 12,
       marginBottom: 8,
     },
@@ -102,7 +102,7 @@ export default function BonusResults({
     channelTitle: { fontSize: 16, fontWeight: 800, color: '#2d3748' },
     channelKPIs: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(3, minmax(0,1fr))',
+      gridTemplateColumns: 'repeat(4, minmax(0,1fr))',
       gap: 8,
       marginTop: 6,
     },
@@ -219,7 +219,7 @@ export default function BonusResults({
     const Day = toStr(r.Day ?? r.Date ?? src?.Day ?? src?.Date ?? '');
     const Time = toStr(r.Time ?? src?.Time ?? '');
     const Cost = num(r.Cost ?? r.Rate ?? r['Rate (DB)'] ?? src?.Cost ?? src?.Rate ?? src?.['Rate (DB)'] ?? 0);
-    const TVR = num(r.TVR ?? src?.TVR ?? 0);
+    const TVR = num(r.TVR ?? r.NTVR ?? src?.TVR ?? src?.NTVR ?? 0);
     const NCost = num(r.NCost ?? src?.NCost ?? 0);
     const NTVR = num(r.NTVR ?? r.TVR ?? src?.NTVR ?? src?.TVR ?? 0);
 
@@ -249,6 +249,13 @@ export default function BonusResults({
     if (Number.isFinite(provided)) return provided;
     return byProgram.reduce((acc, r) => acc + num(r.Total_Rating ?? r.Total_NTVR ?? r.NTVR ?? 0), 0);
   }, [totals, byProgram]);
+
+    const globalGRP = useMemo(() => {
+      return byProgram.reduce((acc, r) => {
+        const enriched = enrichRow(r);
+        return acc + (num(enriched.TVR) * num(enriched.Spots));
+      }, 0);
+    }, [byProgram]);
 
   const globalCPRP = useMemo(() => (globalRating > 0 ? globalCost / globalRating : 0), [globalCost, globalRating]);
 
@@ -289,29 +296,38 @@ export default function BonusResults({
     return base;
   }, [byProgram, byChannel, channels]);
 
-  const channelSummaryRows = useMemo(() => {
-    if (byChannel && byChannel.length > 0) {
-      return byChannel.map((r) => {
-        const ch = toStr(r.Channel);
-        const spots = num(r.Spots ?? r.Total_Spots ?? 0);
-        const cost = num(r.Total_Cost ?? 0);
-        const rating = num(r.Total_Rating ?? r.Total_NTVR ?? 0);
-        const cprp = rating > 0 ? cost / rating : 0;
-        return { Channel: ch, Spots: spots, Total_Cost: cost, Total_Rating: rating, CPRP: cprp };
+    const channelSummaryRows = useMemo(() => {
+      // We ALWAYS use channelMap for Bonus (by_channel is not reliable)
+      return Object.entries(channelMap).map(([ch, data]) => {
+        // GRP = Σ (TVR or NTVR) * Spots for all rows in this channel
+        const grp = Object.values(data.rowsByCommercial)
+          .flat()
+          .reduce(
+            (sum, r) =>
+              sum + num(r.TVR ?? r.NTVR ?? 0) * num(r.Spots ?? 0),
+            0
+          );
+
+        const cprp = data.rating > 0 ? data.cost / data.rating : 0;
+
+        return {
+          Channel: ch,
+          Spots: data.totalSpots,
+          Total_Cost: data.cost,
+          Total_Rating: data.rating, // NGRP
+          GRP: grp,
+          CPRP: cprp,
+        };
       });
-    }
-    return Object.entries(channelMap).map(([ch, data]) => {
-      const cprp = data.rating > 0 ? data.cost / data.rating : 0;
-      return { Channel: ch, Spots: data.totalSpots, Total_Cost: data.cost, Total_Rating: data.rating, CPRP: cprp };
-    });
-  }, [byChannel, channelMap]);
+    }, [channelMap]);
 
   const channelSummaryTotals = useMemo(() => {
     const tSpots = channelSummaryRows.reduce((a, r) => a + num(r.Spots), 0);
     const tCost = channelSummaryRows.reduce((a, r) => a + num(r.Total_Cost), 0);
     const tRating = channelSummaryRows.reduce((a, r) => a + num(r.Total_Rating), 0);
+    const tGRP = channelSummaryRows.reduce((a, r) => a + (num(r.GRP)), 0);
     const tCPRP = tRating > 0 ? tCost / tRating : 0;
-    return { Spots: tSpots, Total_Cost: tCost, Total_Rating: tRating, CPRP: tCPRP };
+    return { Spots: tSpots, Total_Cost: tCost, Total_Rating: tRating,  GRP: tGRP, CPRP: tCPRP };
   }, [channelSummaryRows]);
 
   // ---------------- render ----------------
@@ -352,6 +368,10 @@ export default function BonusResults({
                 <div style={s.summaryValue}>{formatLKR(globalCost)}</div>
               </div>
               <div style={s.summaryCard}>
+                <div style={s.summaryTitle}>Total Bonus GRP</div>
+                <div style={s.summaryValue}>{safeFixed(globalGRP, 2)}</div>
+              </div>
+              <div style={s.summaryCard}>
                 <div style={s.summaryTitle}>Total Bonus NGRP</div>
                 <div style={s.summaryValue}>{safeFixed(globalRating, 2)}</div>
               </div>
@@ -370,6 +390,7 @@ export default function BonusResults({
 
             {Object.entries(channelMap).map(([ch, data]) => {
               const chCost = data.cost;
+              const chGRP = Object.values(data.rowsByCommercial).flat().reduce((sum, r) => sum + (num(r.TVR) * num(r.Spots)), 0);
               const chRating = data.rating;
               const chCPRP = chRating > 0 ? chCost / chRating : 0;
 
@@ -391,6 +412,10 @@ export default function BonusResults({
                       <div style={s.summaryTitle}>Bonus Budget</div>
                       <div style={s.summaryValue}>{formatLKR(chCost)}</div>
                     </div>
+                      <div style={s.summaryCard}>
+                        <div style={s.summaryTitle}>Bonus GRP</div>
+                        <div style={s.summaryValue}>{safeFixed(chGRP)}</div>
+                      </div>
                     <div style={s.summaryCard}>
                       <div style={s.summaryTitle}>Bonus NGRP</div>
                       <div style={s.summaryValue}>{safeFixed(chRating)}</div>
@@ -416,6 +441,7 @@ export default function BonusResults({
                             <th style={s.th}>NCost</th>
                             <th style={s.th}>NTVR</th>
                             <th style={s.th}>Total Budget</th>
+                            <th style={s.th}>GRP</th>
                             <th style={s.th}>NGRP</th>
                             <th style={s.th}>Spots</th>
                           </tr>
@@ -445,13 +471,45 @@ export default function BonusResults({
                                       <td style={s.td}>{toStr(r.Program ?? '')}</td>
                                       <td style={s.td}>{toStr(r.Day ?? '')}</td>
                                       <td style={s.td}>{toStr(r.Time ?? '')}</td>
-                                      <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR(costPerSpot)}</td>
-                                      <td style={{ ...s.td, textAlign: 'right' }}>{safeFixed(tvrPerSpot)}</td>
-                                      <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR(num(r.NCost ?? 0))}</td>
-                                      <td style={{ ...s.td, textAlign: 'right' }}>{safeFixed(num(r.NTVR ?? 0))}</td>
-                                      <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR(totalCost)}</td>
-                                      <td style={{ ...s.td, textAlign: 'right' }}>{safeFixed(totalNtvr)}</td>
-                                      <td style={{ ...s.td, textAlign: 'center' }}>{spots}</td>
+                                      {/* Cost */}
+                                      <td style={{ ...s.td, textAlign: 'right' }}>
+                                        {formatLKR(costPerSpot)}
+                                      </td>
+
+                                      {/* TVR */}
+                                      <td style={{ ...s.td, textAlign: 'right' }}>
+                                        {safeFixed(tvrPerSpot)}
+                                      </td>
+
+                                      {/* NCost */}
+                                      <td style={{ ...s.td, textAlign: 'right' }}>
+                                        {formatLKR(num(r.NCost ?? 0))}
+                                      </td>
+
+                                      {/* NTVR */}
+                                      <td style={{ ...s.td, textAlign: 'right' }}>
+                                        {safeFixed(num(r.NTVR ?? 0))}
+                                      </td>
+
+                                      {/* Total Budget */}
+                                      <td style={{ ...s.td, textAlign: 'right' }}>
+                                        {formatLKR(totalCost)}
+                                      </td>
+
+                                      {/* GRP */}
+                                      <td style={{ ...s.td, textAlign: 'right' }}>
+                                        {safeFixed(num(r.TVR) * num(r.Spots))}
+                                      </td>
+
+                                      {/* NGRP (Total Rating) */}
+                                      <td style={{ ...s.td, textAlign: 'right' }}>
+                                        {safeFixed(totalNtvr)}
+                                      </td>
+
+                                      {/* Spots */}
+                                      <td style={{ ...s.td, textAlign: 'center' }}>
+                                        {spots}
+                                      </td>
                                     </tr>
                                   );
                                 })}
@@ -475,7 +533,8 @@ export default function BonusResults({
                     <th style={s.summaryTh}>Channel</th>
                     <th style={s.summaryTh}>Spots</th>
                     <th style={s.summaryTh}>Total Cost</th>
-                    <th style={s.summaryTh}>Total NTVR</th>
+                    <th style={s.summaryTh}>GRP</th>
+                    <th style={s.summaryTh}>NGRP</th>
                     <th style={s.summaryTh}>CPRP</th>
                   </tr>
                 </thead>
@@ -490,6 +549,7 @@ export default function BonusResults({
                       <td style={s.summaryTd}>{toStr(r.Channel)}</td>
                       <td style={{ ...s.summaryTd, textAlign: 'right' }}>{num(r.Spots)}</td>
                       <td style={{ ...s.summaryTd, textAlign: 'right' }}>{formatLKR(num(r.Total_Cost))}</td>
+                      <td style={{ ...s.summaryTd, textAlign: 'right' }}>{safeFixed(num(r.GRP))}</td>
                       <td style={{ ...s.summaryTd, textAlign: 'right' }}>{safeFixed(num(r.Total_Rating))}</td>
                       <td style={{ ...s.summaryTd, textAlign: 'right' }}>{safeFixed(num(r.CPRP))}</td>
                     </tr>
@@ -499,6 +559,7 @@ export default function BonusResults({
                       <td style={s.summaryTd}>Total</td>
                       <td style={{ ...s.summaryTd, textAlign: 'right' }}>{num(channelSummaryTotals.Spots)}</td>
                       <td style={{ ...s.summaryTd, textAlign: 'right' }}>{formatLKR(num(channelSummaryTotals.Total_Cost))}</td>
+                      <td style={{ ...s.summaryTd, textAlign: 'right' }}>{safeFixed(num(channelSummaryTotals.GRP))}</td>
                       <td style={{ ...s.summaryTd, textAlign: 'right' }}>{safeFixed(num(channelSummaryTotals.Total_Rating))}</td>
                       <td style={{ ...s.summaryTd, textAlign: 'right' }}>{safeFixed(num(channelSummaryTotals.CPRP))}</td>
                     </tr>
