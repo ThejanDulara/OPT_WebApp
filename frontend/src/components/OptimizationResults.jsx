@@ -8,11 +8,41 @@ export default function OptimizationResults({
   displayOrder,
   summaryOrder,
   formatLKR,
-  styles,
   inclusiveTotals,
   channels,
-  propertyPrograms
+  propertyPrograms,
+  onProceedToBonus,
+  onHome,
+  onExport,
+  channelBaseBudgets,
+  commercialPercentsByChannel,
+  commercialDurationsByChannel,
+  defaultChannelBoundPct,
+  maxSpots,
+  timeLimit,
+  allDbPrograms,
+  propertyRunSummary,
+  setMainOptimizationResult,
+  proceedLabel = "Proceed to Bonus Program Optimization" // 👈 default
 }) {
+  // Define styles within the component
+  const styles = {
+    container: {marginTop: '24px', padding: '32px', maxWidth: '1200px', margin: '0 auto', backgroundColor: '#d5e9f7', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0, 0, 0, 0.05)' },
+    title: { color: '#2d3748', fontSize: '24px', fontWeight: '600', marginBottom: '24px' },
+    sectionTitle: { color: '#2d3748', fontSize: '20px', fontWeight: '600', marginBottom: '24px' },
+    summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' },
+    summaryCard: { marginBottom: '24px',backgroundColor: 'white', borderRadius: '8px', padding: '16px', border: '1px solid e2e8f0', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)' },
+    summaryTitle: { color: '#4a5568', fontSize: '14px', fontWeight: '600', marginBottom: '8px' },
+    summaryValue: { color: '#2d3748', fontSize: '18px', fontWeight: '700' },
+    table: { width: '100%', borderCollapse: 'collapse', marginTop: '16px' },
+    th: { border: '1px solid #ccc', padding: '8px', background: '#f7fafc', fontWeight: '600' },
+    td: { border: '1px solid #eee', padding: '8px', textAlign: 'center' },
+    exportButton: { padding: '12px 24px', backgroundColor: '#38a169', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', fontWeight: '500', cursor: 'pointer', transition: 'all 0.2s ease', marginTop: '24px', marginRight: '20px' },
+    backHomeButton: { padding: '12px 24px', backgroundColor: '#edf2f7', color: '#2d3748', border: '1px solid #cbd5e0', borderRadius: '6px', fontSize: '16px', fontWeight: '500', cursor: 'pointer', marginTop: '16px', marginRight: '20px' },
+    primaryButton: { padding: '12px 24px', backgroundColor: '#4299e1', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', fontWeight: '500', cursor: 'pointer' },
+    label: { color: '#4a5568', fontWeight: '500', fontSize: '14px' }
+  };
+
   const toFixedOrInt = (key, val) => {
     const numericCols = ['Cost','TVR','NCost','NTVR','Total_Cost','Total_Rating'];
     const isNumeric = numericCols.includes(key);
@@ -20,6 +50,12 @@ export default function OptimizationResults({
     if (isCount) return parseInt(val);
     if (isNumeric) return Number(val).toFixed(2);
     return val;
+  };
+
+  // keep this helper near the top (you already have it in your file)
+  const handleProceedToBonus = () => {
+    console.log('Proceed to bonus clicked');
+    onProceedToBonus?.();
   };
 
   const handleExportToExcel = () => {
@@ -123,8 +159,38 @@ export default function OptimizationResults({
     saveAs(fileData, 'optimized_schedule.xlsx');
   };
 
+    // ---- COMPUTE EXCLUSIVE GRP (without property) ----
+    const totalGRP_excl = (result?.commercials_summary || [])
+      .flatMap(c => c.details || [])
+      .reduce((s, r) => s + (Number(r.Spots || 0) * Number(r.TVR || 0)), 0);
+
+    // ---- COMPUTE INCLUSIVE GRP (includes property GRP) ----
+    const totalPropertyGRP = Object.keys(propertyPrograms || {}).reduce((sum, ch) => {
+      return sum + (propertyPrograms[ch] || []).reduce((s, r) => {
+        const tvr = parseFloat(r.TVR) || 0;
+        const spots = parseInt(r.spots) || 0;
+        return s + (tvr * spots);
+      }, 0);
+    }, 0);
+
+    const totalGRP_incl = totalGRP_excl + totalPropertyGRP;
+
+    // ---- GROUP PROGRAM ROWS BY CHANNEL FOR GRP ----
+    const programRows = result?.df_result || [];
+
+    const grpByChannel = programRows.reduce((m, r) => {
+      const grp = Number(r.Spots || 0) * Number(r.TVR || 0);
+      m[r.Channel] = (m[r.Channel] || 0) + grp;
+      return m;
+    }, {});
+
+    // Total GRP for GRP %
+    const totalGRPAllChannels = Object.values(grpByChannel)
+      .reduce((a, b) => a + b, 0);
+
+
   return (
-    <div id="optimization-summary">
+    <div id="optimization-summary" style={styles.container}>
       <div style={styles.resultContainer}>
         <h3 style={styles.sectionTitle}>Final Optimization Result</h3>
 
@@ -138,6 +204,10 @@ export default function OptimizationResults({
             <p style={styles.summaryValue}>{Number(result.total_rating).toFixed(2)}</p>
           </div>
           <div style={styles.summaryCard}>
+              <h4 style={styles.summaryTitle}>GRP (excl. Property)</h4>
+              <p style={styles.summaryValue}>{totalGRP_excl.toFixed(2)}</p>
+          </div>
+          <div style={styles.summaryCard}>
             <h4 style={styles.summaryTitle}>CPRP (excl. Property)</h4>
             <p style={styles.summaryValue}>{Number(result.cprp).toFixed(2)}</p>
           </div>
@@ -149,38 +219,50 @@ export default function OptimizationResults({
           <div style={styles.summaryCard}>
             <h4 style={styles.summaryTitle}>Total Budget (incl. Property)</h4>
             <p style={styles.summaryValue}>
-              {formatLKR(inclusiveTotals?.totalBudgetIncl || 0)}
+              {formatLKR(inclusiveTotals?.totalBudgetIncl || result.total_cost)}
             </p>
           </div>
 
           <div style={styles.summaryCard}>
             <h4 style={styles.summaryTitle}>NGRP (incl. Property)</h4>
             <p style={styles.summaryValue}>
-              {Number(inclusiveTotals?.totalNGRPIncl || 0).toFixed(2)}
+              {Number(inclusiveTotals?.totalNGRPIncl || result.total_rating).toFixed(2)}
             </p>
           </div>
+          <div style={styles.summaryCard}>
+              <h4 style={styles.summaryTitle}>GRP (incl. Property)</h4>
+              <p style={styles.summaryValue}>{totalGRP_incl.toFixed(2)}</p>
+            </div>
 
           <div style={styles.summaryCard}>
             <h4 style={styles.summaryTitle}>CPRP (incl. Property)</h4>
             <p style={styles.summaryValue}>
-              {Number(inclusiveTotals?.cprpIncl || 0).toFixed(2)}
+              {Number(inclusiveTotals?.cprpIncl || result.cprp).toFixed(2)}
             </p>
           </div>
         </div>
-
 
         <h3 style={styles.sectionTitle}>Commercial-wise Allocation</h3>
         {(result.commercials_summary || []).map((c, idx) => (
           <div key={idx} style={styles.summaryCard}>
             <h4 style={styles.label}>Commercial {c.commercial_index + 1}</h4>
-            <p>Total Budget: {formatLKR(c.total_cost)}</p>
-            <p>NGRP: {Number(c.total_rating).toFixed(2)}</p>
-            <p>CPRP: {Number(c.cprp).toFixed(2)}</p>
+            <div style={{
+              marginBottom: '12px',
+              fontSize: '16px',
+            }}>
+              <strong>Total Budget:</strong> {formatLKR(c.total_cost)}
+              &nbsp;   &nbsp;
+              <strong>GRP:</strong> {(c.details || []).reduce((s, r) => s + (Number(r.Spots) * Number(r.TVR)), 0).toFixed(2)}
+              &nbsp;   &nbsp;
+              <strong>NGRP:</strong> {Number(c.total_rating).toFixed(2)}
+              &nbsp;  &nbsp;
+              <strong>CPRP:</strong> {Number(c.cprp).toFixed(2)}
+            </div>
             <table style={styles.table}>
               <thead>
                 <tr>
                   {displayOrder.map((key, i) => {
-                    const headerMap = { 'Total_Rating': 'NGRP', 'Total_Cost': 'Total Budget' };
+                    const headerMap = { 'Total_Rating': 'NGRP', 'Total_Cost': 'Total Budget' ,'Slot': 'PT [A] / NPT [B]'  };
                     return <th key={i} style={styles.th}>{headerMap[key] || key}</th>;
                   })}
                 </tr>
@@ -195,12 +277,15 @@ export default function OptimizationResults({
                           ...styles.td,
                           textAlign: ['Spots','Slot'].includes(key)
                             ? 'center'
-                            : ['Cost','TVR','NCost','NTVR','Total_Cost','Total_Rating'].includes(key)
+                            : ['Cost','TVR','NCost','NTVR','Total_Cost','GRP','Total_Rating'].includes(key)
                             ? 'right'
                             : 'left'
                         }}
                       >
-                        {toFixedOrInt(key, row[key])}
+                        {key === 'GRP'
+                          ? (Number(row.Spots) * Number(row.TVR)).toFixed(2)
+                          : toFixedOrInt(key, row[key])
+                        }
                       </td>
                     ))}
                   </tr>
@@ -210,8 +295,9 @@ export default function OptimizationResults({
           </div>
         ))}
 
-        <h3 style={styles.sectionTitle}>Channel Summary with Slot Breakdown</h3>
-        <table style={styles.summaryCard}>
+        <h3 style={styles.sectionTitle}>Channel wise Summary</h3>
+
+        <table style={{...styles.table, ...styles.summaryCard}}>
           <thead>
             <tr>
               {summaryOrder.map((key, i) => {
@@ -229,9 +315,22 @@ export default function OptimizationResults({
               <tr key={i}>
                 {summaryOrder.map((key, j) => {
                   const isNumeric = typeof row[key] === 'number';
+                    const channelGRP = grpByChannel[row.Channel] || 0;
+
+                    const totalGRPForPercent = totalGRP_excl + totalPropertyGRP;
+                    const channelGRPpct = totalGRPForPercent > 0
+                      ? (channelGRP / totalGRPForPercent) * 100
+                      : 0;
                   return (
                     <td key={j} style={{ ...styles.td, textAlign: isNumeric ? 'right' : 'left' }}>
-                      {isNumeric ? Number(row[key]).toFixed(2) : row[key]}
+                     {key === 'GRP'
+                      ? channelGRP.toFixed(2)
+                      : key === 'GRP %'
+                      ? channelGRPpct.toFixed(2) + '%'
+                      : isNumeric
+                      ? Number(row[key]).toFixed(2)
+                      : row[key]
+                    }
                     </td>
                   );
                 })}
@@ -240,8 +339,21 @@ export default function OptimizationResults({
           </tbody>
         </table>
 
-        <button onClick={handleExportToExcel} style={styles.exportButton}>Export Final Plan to Excel</button>
-        <button onClick={() => (window.location.href = '/')} style={styles.backHomeButton}>Go Back to Home</button>
+        <button onClick={handleExportToExcel} style={styles.exportButton}>
+          Export Final Plan to Excel
+        </button>
+
+        <button onClick={onHome} style={styles.backHomeButton}>
+          Go Back to Home
+        </button>
+        <button
+          type="button"
+          onClick={handleProceedToBonus}
+          disabled={!onProceedToBonus}
+          style={{ ...styles.primaryButton, opacity: onProceedToBonus ? 1 : 0.6 }}
+        >
+          {proceedLabel}
+        </button>
       </div>
     </div>
   );

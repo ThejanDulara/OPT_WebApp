@@ -28,8 +28,9 @@ function computeComputed(row) {
   const NTVR = (TVR / 30) * duration;      // NTVR = TVR/30*Duration
   const NCost = spots > 0 ? budget / spots : 0; // NCost = Budget/Spots
   const NGRP = NTVR * spots;               // NGRP = NTVR * Spots
+  const GRP = TVR * spots;
 
-  return { NTVR, NCost, NGRP };
+  return { NTVR, NCost, NGRP, GRP  };
 }
 
 export default function PropertyProgramsEditor({
@@ -69,22 +70,33 @@ export default function PropertyProgramsEditor({
     });
   };
 
-  const handleChange = (ch, id, field, value) => {
-    setPropertyPrograms(prev => {
-      const rows = (prev[ch] || []).map(r => r.id === id ? { ...r, [field]: value } : r);
-      return { ...prev, [ch]: rows };
-    });
-  };
+    const handleChange = (ch, id, field, value) => {
+      setPropertyPrograms(prev => {
+        const rows = (prev[ch] || []).map(r => {
+          let newVal = value;
 
-  const visibleChannels = (channels || []).filter(
-    ch => !!hasProperty[ch] && num(propertyAmounts[ch]) > 0
-  );
+          // Keep everything as string in state
+          if (field === 'budget' || field === 'duration' || field === 'TVR' || field === 'spots') {
+            newVal = value.replace(/^0+/, '');  // strip leading zeros
+          }
+
+          return r.id === id ? { ...r, [field]: newVal } : r;
+        });
+        return { ...prev, [ch]: rows };
+      });
+    };
+
+
+
+    const visibleChannels = (channels || []).filter(
+      ch => !!hasProperty[ch]
+    );
 
   if (visibleChannels.length === 0) return null;
 
   return (
     <div style={{ marginTop: 16 }}>
-      <h3 style={styles.sectionTitle}>Property program breakdown (per channel)</h3>
+      <h3 style={styles.sectionTitle}>Property breakdown (per channel)</h3>
 
       {visibleChannels.map((ch) => {
         const rows = propertyPrograms[ch] || [];
@@ -93,7 +105,17 @@ export default function PropertyProgramsEditor({
         return (
           <div key={ch} style={{ ...styles.summaryCard, marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <h4 style={{ ...styles.summaryTitle, fontSize: 16 }}>{ch}</h4>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <img
+                src={`/logos/${ch}.png`}
+                alt={ch}
+                style={{ height: '40px', width: 'auto', objectFit: 'contain', borderRadius: '4px' }}
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+              <h4 style={{ ...styles.summaryTitle, fontSize: 16, fontWeight: 'bold', color: '#2d3748' }}>
+                {ch}
+              </h4>
+            </div>
               <div style={{ fontSize: 13, color: totals.ok ? '#2d3748' : '#e53e3e' }}>
                 Target: <strong>{formatLKR(totals.target)}</strong> &nbsp;|&nbsp;
                 Entered: <strong>{formatLKR(totals.totalBudget)}</strong> &nbsp;|&nbsp;
@@ -109,19 +131,20 @@ export default function PropertyProgramsEditor({
                     <th style={styles.th}>Com name</th>
                     <th style={styles.th}>Day</th>
                     <th style={styles.th}>Time</th>
-                    <th style={styles.th}>Budget</th>
+                    <th style={styles.th}>On Cost</th>
                     <th style={styles.th}>NCost</th>
                     <th style={styles.th}>Duration</th>
                     <th style={styles.th}>TVR</th>
                     <th style={styles.th}>NTVR</th>
                     <th style={styles.th}>Spots</th>
+                    <th style={styles.th}>GRP</th>
                     <th style={styles.th}>NGRP</th>
                     <th style={styles.th}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((r) => {
-                    const { NTVR, NCost, NGRP } = computeComputed(r);
+                    const { NTVR, NCost, NGRP ,GRP} = computeComputed(r);
                     return (
                       <tr key={r.id}>
                         <td style={styles.td}>
@@ -201,6 +224,9 @@ export default function PropertyProgramsEditor({
                             onChange={e => handleChange(ch, r.id, 'spots', e.target.value)}
                             style={{ ...styles.numberInput, width: 80, textAlign: 'right' }}
                           />
+                        </td>
+                        <td style={{ ...styles.td, textAlign: 'right' }}>
+                          {fmt2(GRP)}             {/* ⭐ NEW */}
                         </td>
                         <td style={{ ...styles.td, textAlign: 'right' }}>
                           {fmt2(NGRP)}

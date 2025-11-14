@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 function ProgramUpdater({ onBack }) {
   const [channels, setChannels] = useState([]);
-  const [selectedChannel, setSelectedChannel] = useState('Derana');
+  const [selectedChannel, setSelectedChannel] = useState('DERANA TV');
   const [programs, setPrograms] = useState([]);
   const [newChannelName, setNewChannelName] = useState('');
   const [isAddingChannel, setIsAddingChannel] = useState(false);
@@ -12,8 +12,8 @@ function ProgramUpdater({ onBack }) {
       .then(res => res.json())
       .then(data => {
         setChannels(data.channels || []);
-        if (data.channels.includes('Derana')) {
-          fetch(`https://optwebapp-production.up.railway.app/programs/Derana`)
+        if (data.channels.includes('DERANA TV')) {
+          fetch(`https://optwebapp-production.up.railway.app/programs/DERANA TV`)
             .then(res => res.json())
             .then(data => setPrograms(data.programs || []));
         }
