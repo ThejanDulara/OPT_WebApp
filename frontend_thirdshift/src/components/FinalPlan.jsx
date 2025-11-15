@@ -800,7 +800,76 @@ export default function FinalPlan({
 
         // SECTION 1: Property Programs
         const propRows = (flatPropertyPrograms || []).filter(r => toStr(r.Channel) === ch);
-        addAOA(ws, [[`Property Benefits – ${ch}`]]);
+        addAOA(ws, [
+          ["", `Client Name: ${clientName}`],
+          ["", `Brand Name: ${brandName}`],
+          ["", `Ref No: ${refNo}`],
+          [""]
+        ]);
+    // ================== DATE RANGE ROW ===================
+
+        // Convert date range to array of dates
+        const dateList = [];
+        let d = new Date(fromDate);
+        const endDate = new Date(toDate);
+
+        while (d <= endDate) {
+          dateList.push(fmtDate(d));
+          d.setDate(d.getDate() + 1);
+        }
+
+        // Row starts at Column M (col 13) so date row does not push table left
+        // Generate empty cells until col M (adjust if needed)
+        const offset = Array(12).fill("");
+
+        // Insert date row
+        addAOA(ws, [offset.concat(dateList)]);
+
+        // Style weekends using XLSX
+        dateList.forEach((dt, idx) => {
+          const colIndex = 13 + idx; // 13 = column M
+          const cellRef = XLSX.utils.encode_cell({ r: 5, c: colIndex }); // Row 6 (0-indexed is 5)
+
+          const day = new Date(dt).getDay(); // 0=Sun, 6=Sat
+          const isWeekend = day === 0 || day === 6;
+
+          // Always ensure the cell exists
+          if (!ws[cellRef]) {
+            ws[cellRef] = { t: "s", v: dt };
+          }
+
+          if (isWeekend) {
+            ws[cellRef].s = {
+              fill: {
+                patternType: "solid",
+                fgColor: { rgb: "E0E0E0" } // light ash
+              }
+            };
+          }
+        });
+
+    // Shade weekend columns downwards until the last row
+        const maxRow = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']).e.r : 200;
+
+        dateList.forEach((dt, idx) => {
+          const col = 13 + idx;
+          const day = new Date(dt).getDay();
+          if (day !== 0 && day !== 6) return;
+
+          for (let r = 5; r <= maxRow; r++) {
+            const cellAddress = XLSX.utils.encode_cell({ r, c: col });
+            if (!ws[cellAddress]) ws[cellAddress] = { t: "s", v: "" };
+
+            ws[cellAddress].s = {
+              fill: {
+                patternType: "solid",
+                fgColor: { rgb: "E0E0E0" }
+              }
+            };
+          }
+        });
+
+        addAOA(ws, [[`Property Benefits`]]);
         addAOA(ws, [propertyHeaders]);
 
         if (propRows.length > 0) {
@@ -825,6 +894,7 @@ export default function FinalPlan({
 
         // SECTION 2..N: Commercial program rows (main + merged benefit), by commercial
         // We’ll include all commercials you have, in sorted order.
+        let headerAdded = false;
         (allCommercialKeys || []).forEach((commercialKey, idx) => {
           const mainPrograms = (mainCommercialData?.[commercialKey]?.programs || [])
             .filter(r => toStr(r.Channel) === ch);
@@ -834,9 +904,18 @@ export default function FinalPlan({
           // Always merge for export
           const mergedPrograms = mergeProgramsForExport(mainPrograms, benefitPrograms);
 
-          addAOA(ws, [['']]); // spacer row
-          addAOA(ws, [[`Commercial ${idx + 1} Programs – ${ch}`]]);
-          addAOA(ws, [progHeaders]);
+        addAOA(ws, [['']]);
+
+        // Add headers FIRST (only once)
+        if (!headerAdded) {
+            addAOA(ws, [progHeaders]);
+            headerAdded = true;
+        }
+
+        // Add commercial name AFTER headers
+        const customName = commercialNames[commercialKey] || `Commercial ${idx + 1}`;
+        addAOA(ws, [[`${customName}`]]);
+
 
           if (mergedPrograms.length > 0) {
                 const mainAOA = mergedPrograms.map(r => ([
@@ -862,8 +941,7 @@ export default function FinalPlan({
         // FINAL SECTION: Bonus Programs
         const bonusRows = (bonusByProgram || []).filter(r => toStr(r.Channel) === ch);
         addAOA(ws, [['']]); // spacer
-        addAOA(ws, [[`Bonus Programs – ${ch}`]]);
-        addAOA(ws, [progHeaders]);
+        addAOA(ws, [[`Bonus Programs`]]);
 
         if (bonusRows.length > 0) {
         const bonusAOA = bonusRows.map(r => ([
@@ -884,7 +962,10 @@ export default function FinalPlan({
         } else {
           addAOA(ws, [['(No bonus program rows)']]);
         }
-
+        if (ws['!ref']) {
+          const range = XLSX.utils.decode_range(ws['!ref']);
+          ws['!ref'] = XLSX.utils.encode_range(range);
+        }
         XLSX.utils.book_append_sheet(wb, ws, sheetTitle);
       });
 
@@ -932,7 +1013,7 @@ export default function FinalPlan({
       }
 
       // ---------- Save ----------
-      const wbout = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+      const wbout = XLSX.write(wb, {type: 'array',bookType: 'xlsx', cellStyles: true});
       saveAs(new Blob([wbout], { type: 'application/octet-stream' }), 'Final_Plan_By_Channel.xlsx');
     };
 
@@ -962,7 +1043,16 @@ export default function FinalPlan({
     // Bonus row background
     bonusRow: { background: '#deeffa' }, // light ash
   };
-  s.tdNowrap = { ...s.td, whiteSpace: 'nowrap' };
+      s.tdNowrap = { ...s.td, whiteSpace: 'nowrap' };
+
+      s.inputBox = {
+          width: "100%",
+          padding: "8px",
+          marginBottom: "12px",
+          border: "1px solid #ccc",
+          borderRadius: "6px"
+        };
+
     const normalizeRow = (r) => ({
       Channel: toStr(r.Channel),
       Program: toStr(r.Program),
@@ -991,7 +1081,29 @@ export default function FinalPlan({
   // NEW: State for merging benefit into main
   const [mergeBenefit, setMergeBenefit] = useState(false);
 
-  // ---------- Render ----------
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [clientName, setClientName] = useState("");
+  const [brandName, setBrandName] = useState("");
+  const [refNo, setRefNo] = useState("");
+  const [commercialNames, setCommercialNames] = useState({});
+
+    const today = new Date();
+    const nextWeek = new Date();
+    nextWeek.setDate(today.getDate() + 6);
+
+    const fmtDate = (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
+    // Default: Today → 7 days ahead
+    const [fromDate, setFromDate] = useState(fmtDate(today));
+    const [toDate, setToDate] = useState(fmtDate(nextWeek));
+
+
+  // ---------- Render ---<button type="button" onClick={handleExport} style={s.exportButton}>-------
   return (
     <div style={s.container}>
        <h2 style={s.pageTitle || {fontSize: 22,fontWeight: 700, margin: '8px 0 16px', letterSpacing: 0.3,}}>Final Optimized Plan (Property + Spot Buying + Bonus)</h2>
@@ -1401,13 +1513,105 @@ export default function FinalPlan({
 
       {/* Actions */}
       <div style={{marginTop: '24px'}}>
-        <button type="button" onClick={handleExport} style={s.exportButton}>
+        <button type="button" onClick={() => setShowExportDialog(true)} style={s.exportButton}>
           Export Final Plan to Excel
         </button>
         <button type="button" onClick={onHome} style={s.backHomeButton}>
           Go Back to Home
         </button>
       </div>
+      {showExportDialog && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+            background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center",
+            justifyContent: "center", zIndex: 9999
+          }}>
+            <div style={{
+              background: "white", padding: "24px", borderRadius: "12px",
+              width: "420px", boxShadow: "0 4px 20px rgba(0,0,0,0.2)"
+            }}>
+              <h3 style={{marginBottom: "12px"}}>Export Details</h3>
+
+              <label>Date Range</label>
+
+                <div style={{ display: "flex", gap: "10px", marginBottom: "12px" }}>
+                  <div style={{ flex: 1 }}>
+                    <label>From</label>
+                    <input
+                      type="date"
+                      style={s.inputBox}
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                    />
+                  </div>
+
+                  <div style={{ flex: 1 }}>
+                    <label>To</label>
+                    <input
+                      type="date"
+                      style={s.inputBox}
+                      value={toDate}
+                      onChange={(e) => setToDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+              <label>Client Name</label>
+              <input style={s.inputBox}
+                value={clientName}
+                onChange={e => setClientName(e.target.value)}
+              />
+
+              <label>Brand Name</label>
+              <input style={s.inputBox}
+                value={brandName}
+                onChange={e => setBrandName(e.target.value)}
+              />
+
+              <label>Ref No</label>
+              <input style={s.inputBox}
+                value={refNo}
+                onChange={e => setRefNo(e.target.value)}
+              />
+
+              <hr style={{margin: "16px 0"}} />
+
+              <h4>Commercial Names</h4>
+              {allCommercialKeys.map((key, index) => {
+                const defaultName = `Commercial ${index + 1}`;
+                return (
+                  <div key={key} style={{marginBottom: "8px"}}>
+                    <label>{defaultName}</label>
+                    <input
+                      style={s.inputBox}
+                      value={commercialNames[key] || defaultName}
+                      onChange={(e) => {
+                        setCommercialNames(prev => ({
+                          ...prev,
+                          [key]: e.target.value
+                        }));
+                      }}
+                    />
+                  </div>
+                );
+              })}
+
+              <div style={{marginTop:"20px", textAlign:"right"}}>
+                <button style={s.backHomeButton} onClick={() => setShowExportDialog(false)}>
+                  Cancel
+                </button>
+                <button
+                  style={s.primaryButton}
+                  onClick={() => {
+                    setShowExportDialog(false);
+                    handleExport();
+                  }}>
+                  Export
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }
