@@ -27,6 +27,7 @@ function NegotiatedRates({
   onProceed,
   initialChannelDiscounts,
   initialNegotiatedRates,
+  selectedChannels,
 }) {
   const [channels, setChannels] = useState([]);
   const [selectedChannel, setSelectedChannel] = useState('');
@@ -38,25 +39,23 @@ function NegotiatedRates({
   const [loadingPrograms, setLoadingPrograms] = useState(false);
 
   // --- Load channels
-  useEffect(() => {
-    fetch('https://optwebapp-production.up.railway.app/channels')
-      .then(res => res.json())
-      .then(data => {
-        const list = data.channels || [];
-        setChannels(list);
+    useEffect(() => {
+      if (!selectedChannels || selectedChannels.length === 0) return;
 
-        // seed default 30% for all channels (or restore if provided)
-        const base = {};
-        list.forEach(ch => {
-          base[ch] = initialChannelDiscounts?.[ch] ?? 30;
-        });
-        setChannelDiscounts(base);
+      setChannels(selectedChannels);
+      setLoadingChannels(false);
 
-        // Select first channel by default
-        if (list.length > 0) setSelectedChannel(list[0]);
-      })
-      .finally(() => setLoadingChannels(false));
-  }, []); // eslint-disable-line
+      // Seed 30% discounts or restore previous
+      const base = {};
+      selectedChannels.forEach(ch => {
+        base[ch] = initialChannelDiscounts?.[ch] ?? 30;
+      });
+      setChannelDiscounts(base);
+
+      // Select the first channel by default
+      setSelectedChannel(selectedChannels[0]);
+
+    }, [selectedChannels]);
 
   // --- Load programs when channel changes (use query param endpoint to get `id`)
   useEffect(() => {
@@ -95,7 +94,7 @@ function NegotiatedRates({
         });
       })
       .finally(() => setLoadingPrograms(false));
-  }, [selectedChannel]); // eslint-disable-line
+  }, [selectedChannel, selectedChannels]); // eslint-disable-line
 
   // --- When the discount for the selected channel changes, recompute non-overridden rows
   useEffect(() => {

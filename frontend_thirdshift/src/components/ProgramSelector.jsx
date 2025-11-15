@@ -1,7 +1,7 @@
 import React, { useState, useEffect ,useRef } from 'react';
 
 
-function ProgramSelector({ onSubmit, onBack, negotiatedRates }) {
+function ProgramSelector({ onSubmit, onBack, negotiatedRates,selectedChannels }) {
   const [programsByChannel, setProgramsByChannel] = useState({});
   const [selectedPrograms, setSelectedPrograms] = useState({});
 
@@ -13,16 +13,21 @@ function ProgramSelector({ onSubmit, onBack, negotiatedRates }) {
           const allSelected = {};
 
           data.programs.forEach(p => {
+            if (!selectedChannels.includes(p.channel)) return; // 🔥 filter only selected
+
             if (!grouped[p.channel]) grouped[p.channel] = [];
             grouped[p.channel].push(p);
-            allSelected[p.id] = true; // ✅ mark all programs as selected by default
+
+            allSelected[p.id] = true; // auto-select
           });
 
           setProgramsByChannel(grouped);
-          setSelectedPrograms(allSelected); // ✅ pre-select all
+          setSelectedPrograms(allSelected);
+
           window.scrollTo({ top: 0, behavior: 'smooth' });
         });
-    }, []);
+    }, [selectedChannels]);   // 🔥 added dependency
+
 
   const handleCheckboxChange = (programId) => {
     setSelectedPrograms(prev => ({

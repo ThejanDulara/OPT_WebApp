@@ -7,6 +7,7 @@ import Footer from './components/Footer';
 
 // Core flow
 import FrontPage from './components/FrontPage';
+import ChannelSelector from './components/ChannelSelector';
 import NegotiatedRates from './components/NegotiatedRates';
 import ProgramSelector from './components/ProgramSelector';
 import OptimizationSetup from './components/OptimizationSetup';
@@ -131,18 +132,32 @@ function App() {
             path="/"
             element={
               <FrontPage
-                onStart={() => navigate('/negotiated')}
+                onStart={() => navigate('/select-channels')}
                 onManagePrograms={() => navigate('/program-updater')}
               />
             }
           />
+          <Route
+          path="/select-channels"
+          element={
+            <ChannelSelector
+              onBack={() => navigate('/')}
+              onProceed={(chs) => {
+                setChannels(chs);       // 🔥 store selected channels globally
+                navigate('/negotiated');
+              }}
+            />
+          }
+        />
 
           {/** STEP 1 */}
           <Route
             path="/negotiated"
             element={
               <NegotiatedRates
-                onBack={() => navigate('/')}
+                channels={channels}   // 🔥 NEW LINE
+                onBack={() => navigate('/select-channels')}
+                selectedChannels={channels}
                 onProceed={({ channelDiscounts: cd = {}, negotiatedRates: nr = {} }) => {
                   setChannelDiscounts(cd);
                   setNegotiatedRates(nr);
@@ -153,16 +168,17 @@ function App() {
           />
 
           {/** STEP 2 */}
-          <Route
-            path="/program-selector"
-            element={
-              <ProgramSelector
-                negotiatedRates={negotiatedRates}
-                onSubmit={handleProgramsSubmit}
-                onBack={() => navigate('/negotiated')}
-              />
-            }
-          />
+        <Route
+          path="/program-selector"
+          element={
+            <ProgramSelector
+              negotiatedRates={negotiatedRates}
+              selectedChannels={channels}   // 🔥 NEW PROP
+              onSubmit={handleProgramsSubmit}
+              onBack={() => navigate('/negotiated')}
+            />
+          }
+        />
 
           {/** STEP 3 */}
           <Route
