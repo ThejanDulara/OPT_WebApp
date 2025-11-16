@@ -2,6 +2,7 @@
 import React, { useMemo , useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import ExcelJS from 'exceljs';
 
 export default function FinalPlan({
   // Accept BOTH naming styles so App.js doesn't have to change
@@ -64,6 +65,9 @@ export default function FinalPlan({
     const moneyCell = (v) =>
       Number(v ?? 0).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+    const monthName = (mm) => {
+      return new Date(2000, parseInt(mm)-1).toLocaleString("en-US", { month: "short" });
+    };
 
   // ---------- Tables ----------
   // Main tables from optimization results
@@ -674,20 +678,11 @@ export default function FinalPlan({
       (flatPropertyPrograms || []).length,
     ]);
 
-
-
     // ---------- Export ----------
-    const handleExport = () => {
-      const wb = XLSX.utils.book_new();
+    const handleExport = async () => {
+      const workbook = new ExcelJS.Workbook();
 
-      // --- Helpers ---
-      const safeSheetName = (s) => {
-        const t = String(s || '').replace(/[:\\/?*\[\]]/g, '-');
-        return t.length > 31 ? t.slice(0, 31) : t || 'Sheet';
-      };
-      const addAOA = (ws, aoa) => XLSX.utils.sheet_add_aoa(ws, aoa, { origin: -1 });
-
-      // ---------- Build KPI sheet (aligned with your new KPIs) ----------
+      // ---------- Build KPI sheet ----------
       const mainSpotNGRP = (mainByChannel || []).reduce((a, r) => a + num(r.Total_Rating), 0)
                           || (mainByProgram || []).reduce((a, r) => a + num(r.Total_Rating), 0);
 
@@ -699,22 +694,24 @@ export default function FinalPlan({
         ? budgetInclProperty / totalNGRP_InclPropertyBonus
         : 0;
 
-    const kpiRows = [
-      { Metric: 'Total Budget (incl. Property)', Value: budgetInclProperty },
+      const kpiRows = [
+        { Metric: 'Total Budget (incl. Property)', Value: budgetInclProperty },
+        { Metric: 'Spot Buying GRP', Value: mainSpotGRP },
+        { Metric: 'Property GRP', Value: propertyGRPTotal },
+        { Metric: 'Bonus GRP', Value: bonusGRP },
+        { Metric: 'Total GRP (incl. Property + Bonus)', Value: totalGRP_InclPropertyBonus },
+        { Metric: 'NGRP (Spot Buying)', Value: mainSpotNGRP },
+        { Metric: 'NGRP (Property)', Value: propertyNGRP_InclBenefit },
+        { Metric: 'Bonus NGRP', Value: bonusNGRP },
+        { Metric: 'Total NGRP (incl. Property + Bonus)', Value: totalNGRP_InclPropertyBonus },
+        { Metric: 'CPRP (incl. Property + Bonus)', Value: cprp_InclPropertyBonus },
+      ];
 
-      { Metric: 'Spot Buying GRP', Value: mainSpotGRP },
-      { Metric: 'Property GRP', Value: propertyGRPTotal },
-      { Metric: 'Bonus GRP', Value: bonusGRP },
-      { Metric: 'Total GRP (incl. Property + Bonus)', Value: totalGRP_InclPropertyBonus },
-
-      { Metric: 'NGRP (Spot Buying)', Value: mainSpotNGRP },
-      { Metric: 'NGRP (Property)', Value: propertyNGRP_InclBenefit },
-      { Metric: 'Bonus NGRP', Value: bonusNGRP },
-      { Metric: 'Total NGRP (incl. Property + Bonus)', Value: totalNGRP_InclPropertyBonus },
-
-      { Metric: 'CPRP (incl. Property + Bonus)', Value: cprp_InclPropertyBonus },
-    ];
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(kpiRows), 'Final KPIs');
+      const kpiSheet = workbook.addWorksheet('Final KPIs');
+      kpiSheet.addRow(['Metric', 'Value']);
+      kpiRows.forEach(row => {
+        kpiSheet.addRow([row.Metric, row.Value]);
+      });
 
       // ---------- Channel list ----------
       const channelSet = new Set([
@@ -725,15 +722,15 @@ export default function FinalPlan({
       const channelList = Array.from(channelSet).sort((a, b) => a.localeCompare(b));
 
       // ---------- Headers ----------
-        const propertyHeaders = [
-          'Name of the program','Com name','Day','Time',
-          'Budget (LKR)','NCost (LKR)','Duration','TVR','NTVR','Spots','GRP','NGRP'
-        ];
-        const progHeaders = [
-          'Program','Day','Time','PT [A] / NPT [B]',
-          'Cost (LKR)','TVR','NCost (LKR)','NTVR',
-          'Total Budget (LKR)','GRP','NGRP','Spots'
-        ];
+      const propertyHeaders = [
+        'Name of the program','Com name','Day','Time',
+        'Budget (LKR)','NCost (LKR)','Duration','TVR','NTVR','Spots','GRP','NGRP'
+      ];
+      const progHeaders = [
+        'Program','Day','Time','PT [A] / NPT [B]',
+        'Cost (LKR)','TVR','NCost (LKR)','NTVR',
+        'Total Budget (LKR)','GRP','NGRP','Spots'
+      ];
 
       // Merge helper for export (always merge benefit into main)
       const mergeProgramsForExport = (mainRows, benefitRows) => {
@@ -786,7 +783,7 @@ export default function FinalPlan({
           const slotB = toStr(b.Slot ?? 'A').toUpperCase();
           if (slotA === 'A' && slotB === 'B') return -1;
           if (slotA === 'B' && slotB === 'A') return 1;
-          return 0; // same slot or fallback
+          return 0;
         });
 
         return allNonBonusRows;
@@ -794,147 +791,555 @@ export default function FinalPlan({
 
       // ---------- Build per-channel sheets ----------
       channelList.forEach((ch) => {
-        const sheetTitle = safeSheetName(`Channel - ${ch}`);
-        // Start with an empty AOA sheet
-        const ws = XLSX.utils.aoa_to_sheet([['']]); // placeholder, we’ll append below
+        const sheetTitle = `Channel - ${ch}`.substring(0, 31); // Excel sheet name limit
+        const worksheet = workbook.addWorksheet(sheetTitle);
 
-        // SECTION 1: Property Programs
-        const propRows = (flatPropertyPrograms || []).filter(r => toStr(r.Channel) === ch);
-        addAOA(ws, [[`Property Benefits – ${ch}`]]);
-        addAOA(ws, [propertyHeaders]);
+        // SECTION 1: Header Info
+        worksheet.addRow(["", `Client Name: ${clientName}`]);
+        worksheet.addRow(["", `Brand Name: ${brandName}`]);
+        worksheet.addRow(["", `Ref No: ${refNo}`]);
+        worksheet.addRow([]);
 
-        if (propRows.length > 0) {
-        const propAOA = propRows.map(r => ([
-          toStr(r['Name of the program']),
-          toStr(r['Com name']),
-          toStr(r.Day),
-          toStr(r.Time),
-          Number(num(r.Budget)),
-          Number(num(r.NCost)),
-          Number(num(r.Duration)),
-          Number(num(r.TVR)),
-          Number(num(r.NTVR)),
-          Number(num(r.Spots)),
-          Number(num(r.TVR) * num(r.Spots)),   // <-- GRP (added)
-          Number(num(r.NGRP)),                 // <-- NGRP
-        ]));
-          addAOA(ws, propAOA);
-        } else {
-          addAOA(ws, [['(No property rows)']]);
+        // ================== DATE RANGE ROW ===================
+        // Build date list
+        const dateList = [];
+        let d = new Date(fromDate);
+        const endDate = new Date(toDate);
+        while (d <= endDate) {
+          dateList.push(fmtDate(d));
+          d.setDate(d.getDate() + 1);
         }
 
-        // SECTION 2..N: Commercial program rows (main + merged benefit), by commercial
-        // We’ll include all commercials you have, in sorted order.
+        const OFFSET = 12;
+        const empty = Array(OFFSET).fill("");
+
+        // --- 3 header rows ---
+        const rowMonth = [];
+        const rowDay   = [];
+        const rowDate  = [];
+
+        for (let i = 1; i <= OFFSET; i++) {
+          rowMonth[i] = "";
+          rowDay[i]   = "";
+          rowDate[i]  = "";
+        }
+
+        // Fill date columns starting at OFFSET+1
+        dateList.forEach((dt, idx) => {
+          const d = new Date(dt);
+          const mm = String(d.getMonth() + 1).padStart(2, "0");
+          const yyyy = d.getFullYear();
+          const dayName = d.toLocaleString("en-US", { weekday: "short" });
+          const dateNum = d.getDate();
+
+          const col = OFFSET + 1 + idx;
+
+          rowMonth[col] = { mm, yyyy };
+          rowDay[col]   = dayName;
+          rowDate[col]  = dateNum;
+        });
+
+        // Add 3 rows to sheet
+        const r1 = worksheet.addRow(rowMonth);
+        const r2 = worksheet.addRow(rowDay);
+        const r3 = worksheet.addRow(rowDate);
+
+        // === COLOR ONLY DATE HEADER CELLS (ASH COLOR) ===
+        const ashColor = 'D9D9D9';
+        const startCol = OFFSET + 1;               // first date column
+        const endCol   = OFFSET + dateList.length; // last date column
+
+        // Month row (r1)
+        for (let c = startCol; c <= endCol; c++) {
+          const cell = r1.getCell(c);
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: ashColor }
+          };
+          cell.font = { bold: true };
+        }
+
+        // Day row (r2)
+        for (let c = startCol; c <= endCol; c++) {
+          const cell = r2.getCell(c);
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: ashColor }
+          };
+          cell.font = { bold: true };
+        }
+
+        // Date row (r3)
+        for (let c = startCol; c <= endCol; c++) {
+          const cell = r3.getCell(c);
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: ashColor }
+          };
+          cell.font = { bold: true };
+        }
+
+        // === MERGE MONTH CELLS BY GROUP ===
+        let start = OFFSET + 1; // first date column index (12 offset + 1)
+        let currentMM = rowMonth[start]?.mm;
+        let currentYY = rowMonth[start]?.yyyy;
+
+        for (let col = start + 1; col <= OFFSET + dateList.length; col++) {
+          const thisCell = rowMonth[col];
+
+          if (!thisCell || thisCell.mm !== currentMM || thisCell.yyyy !== currentYY) {
+            // merge from start → col-1
+            if (col - 1 >= start) {
+              worksheet.mergeCells(r1.number, start, r1.number, col - 1);
+              const cell = worksheet.getRow(r1.number).getCell(start);
+              cell.value = `${monthName(currentMM)} - ${currentYY}`;
+              cell.alignment = { horizontal: "center", vertical: "middle" };
+              cell.font = { bold: true };
+            }
+
+            // reset group
+            start = col;
+            currentMM = thisCell?.mm;
+            currentYY = thisCell?.yyyy;
+          }
+        }
+
+        // merge last group
+        // merge last group correctly
+        worksheet.mergeCells(
+          r1.number,
+          start,
+          r1.number,
+          OFFSET + dateList.length  // <-- Correct!
+        );
+        const cellLast = worksheet.getRow(r1.number).getCell(start);
+        cellLast.value = `${monthName(currentMM)} - ${currentYY}`;
+        cellLast.alignment = { horizontal: "center", vertical: "middle" };
+        cellLast.font = { bold: true };
+
+        // Style Month-Year row
+        r1.eachCell((cell) => {
+          cell.font = { bold: true };
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+        });
+
+        // Style Day row (VERTICAL)
+        r2.height = 40; // Give space for vertical text
+        r2.eachCell((cell) => {
+          cell.font = { bold: true };
+          cell.alignment = {
+            horizontal: "center",
+            vertical: "middle",
+            textRotation: 90,     // ← ROTATE 90°
+            wrapText: true
+          };
+        });
+
+        // Style Date row
+        r3.eachCell((cell) => {
+          cell.font = { bold: true };
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+        });
+
+        // Capture the 3rd row index (for later weekend shading)
+        const DATE_HEADER_END_ROW = r3.number;
+
+        // Property Benefits Section
+        const propHeaderRow = worksheet.addRow([`Property Benefits`]);
+
+        propHeaderRow.getCell(1).fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FABF8F' }  //
+        };
+        // Property Header Row (ASH COLORED)
+        const headerRow = worksheet.addRow(propertyHeaders);
+
+        headerRow.eachCell((cell) => {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'D9D9D9' } // ASH color
+          };
+          cell.font = { bold: true };
+        });
+
+        const propRows = (flatPropertyPrograms || []).filter(r => toStr(r.Channel) === ch);
+        if (propRows.length > 0) {
+          propRows.forEach(r => {
+            worksheet.addRow([
+              toStr(r['Name of the program']),
+              toStr(r['Com name']),
+              toStr(r.Day),
+              toStr(r.Time),
+              Number(num(r.Budget)),
+              Number(num(r.NCost)),
+              Number(num(r.Duration)),
+              Number(num(r.TVR)),
+              Number(num(r.NTVR)),
+              Number(num(r.Spots)),
+              Number(num(r.TVR) * num(r.Spots)),   // GRP
+              Number(num(r.NGRP)),                 // NGRP
+            ]);
+          });
+        } else {
+          worksheet.addRow(['(No property rows)']);
+        }
+
+        // SECTION: Commercial Programs (Main + Benefit merged)
+        let headerAdded = false;
         (allCommercialKeys || []).forEach((commercialKey, idx) => {
           const mainPrograms = (mainCommercialData?.[commercialKey]?.programs || [])
             .filter(r => toStr(r.Channel) === ch);
           const benefitPrograms = (benefitCommercialData?.[commercialKey]?.programs || [])
             .filter(r => toStr(r.Channel) === ch);
 
-          // Always merge for export
           const mergedPrograms = mergeProgramsForExport(mainPrograms, benefitPrograms);
 
-          addAOA(ws, [['']]); // spacer row
-          addAOA(ws, [[`Commercial ${idx + 1} Programs – ${ch}`]]);
-          addAOA(ws, [progHeaders]);
+          worksheet.addRow([]);
+
+            if (!headerAdded) {
+              const progHeaderRow = worksheet.addRow(progHeaders);
+
+              // ASH color for each header cell
+              progHeaderRow.eachCell((cell) => {
+                cell.fill = {
+                  type: 'pattern',
+                  pattern: 'solid',
+                  fgColor: { argb: 'D9D9D9' } // ASH
+                };
+                cell.font = { bold: true };
+              });
+
+              headerAdded = true;
+            }
+
+          const customName = commercialNames[commercialKey] || `Commercial ${idx + 1}`;
+          const commercialHeaderRow = worksheet.addRow([`${customName}`]);
+
+            commercialHeaderRow.getCell(1).fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FABF8F' }  //
+            };
+
 
           if (mergedPrograms.length > 0) {
-                const mainAOA = mergedPrograms.map(r => ([
-                  toStr(r.Program),
-                  toStr(r.Day ?? r.Date ?? ''),
-                  toStr(r.Time ?? ''),
-                  toStr(r.Slot ?? 'A'),
-                  Number(num(r.Cost ?? r.NCost)),
-                  Number(num(r.TVR ?? r.NTVR)),
-                  Number(num(r.NCost ?? 0)),
-                  Number(num(r.NTVR ?? 0)),
-                  Number(num(r.Total_Cost ?? 0)),
-                  Number(num(r.TVR ?? r.NTVR) * num(r.Spots)), // <-- GRP
-                  Number(num(r.Total_Rating ?? r.Total_NTVR ?? 0)), // NGRP
-                  Number(num(r.Spots ?? 0)),
-                ]));
-            addAOA(ws, mainAOA);
+            mergedPrograms.forEach(r => {
+              worksheet.addRow([
+                toStr(r.Program),
+                toStr(r.Day ?? r.Date ?? ''),
+                toStr(r.Time ?? ''),
+                toStr(r.Slot ?? 'A'),
+                Number(num(r.Cost ?? r.NCost)),
+                Number(num(r.TVR ?? r.NTVR)),
+                Number(num(r.NCost ?? 0)),
+                Number(num(r.NTVR ?? 0)),
+                Number(num(r.Total_Cost ?? 0)),
+                Number(num(r.TVR ?? r.NTVR) * num(r.Spots)), // GRP
+                Number(num(r.Total_Rating ?? r.Total_NTVR ?? 0)), // NGRP
+                Number(num(r.Spots ?? 0)),
+              ]);
+            });
           } else {
-            addAOA(ws, [['(No program rows for this commercial)']]);
+            worksheet.addRow(['(No program rows for this commercial)']);
           }
         });
 
         // FINAL SECTION: Bonus Programs
         const bonusRows = (bonusByProgram || []).filter(r => toStr(r.Channel) === ch);
-        addAOA(ws, [['']]); // spacer
-        addAOA(ws, [[`Bonus Programs – ${ch}`]]);
-        addAOA(ws, [progHeaders]);
+        worksheet.addRow([]);
+        const bonusHeaderRow = worksheet.addRow([`Bonus Programs`]);
+
+        bonusHeaderRow.getCell(1).fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FABF8F' }  //
+        };
 
         if (bonusRows.length > 0) {
-        const bonusAOA = bonusRows.map(r => ([
-          toStr(r.Program),
-          toStr(r.Day ?? r.Date ?? ''),
-          toStr(r.Time ?? ''),
-          'B',
-          Number(num(r.Cost ?? r.NCost)),
-          Number(num(r.TVR ?? r.NTVR)),
-          Number(num(r.NCost ?? 0)),
-          Number(num(r.NTVR ?? 0)),
-          Number(num(r.Total_Cost ?? 0)),
-          Number(num(r.TVR ?? r.NTVR) * num(r.Spots)),   // <-- GRP ADDED
-          Number(num(r.Total_Rating ?? r.Total_NTVR ?? 0)), // <-- NGRP
-          Number(num(r.Spots ?? 0)),
-        ]));
-          addAOA(ws, bonusAOA);
+          bonusRows.forEach(r => {
+            worksheet.addRow([
+              toStr(r.Program),
+              toStr(r.Day ?? r.Date ?? ''),
+              toStr(r.Time ?? ''),
+              'B',
+              Number(num(r.Cost ?? r.NCost)),
+              Number(num(r.TVR ?? r.NTVR)),
+              Number(num(r.NCost ?? 0)),
+              Number(num(r.NTVR ?? 0)),
+              Number(num(r.Total_Cost ?? 0)),
+              Number(num(r.TVR ?? r.NTVR) * num(r.Spots)),
+              Number(num(r.Total_Rating ?? r.Total_NTVR ?? 0)),
+              Number(num(r.Spots ?? 0)),
+            ]);
+          });
         } else {
-          addAOA(ws, [['(No bonus program rows)']]);
+          worksheet.addRow(['(No bonus program rows)']);
         }
 
-        XLSX.utils.book_append_sheet(wb, ws, sheetTitle);
+        // === APPLY WEEKEND COLUMN SHADING ===
+        dateList.forEach((dt, idx) => {
+          const col = 13 + idx; // ExcelJS columns are 1-based, starting after 12 offset columns + 1
+          const day = new Date(dt).getDay();
+          if (day !== 0 && day !== 6) return; // not weekend
+
+          for (let r = 8; r <= worksheet.rowCount; r++) { // Start from row 8 (after headers)
+            const row = worksheet.getRow(r);
+            const cell = row.getCell(col);
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'D8E4BC' } // Light green
+            };
+          }
+        });
+
+        // === APPLY BONUS ROW STYLING ===
+        let bonusStartRow = -1;
+        worksheet.eachRow((row, rowNumber) => {
+          if (row.getCell(1).value === 'Bonus Programs') {
+            bonusStartRow = rowNumber + 1; // data starts 2 rows below
+          }
+        });
+
+        if (bonusStartRow > 0 && bonusRows.length > 0) {
+          const bonusEndRow = bonusStartRow + bonusRows.length - 1;
+          for (let r = bonusStartRow; r <= bonusEndRow; r++) {
+            const row = worksheet.getRow(r);
+            row.eachCell((cell) => {
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFDEEFFA' } // Light blue
+              };
+            });
+          }
+        }
+
+        // --- CUSTOM COLUMN WIDTHS ---
+        worksheet.getColumn(1).width = 25;
+        worksheet.getColumn(2).width = 15;
+        worksheet.getColumn(3).width = 15;
+
+        worksheet.getColumn(4).width = 5;
+        worksheet.getColumn(5).width = 10;
+
+        // Date columns (start at column M = 13)
+        const firstDateCol = 13;
+        dateList.forEach((_, idx) => {
+          worksheet.getColumn(firstDateCol + idx).width = 3;
+        });
+
+        // === APPLY BORDER STYLING ===
+
+        // Identify where borders should start
+        const propertyHeaderRowIndex = headerRow.number;     // first header after Property Benefits
+        const firstBorderRow = propHeaderRow.number;    // start horizontal/vertical borders from here
+        const firstBorderCol = startCol;                     // first date column (OFFSET + 1)
+        const lastRow = worksheet.rowCount;
+        const lastCol = worksheet.actualColumnCount;
+
+        // Starting row for date section (first row with dates)
+        const firstDateRow = r3.number + 1;   // date header rows end at r3
+
+        // === VERTICAL BORDER at START (first date column) ===
+        for (let r = firstDateRow; r <= worksheet.rowCount; r++) {
+          const cell = worksheet.getRow(r).getCell(startCol);
+          cell.border = {
+            ...cell.border,
+            left: { style: 'thin' }
+          };
+        }
+
+        // === VERTICAL BORDER at END (last date column) ===
+        for (let r = firstDateRow; r <= worksheet.rowCount; r++) {
+          const cell = worksheet.getRow(r).getCell(lastCol);
+          cell.border = {
+            ...cell.border,
+            right: { style: 'thin' }
+          };
+        }
+
+        // === COLOR FULL PROPERTY BENEFITS TOPIC ROW ===
+        for (let c = 1; c <= lastCol; c++) {
+          const cell = propHeaderRow.getCell(c);
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FABF8F' }};
+          cell.font = { bold: true };
+        }
+
+        // === COLOR FULL COMMERCIAL HEADER ROWS ===
+        worksheet.eachRow((row) => {
+          if (String(row.getCell(1).value || '').startsWith('Commercial ')) {
+            for (let c = 1; c <= lastCol; c++) {
+              const cell = row.getCell(c);
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FABF8F' }};
+              cell.font = { bold: true };
+            }
+          }
+        });
+
+        // === COLOR FULL BONUS HEADER ROW ===
+        for (let c = 1; c <= lastCol; c++) {
+          const cell = bonusHeaderRow.getCell(c);
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FABF8F' }};
+          cell.font = { bold: true };
+        }
+
+        // --- 1) HORIZONTAL THIN BORDERS ---
+        for (let r = firstBorderRow; r <= lastRow; r++) {
+          const row = worksheet.getRow(r);
+          for (let c = 1; c <= lastCol; c++) {
+            const cell = row.getCell(c);
+            cell.border = {
+              ...cell.border,
+              top: { style: 'thin' },
+              bottom: { style: 'thin' }
+            };
+          }
+        }
+
+        // --- 2) VERTICAL DOTTED BORDERS (INSIDE DATE AREA ONLY) ---
+        for (let r = firstBorderRow; r <= lastRow; r++) {
+          const row = worksheet.getRow(r);
+
+          for (let c = firstBorderCol + 1; c <= lastCol - 1; c++) {   // <<<<<< FIX HERE
+            const cell = row.getCell(c);
+            cell.border = {
+              ...cell.border,
+              left: { style: 'dotted' },
+              right: { style: 'dotted' }
+            };
+          }
+        }
+
+    // --- 3) SOLID LEFT BORDER (OVERRIDE dotted) ---
+        for (let r = firstDateRow; r <= lastRow; r++) {
+          const cell = worksheet.getRow(r).getCell(firstBorderCol);
+          cell.border = {
+            ...cell.border,
+            left: { style: 'thin' }  // override dotted
+          };
+        }
+
+        // --- 4) SOLID RIGHT BORDER (OVERRIDE dotted) ---
+        for (let r = firstDateRow; r <= lastRow; r++) {
+          const cell = worksheet.getRow(r).getCell(lastCol);
+          cell.border = {
+            ...cell.border,
+            right: { style: 'thin' } // override dotted
+          };
+        }
+    // === APPLY SOLID BORDER TO DATE HEADER ROWS (r1, r2, r3) ===
+        [r1, r2, r3].forEach((row) => {
+          // Solid LEFT BORDER
+          const leftCell = row.getCell(firstBorderCol);
+          leftCell.border = {
+            ...leftCell.border,
+            left: { style: 'thin' },
+          };
+
+          // Solid RIGHT BORDER
+          const rightCell = row.getCell(lastCol);
+          rightCell.border = {
+            ...rightCell.border,
+            right: { style: 'thin' },
+          };
+        });
+
+        [r1, r2, r3].forEach((row) => {
+          for (let c = firstBorderCol; c <= lastCol; c++) {
+            const cell = row.getCell(c);
+            cell.border = {
+              ...cell.border,    // <<<<<< preserve previous left/right
+              top: { style: 'thin' },
+              bottom: { style: 'thin' },
+            };
+          }
+
+                // === ADD VERTICAL THIN BORDERS FOR ROW 6 & 7 (DATE COLUMNS ONLY) ===
+        const row6 = worksheet.getRow(r3.number -1);  // Row after date headers (PT/NPT header)
+        const row7 = worksheet.getRow(r3.number );  // Next row (Cost/TVR header)
+
+        for (let c = firstBorderCol + 1; c <= lastCol - 1; c++) {
+          const cell6 = row6.getCell(c);
+          const cell7 = row7.getCell(c);
+
+          cell6.border = {
+            ...cell6.border,
+            left: { style: 'thin' },
+            right: { style: 'thin' },
+          };
+
+          cell7.border = {
+            ...cell7.border,
+            left: { style: 'thin' },
+            right: { style: 'thin' },
+          };
+        }
+        });
       });
 
       // ---------- Last sheet: Channel Summary (All-In) ----------
       if (combinedChannelRows?.length) {
-    const exportRows = combinedChannelRows.map((r) => ({
-      Channel: r.Channel,
+        const summarySheet = workbook.addWorksheet('Channel Summary (All-In)');
 
-      'Cost (LKR)': Number(r.Cost_LKR),
-      'Property value (LKR)': Number(r.Property_LKR),
-      'Total Cost (LKR)': Number(r.TotalCost_LKR),
+        const summaryHeaders = [
+          'Channel', 'Cost (LKR)', 'Property value (LKR)', 'Total Cost (LKR)',
+          'GRP (Spot Buying)', 'Property GRP', 'Bonus GRP', 'Total GRP',
+          'NGRP (Spot Buying)', 'NGRP (Property)', 'Bonus NGRP', 'Total NGRP', 'CPRP (LKR)'
+        ];
 
-      'GRP (Spot Buying)': Number(
-        (mainByProgram || [])
-          .filter(p => toStr(p.Channel) === r.Channel)
-          .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
-      ),
+        summarySheet.addRow(summaryHeaders);
 
-      'Property GRP': Number(
-        (flatPropertyPrograms || [])
-          .filter(p => toStr(p.Channel) === r.Channel)
-          .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
-      ),
+        combinedChannelRows.forEach((r) => {
+          summarySheet.addRow([
+            r.Channel,
+            Number(r.Cost_LKR),
+            Number(r.Property_LKR),
+            Number(r.TotalCost_LKR),
+            Number((mainByProgram || [])
+              .filter(p => toStr(p.Channel) === r.Channel)
+              .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
+            ),
+            Number((flatPropertyPrograms || [])
+              .filter(p => toStr(p.Channel) === r.Channel)
+              .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
+            ),
+            Number((bonusByProgram || [])
+              .filter(p => toStr(p.Channel) === r.Channel)
+              .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
+            ),
+            Number(r.GRP_Total),
+            Number(r.NGRP_Spot),
+            Number(r.NGRP_Property),
+            Number(r.NGRP_Bonus),
+            Number(r.NGRP_Total),
+            Number(r.CPRP_LKR),
+          ]);
+        });
 
-      'Bonus GRP': Number(
-        (bonusByProgram || [])
-          .filter(p => toStr(p.Channel) === r.Channel)
-          .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
-      ),
-
-      'Total GRP': Number(r.GRP_Total),
-
-      'NGRP (Spot Buying)': Number(r.NGRP_Spot),
-      'NGRP (Property)': Number(r.NGRP_Property),
-      'Bonus NGRP': Number(r.NGRP_Bonus),
-      'Total NGRP': Number(r.NGRP_Total),
-
-      'CPRP (LKR)': Number(r.CPRP_LKR),
-    }));
-        XLSX.utils.book_append_sheet(
-          wb,
-          XLSX.utils.json_to_sheet(exportRows),
-          'Channel Summary (All-In)'
-        );
+        // Auto-fit summary columns
+        summarySheet.columns.forEach(column => {
+          column.width = 15;
+        });
       }
 
+
       // ---------- Save ----------
-      const wbout = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
-      saveAs(new Blob([wbout], { type: 'application/octet-stream' }), 'Final_Plan_By_Channel.xlsx');
+      try {
+        const buffer = await workbook.xlsx.writeBuffer();
+        saveAs(new Blob([buffer]), 'Final_Plan_By_Channel.xlsx');
+      } catch (error) {
+        console.error('Error exporting Excel file:', error);
+        alert('Error exporting Excel file. Please try again.');
+      }
     };
+
+
 
   // ---------- Styles (same as OptimizationResults.jsx) ----------
   const s = {
@@ -962,7 +1367,16 @@ export default function FinalPlan({
     // Bonus row background
     bonusRow: { background: '#deeffa' }, // light ash
   };
-  s.tdNowrap = { ...s.td, whiteSpace: 'nowrap' };
+      s.tdNowrap = { ...s.td, whiteSpace: 'nowrap' };
+
+      s.inputBox = {
+          width: "100%",
+          padding: "8px",
+          marginBottom: "12px",
+          border: "1px solid #ccc",
+          borderRadius: "6px"
+        };
+
     const normalizeRow = (r) => ({
       Channel: toStr(r.Channel),
       Program: toStr(r.Program),
@@ -991,7 +1405,29 @@ export default function FinalPlan({
   // NEW: State for merging benefit into main
   const [mergeBenefit, setMergeBenefit] = useState(false);
 
-  // ---------- Render ----------
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [clientName, setClientName] = useState("");
+  const [brandName, setBrandName] = useState("");
+  const [refNo, setRefNo] = useState("");
+  const [commercialNames, setCommercialNames] = useState({});
+
+    const today = new Date();
+    const nextWeek = new Date();
+    nextWeek.setDate(today.getDate() + 6);
+
+    const fmtDate = (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
+    // Default: Today → 7 days ahead
+    const [fromDate, setFromDate] = useState(fmtDate(today));
+    const [toDate, setToDate] = useState(fmtDate(nextWeek));
+
+
+  // ---------- Render ---<button type="button" onClick={handleExport} style={s.exportButton}>-------
   return (
     <div style={s.container}>
        <h2 style={s.pageTitle || {fontSize: 22,fontWeight: 700, margin: '8px 0 16px', letterSpacing: 0.3,}}>Final Optimized Plan (Property + Spot Buying + Bonus)</h2>
@@ -1401,13 +1837,105 @@ export default function FinalPlan({
 
       {/* Actions */}
       <div style={{marginTop: '24px'}}>
-        <button type="button" onClick={handleExport} style={s.exportButton}>
+        <button type="button" onClick={() => setShowExportDialog(true)} style={s.exportButton}>
           Export Final Plan to Excel
         </button>
         <button type="button" onClick={onHome} style={s.backHomeButton}>
           Go Back to Home
         </button>
       </div>
+      {showExportDialog && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+            background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center",
+            justifyContent: "center", zIndex: 9999
+          }}>
+            <div style={{
+              background: "white", padding: "24px", borderRadius: "12px",
+              width: "420px", boxShadow: "0 4px 20px rgba(0,0,0,0.2)"
+            }}>
+              <h3 style={{marginBottom: "12px"}}>Export Details</h3>
+
+              <label>Date Range</label>
+
+                <div style={{ display: "flex", gap: "10px", marginBottom: "12px" }}>
+                  <div style={{ flex: 1 }}>
+                    <label>From</label>
+                    <input
+                      type="date"
+                      style={s.inputBox}
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                    />
+                  </div>
+
+                  <div style={{ flex: 1 }}>
+                    <label>To</label>
+                    <input
+                      type="date"
+                      style={s.inputBox}
+                      value={toDate}
+                      onChange={(e) => setToDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+              <label>Client Name</label>
+              <input style={s.inputBox}
+                value={clientName}
+                onChange={e => setClientName(e.target.value)}
+              />
+
+              <label>Brand Name</label>
+              <input style={s.inputBox}
+                value={brandName}
+                onChange={e => setBrandName(e.target.value)}
+              />
+
+              <label>Ref No</label>
+              <input style={s.inputBox}
+                value={refNo}
+                onChange={e => setRefNo(e.target.value)}
+              />
+
+              <hr style={{margin: "16px 0"}} />
+
+              <h4>Commercial Names</h4>
+              {allCommercialKeys.map((key, index) => {
+                const defaultName = `Commercial ${index + 1}`;
+                return (
+                  <div key={key} style={{marginBottom: "8px"}}>
+                    <label>{defaultName}</label>
+                    <input
+                      style={s.inputBox}
+                      value={commercialNames[key] || defaultName}
+                      onChange={(e) => {
+                        setCommercialNames(prev => ({
+                          ...prev,
+                          [key]: e.target.value
+                        }));
+                      }}
+                    />
+                  </div>
+                );
+              })}
+
+              <div style={{marginTop:"20px", textAlign:"right"}}>
+                <button style={s.backHomeButton} onClick={() => setShowExportDialog(false)}>
+                  Cancel
+                </button>
+                <button
+                  style={s.primaryButton}
+                  onClick={() => {
+                    setShowExportDialog(false);
+                    handleExport();
+                  }}>
+                  Export
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }
