@@ -24,6 +24,7 @@ import BonusResults from './components/BonusResults';
 import FinalPlan from './components/FinalPlan';
 
 import CommercialBenefitSetup from './components/CommercialBenefitSetup';
+import ScrollToTop from "./components/ScrollToTop";
 
 function App() {
   const navigate = useNavigate();
@@ -121,7 +122,7 @@ function App() {
   return (
     <div>
       <Header />
-
+      <ScrollToTop />
       <main style={{ padding: '20px', minHeight: '80vh' }}>
 
         {/** ROUTING STARTS HERE */}

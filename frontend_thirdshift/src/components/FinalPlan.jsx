@@ -707,11 +707,58 @@ export default function FinalPlan({
         { Metric: 'CPRP (incl. Property + Bonus)', Value: cprp_InclPropertyBonus },
       ];
 
-      const kpiSheet = workbook.addWorksheet('Final KPIs');
-      kpiSheet.addRow(['Metric', 'Value']);
-      kpiRows.forEach(row => {
-        kpiSheet.addRow([row.Metric, row.Value]);
-      });
+        const kpiSheet = workbook.addWorksheet('Final KPIs');
+
+        // --- Add header ---
+        const header = kpiSheet.addRow(['KPI', 'Value']);
+
+        // --- Header styling (Light Excel Green + bold) ---
+        header.eachCell((cell) => {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'C6EFCE' }   // light Excel green
+          };
+          cell.font = { bold: true };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' },
+          };
+        });
+
+        // --- Add KPI rows ---
+        kpiRows.forEach((row) => {
+          const r = kpiSheet.addRow([row.Metric, row.Value]);
+
+          r.height = 20;
+
+          r.eachCell((cell) => {
+            cell.alignment = {
+              wrapText: true,
+              vertical: 'middle'
+            };
+            cell.border = {
+              top: { style: 'thin' },
+              left: { style: 'thin' },
+              bottom: { style: 'thin' },
+              right: { style: 'thin' },
+            };
+          });
+        });
+
+        // --- Auto-fit Metric column width ---
+        let maxMetricLen = 0;
+        kpiRows.forEach((r) => {
+          if (r.Metric.length > maxMetricLen) maxMetricLen = r.Metric.length;
+        });
+
+        kpiSheet.getColumn(1).width = Math.min(Math.max(maxMetricLen * 1.2, 20), 50);
+
+        // Value column width
+        kpiSheet.getColumn(2).width = 20;
 
       // ---------- Channel list ----------
       const channelSet = new Set([
@@ -1299,50 +1346,80 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
         });
       });
 
-      // ---------- Last sheet: Channel Summary (All-In) ----------
-      if (combinedChannelRows?.length) {
-        const summarySheet = workbook.addWorksheet('Channel Summary (All-In)');
+    if (combinedChannelRows?.length) {
+      const summarySheet = workbook.addWorksheet('Channel Summary (All-In)');
 
-        const summaryHeaders = [
-          'Channel', 'Cost (LKR)', 'Property value (LKR)', 'Total Cost (LKR)',
-          'GRP (Spot Buying)', 'Property GRP', 'Bonus GRP', 'Total GRP',
-          'NGRP (Spot Buying)', 'NGRP (Property)', 'Bonus NGRP', 'Total NGRP', 'CPRP (LKR)'
-        ];
+      const summaryHeaders = [
+        'Channel', 'Cost (LKR)', 'Property value (LKR)', 'Total Cost (LKR)',
+        'GRP (Spot Buying)', 'Property GRP', 'Bonus GRP', 'Total GRP',
+        'NGRP (Spot Buying)', 'NGRP (Property)', 'Bonus NGRP', 'Total NGRP', 'CPRP (LKR)'
+      ];
 
-        summarySheet.addRow(summaryHeaders);
+      // --- Header Row ---
+      const headerRow = summarySheet.addRow(summaryHeaders);
 
-        combinedChannelRows.forEach((r) => {
-          summarySheet.addRow([
-            r.Channel,
-            Number(r.Cost_LKR),
-            Number(r.Property_LKR),
-            Number(r.TotalCost_LKR),
-            Number((mainByProgram || [])
-              .filter(p => toStr(p.Channel) === r.Channel)
-              .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
-            ),
-            Number((flatPropertyPrograms || [])
-              .filter(p => toStr(p.Channel) === r.Channel)
-              .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
-            ),
-            Number((bonusByProgram || [])
-              .filter(p => toStr(p.Channel) === r.Channel)
-              .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
-            ),
-            Number(r.GRP_Total),
-            Number(r.NGRP_Spot),
-            Number(r.NGRP_Property),
-            Number(r.NGRP_Bonus),
-            Number(r.NGRP_Total),
-            Number(r.CPRP_LKR),
-          ]);
+      headerRow.eachCell((cell) => {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'C6EFCE' }  // same Excel light green as KPI sheet
+        };
+        cell.font = { bold: true };
+        cell.alignment = { horizontal: 'center', vertical: 'middle',wrapText: true  };
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
+        };
+      });
+
+      // --- Add Data Rows ---
+      combinedChannelRows.forEach((r) => {
+        const row = summarySheet.addRow([
+          r.Channel,
+          Number(r.Cost_LKR),
+          Number(r.Property_LKR),
+          Number(r.TotalCost_LKR),
+          Number((mainByProgram || [])
+            .filter(p => toStr(p.Channel) === r.Channel)
+            .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
+          ),
+          Number((flatPropertyPrograms || [])
+            .filter(p => toStr(p.Channel) === r.Channel)
+            .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
+          ),
+          Number((bonusByProgram || [])
+            .filter(p => toStr(p.Channel) === r.Channel)
+            .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
+          ),
+          Number(r.GRP_Total),
+          Number(r.NGRP_Spot),
+          Number(r.NGRP_Property),
+          Number(r.NGRP_Bonus),
+          Number(r.NGRP_Total),
+          Number(r.CPRP_LKR),
+        ]);
+
+        row.eachCell((cell) => {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' },
+          };
         });
 
-        // Auto-fit summary columns
-        summarySheet.columns.forEach(column => {
-          column.width = 15;
-        });
-      }
+        // make first column (Channel) left-aligned
+        row.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+      });
+
+      // --- FIXED COLUMN WIDTHS (all = 10) ---
+      summarySheet.columns.forEach((col) => {
+        col.width = 13;
+      });
+    }
 
 
       // ---------- Save ----------

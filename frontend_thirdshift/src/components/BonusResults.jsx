@@ -41,6 +41,7 @@ export default function BonusResults({
   // Prefer parent-supplied result; otherwise use locally-fetched
   const result = externalResult || localResult;
 
+
   // ---------------- styles ----------------
   const defaultStyles = {
     page: { padding: 40, maxWidth: 1280, margin: '0 auto' },

@@ -279,7 +279,14 @@ export default function CommercialBenefitSetup({
         }
       };
 
-      setResult(adapted); // 👈 show inline results
+        setResult(adapted);
+
+        // 🔥 Auto-scroll to results
+        setTimeout(() => {
+          const el = document.getElementById("commercial-benefit-summary");
+          if (el) el.scrollIntoView({ behavior: "smooth" });
+        }, 300);
+
       onResultReady?.({ raw: data, final: adapted, inclusiveTotals: adapted.inclusiveTotals });
       toast.success('Commercial Benefit optimization complete.');
     })

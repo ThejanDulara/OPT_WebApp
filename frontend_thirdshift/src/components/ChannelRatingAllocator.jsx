@@ -354,6 +354,11 @@ function ChannelRatingAllocator({
 
         setResult(data);
 
+        setTimeout(() => {
+          const el = document.getElementById("optimization-summary");
+          if (el) el.scrollIntoView({ behavior: "smooth" });
+        }, 300);
+
         const inclusiveTotals = {
           totalBudgetIncl: toNumber(data.total_cost) + toNumber(totalProperty),
           totalNGRPIncl: toNumber(data.total_rating) + toNumber(propertyNGRPTotal),
