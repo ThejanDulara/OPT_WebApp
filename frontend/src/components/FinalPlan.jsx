@@ -988,7 +988,7 @@ export default function FinalPlan({
         } else {
           worksheet.addRow(['(No property rows)']);
         }
-
+        const commercialHeaderRows = [];
         // SECTION: Commercial Programs (Main + Benefit merged)
         let headerAdded = false;
         (allCommercialKeys || []).forEach((commercialKey, idx) => {
@@ -1018,13 +1018,9 @@ export default function FinalPlan({
             }
 
           const customName = commercialNames[commercialKey] || `Commercial ${idx + 1}`;
-          const commercialHeaderRow = worksheet.addRow([`${customName}`]);
-
-            commercialHeaderRow.getCell(1).fill = {
-              type: 'pattern',
-              pattern: 'solid',
-              fgColor: { argb: 'FABF8F' }  //
-            };
+            const commercialHeaderRow = worksheet.addRow([`${customName}`]);
+            const commercialHeaderRowIndex = commercialHeaderRow.number;
+            commercialHeaderRows.push(commercialHeaderRowIndex);
 
 
           if (mergedPrograms.length > 0) {
@@ -1080,6 +1076,12 @@ export default function FinalPlan({
         } else {
           worksheet.addRow(['(No bonus program rows)']);
         }
+// find area where actual program rows begin
+const firstProgramRow = worksheet._rows.find(r => {
+  if (!r) return false;
+  const v = r.getCell(1).value;
+  return typeof v === 'string' && !v.includes("Property") && !v.includes("Bonus") && v.trim() !== "" && !isNaN(v.match(/\d/));
+})?.number || 10;
 
         // === APPLY WEEKEND COLUMN SHADING ===
         dateList.forEach((dt, idx) => {
@@ -1087,15 +1089,26 @@ export default function FinalPlan({
           const day = new Date(dt).getDay();
           if (day !== 0 && day !== 6) return; // not weekend
 
-          for (let r = 8; r <= worksheet.rowCount; r++) { // Start from row 8 (after headers)
-            const row = worksheet.getRow(r);
-            const cell = row.getCell(col);
-            cell.fill = {
-              type: 'pattern',
-              pattern: 'solid',
-              fgColor: { argb: 'D8E4BC' } // Light green
-            };
-          }
+for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
+          const row = worksheet.getRow(r);
+
+        // === SKIP HEADER ROWS (Property, Commercial, Bonus) ===
+
+        // FINAL FIX: skip commercial header rows
+        if (commercialHeaderRows.includes(r)) {
+            continue;
+        }
+
+
+          // Apply weekend shading
+          const cell = row.getCell(col);
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'D8E4BC' } // Light green
+          };
+        }
+
         });
 
         // === APPLY BONUS ROW STYLING ===
@@ -1171,14 +1184,17 @@ export default function FinalPlan({
           cell.font = { bold: true };
         }
 
-        // === COLOR FULL COMMERCIAL HEADER ROWS ===
-        worksheet.eachRow((row) => {
-          if (String(row.getCell(1).value || '').startsWith('Commercial ')) {
-            for (let c = 1; c <= lastCol; c++) {
-              const cell = row.getCell(c);
-              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FABF8F' }};
-              cell.font = { bold: true };
-            }
+        // === COLOR FULL COMMERCIAL HEADER ROWS (whether default name or custom name) ===
+        commercialHeaderRows.forEach((rowIndex) => {
+          const row = worksheet.getRow(rowIndex);
+          for (let c = 1; c <= lastCol; c++) {
+            const cell = row.getCell(c);
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FABF8F' } // your brownish highlight
+            };
+            cell.font = { bold: true };
           }
         });
 
@@ -1852,14 +1868,14 @@ export default function FinalPlan({
           }}>
             <div style={{
               background: "white", padding: "24px", borderRadius: "12px",
-              width: "420px", boxShadow: "0 4px 20px rgba(0,0,0,0.2)"
+              width: "520px", boxShadow: "0 4px 20px rgba(0,0,0,0.2)"
             }}>
               <h3 style={{marginBottom: "12px"}}>Export Details</h3>
 
               <label>Date Range</label>
 
                 <div style={{ display: "flex", gap: "10px", marginBottom: "12px" }}>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1 , marginRight: "20px"  }}>
                     <label>From</label>
                     <input
                       type="date"
@@ -1901,24 +1917,26 @@ export default function FinalPlan({
               <hr style={{margin: "16px 0"}} />
 
               <h4>Commercial Names</h4>
-              {allCommercialKeys.map((key, index) => {
-                const defaultName = `Commercial ${index + 1}`;
-                return (
-                  <div key={key} style={{marginBottom: "8px"}}>
-                    <label>{defaultName}</label>
-                    <input
-                      style={s.inputBox}
-                      value={commercialNames[key] || defaultName}
-                      onChange={(e) => {
-                        setCommercialNames(prev => ({
-                          ...prev,
-                          [key]: e.target.value
-                        }));
-                      }}
-                    />
-                  </div>
-                );
-              })}
+            {allCommercialKeys.map((key, index) => {
+              const defaultName = `Commercial ${index + 1}`;
+              return (
+                <div key={key} style={{ marginBottom: "12px" }}>
+                  <label>{defaultName}</label>
+                  <input
+                    style={s.inputBox}
+                    placeholder={`Enter name for ${defaultName}`}
+                    required
+                    value={commercialNames[key] || ""}
+                    onChange={(e) => {
+                      setCommercialNames(prev => ({
+                        ...prev,
+                        [key]: e.target.value
+                      }));
+                    }}
+                  />
+                </div>
+              );
+            })}
 
               <div style={{marginTop:"20px", textAlign:"right"}}>
                 <button style={s.backHomeButton} onClick={() => setShowExportDialog(false)}>
