@@ -10,8 +10,7 @@ function FrontPage({ onStart, onManagePrograms }) {
             src="/TS-GARA-Mask.png"
             alt="TS GARA Mask"
             style={{
-              height: 420,
-              marginBottom: 40,
+              height: 520,
               filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.25))",
             }}
           />
@@ -44,7 +43,7 @@ function FrontPage({ onStart, onManagePrograms }) {
             </div>
           </div>
 
-          <h1 style={companyName}>Third Shift Media (PVT) LTD</h1>
+          <h1 style={companyName}>MTM Group</h1>
           <p style={tagline}>Where Intelligence Shapes Smarter Media Planning.</p>
 
           <button onClick={onStart} style={primaryButton}>
@@ -133,13 +132,13 @@ const contentBox = {
 
 /* Logo */
 const logoContainer = {
-  marginBottom: '30px',
-  width: '130px',
-  height: '130px',
+  marginBottom: '30',
+  width: '80px',
+  height: '80px',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  margin: '0 auto 30px',
+  margin: '0 auto 40px',
 };
 const logoStyle = {
   maxWidth: '180%',
@@ -152,7 +151,7 @@ const companyName = {
   fontSize: '24px',
   fontWeight: '700',
   color: colors.textDark,
-  marginBottom: '8px',
+  marginBottom: '2px',
 };
 const tagline = {
   fontSize: '18px',
