@@ -330,7 +330,6 @@ def run_optimization():
         #"channel_summary": channel_summary.to_dict(orient='records'),
         "channel_summary": json.loads(channel_summary.to_json(orient='records')),
         "df_result": json.loads(df_full.to_json(orient='records'))
-        #"df_result": df_full.to_dict(orient='records')
 
     })
 
