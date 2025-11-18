@@ -8,6 +8,7 @@ from pulp import LpStatus
 import os
 import json
 import time
+from flask import send_file
 from collections import defaultdict
 
 app = Flask(__name__)
@@ -426,16 +427,18 @@ def export_all_programs():
     conn.close()
 
     df = pd.DataFrame(rows)
+
+    # Save to temporary file
     file_path = "/tmp/all_programs.xlsx"
     df.to_excel(file_path, index=False)
 
-    with open(file_path, "rb") as f:
-        data = f.read()
-
-    return data, 200, {
-        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": "attachment; filename=all_programs.xlsx"
-    }
+    # IMPORTANT: Use send_file to avoid corruption
+    return send_file(
+        file_path,
+        as_attachment=True,
+        download_name="all_programs.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 @app.route('/delete-program', methods=['POST'])
 def delete_program():
