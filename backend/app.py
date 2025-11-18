@@ -74,11 +74,31 @@ def generate_df():
     data = request.get_json()
 
     program_ids = data.get('program_ids', [])
+    tg = data.get("target_group", "tvr_all")
     num_commercials = data.get('num_commercials')
     durations = data.get('durations')
 
     negotiated_rates = data.get('negotiated_rates', {})     # { programId: value }
     channel_discounts = data.get('channel_discounts', {})   # { channel: pct }
+
+    ALLOWED_TGS = [
+        "tvr_all",
+        "tvr_abc_15_90",
+        "tvr_abc_30_60",
+        "tvr_abc_15_30",
+        "tvr_abc_20_plus",
+        "tvr_ab_15_plus",
+        "tvr_cd_15_plus",
+        "tvr_ab_female_15_45",
+        "tvr_abc_15_60",
+        "tvr_bcde_15_plus",
+        "tvr_abcde_15_plus",
+        "tvr_abc_female_15_60",
+        "tvr_abc_male_15_60",
+    ]
+
+    if tg not in ALLOWED_TGS:
+        tg = "tvr_all"
 
     if not program_ids or not num_commercials or not durations:
         return jsonify({"error": "Missing required data"}), 400
@@ -87,7 +107,7 @@ def generate_df():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     fmt = ','.join(['%s'] * len(program_ids))
-    cursor.execute(f"SELECT id, channel, day, time, program, cost, tvr, slot FROM programs WHERE id IN ({fmt})", tuple(program_ids))
+    cursor.execute(f"SELECT id, channel, day, time, program, cost, {tg} AS tvr, slot FROM programs WHERE id IN ({fmt})", tuple(program_ids))
     rows = cursor.fetchall()
     conn.close()
 
