@@ -321,6 +321,55 @@ def run_optimization():
     total_cost_all = df_full['Total_Cost'].sum()
     channel_summary['% of Total'] = (channel_summary['Total_Cost'] / total_cost_all * 100).round(2)
 
+    # DEBUG: Check all values before returning
+    print("=== DEBUG: Checking types before jsonify ===")
+    print(f"total_cost type: {type(total_cost_all)}, value: {total_cost_all}")
+    print(f"total_rating type: {type(df_full['Total_Rating'].sum())}, value: {df_full['Total_Rating'].sum()}")
+
+    # Check commercials_summary
+    print("=== Checking commercials_summary ===")
+    for i, commercial in enumerate(commercials_summary):
+        print(f"Commercial {i}:")
+        for key, value in commercial.items():
+            if key != "details":  # Skip details for now
+                print(f"  {key}: type={type(value)}, value={value}")
+
+    # Check channel_summary
+    print("=== Checking channel_summary ===")
+    channel_summary_records = json.loads(channel_summary.to_json(orient='records'))
+    for i, channel in enumerate(channel_summary_records):
+        print(f"Channel {i}: {channel['Channel']}")
+        for key, value in channel.items():
+            print(f"  {key}: type={type(value)}, value={value}")
+
+    # Check if there are any numpy types in the structure we're about to return
+    def check_for_numpy_types(obj, path="root"):
+        if isinstance(obj, (np.integer, np.int64, np.floating, np.float64)):
+            print(f"🚨 NUMPY TYPE FOUND at {path}: {type(obj)} = {obj}")
+            return True
+        elif isinstance(obj, dict):
+            for k, v in obj.items():
+                check_for_numpy_types(v, f"{path}.{k}")
+        elif isinstance(obj, list):
+            for i, item in enumerate(obj):
+                check_for_numpy_types(item, f"{path}[{i}]")
+        return False
+
+    print("=== Scanning for numpy types in final structure ===")
+    final_structure = {
+        "success": True,
+        "total_cost": round(total_cost_all, 2),
+        "total_rating": round(df_full['Total_Rating'].sum(), 2),
+        "cprp": round(total_cost_all / df_full['Total_Rating'].sum(), 2) if df_full['Total_Rating'].sum() else None,
+        "commercials_summary": commercials_summary,
+        "channel_summary": channel_summary_records,
+        "df_result": json.loads(df_full.to_json(orient='records'))
+    }
+
+    check_for_numpy_types(final_structure)
+    print("=== DEBUG complete ===")
+
+
     return jsonify({
         "success": True,
         "total_cost": float(round(total_cost_all, 2)),
