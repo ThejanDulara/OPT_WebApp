@@ -321,6 +321,10 @@ def run_optimization():
     total_cost_all = df_full['Total_Cost'].sum()
     channel_summary['% of Total'] = (channel_summary['Total_Cost'] / total_cost_all * 100).round(2)
 
+    # Debug: Check types before returning
+    print(f"total_cost type: {type(total_cost_all)}, value: {total_cost_all}")
+    print(f"total_rating type: {type(df_full['Total_Rating'].sum())}, value: {df_full['Total_Rating'].sum()}")
+
     return jsonify({
         "success": True,
         "total_cost": round(total_cost_all, 2),
