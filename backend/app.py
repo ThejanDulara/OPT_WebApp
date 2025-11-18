@@ -321,15 +321,12 @@ def run_optimization():
     total_cost_all = df_full['Total_Cost'].sum()
     channel_summary['% of Total'] = (channel_summary['Total_Cost'] / total_cost_all * 100).round(2)
 
-    # Debug: Check types before returning
-    print(f"total_cost type: {type(total_cost_all)}, value: {total_cost_all}")
-    print(f"total_rating type: {type(df_full['Total_Rating'].sum())}, value: {df_full['Total_Rating'].sum()}")
 
     return jsonify({
         "success": True,
         "total_cost": round(total_cost_all, 2),
-        "total_rating": round(df_full['Total_Rating'].sum(), 2),
-        "cprp": round(total_cost_all / df_full['Total_Rating'].sum(), 2) if df_full['Total_Rating'].sum() else None,
+        "total_rating": float(round(df_full['Total_Rating'].sum(), 2)),
+        "cprp": float(round(total_cost_all / df_full['Total_Rating'].sum(), 2)) if df_full['Total_Rating'].sum() else None,
         "commercials_summary": commercials_summary,
         #"channel_summary": channel_summary.to_dict(orient='records'),
         "channel_summary": json.loads(channel_summary.to_json(orient='records')),
