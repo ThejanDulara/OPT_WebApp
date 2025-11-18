@@ -32,6 +32,7 @@ function App() {
   // Keep ALL states EXACTLY as before
   const [negotiatedRates, setNegotiatedRates] = useState({});
   const [channelDiscounts, setChannelDiscounts] = useState({});
+  const [selectedTG, setSelectedTG] = useState("tvr_all");
   const [channelMoney, setChannelMoney] = useState({});
   const [benefitResult, setBenefitResult] = useState(null);
 
@@ -62,6 +63,7 @@ function App() {
   const [bonusReadyRows, setBonusReadyRows] = useState([]);
 
   const [selectedBonusPrograms, setSelectedBonusPrograms] = useState({});
+
 
   // ---- Navigation helper replacements ----
 
@@ -159,9 +161,10 @@ function App() {
                 channels={channels}   // 🔥 NEW LINE
                 onBack={() => navigate('/select-channels')}
                 selectedChannels={channels}
-                onProceed={({ channelDiscounts: cd = {}, negotiatedRates: nr = {} }) => {
+                onProceed={({ channelDiscounts: cd = {}, negotiatedRates: nr = {},selectedTG: tg }) => {
                   setChannelDiscounts(cd);
                   setNegotiatedRates(nr);
+                  setSelectedTG(tg);
                   navigate('/program-selector');
                 }}
               />
@@ -175,6 +178,7 @@ function App() {
             <ProgramSelector
               negotiatedRates={negotiatedRates}
               selectedChannels={channels}   // 🔥 NEW PROP
+              selectedTG={selectedTG}   // ADD THIS
               onSubmit={handleProgramsSubmit}
               onBack={() => navigate('/negotiated')}
             />
@@ -189,6 +193,7 @@ function App() {
                 onSubmit={handleOptimizationSubmit}
                 onBack={() => navigate('/program-selector')}
                 initialValues={optimizationInput}
+                selectedTG={selectedTG}
               />
             }
           />
@@ -202,6 +207,7 @@ function App() {
                 optimizationInput={optimizationInput}
                 negotiatedRates={negotiatedRates}
                 channelDiscounts={channelDiscounts}
+                selectedTG={selectedTG}
                 onReady={handleDfReady}
                 goBack={() => navigate('/optimization-setup')}
               />

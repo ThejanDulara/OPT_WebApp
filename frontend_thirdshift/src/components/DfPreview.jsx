@@ -4,7 +4,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
-function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRates ,channelDiscounts}) {
+function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRates ,channelDiscounts ,selectedTG}) {
   const [dfFull, setDfFull] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -52,7 +52,8 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
       num_commercials: optimizationInput.numCommercials,
       durations: optimizationInput.durations,
       negotiated_rates: negotiatedRates,       // { [programId]: number }
-      channel_discounts: channelDiscounts      // { [channel]: number }
+      channel_discounts: channelDiscounts,      // { [channel]: number }
+      target_group: selectedTG || "tvr_all"
     };
 
     fetch('https://optwebapp-production.up.railway.app/generate-df', {

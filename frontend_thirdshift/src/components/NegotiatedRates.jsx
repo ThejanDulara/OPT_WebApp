@@ -1,25 +1,6 @@
 // NegotiatedRates.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 
-/**
- * Props:
- * - onBack: () => void
- * - onProceed: (payload: {
- *     channelDiscounts: { [channel: string]: number },
- *     negotiatedRates: { [programId: number]: number }
- *   }) => void
- * - initialChannelDiscounts?: { [channel: string]: number }   // optional restore
- * - initialNegotiatedRates?: { [programId: number]: number }  // optional restore
- *
- * Notes:
- * - Default discount for every channel = 30%
- * - We fetch channels from /channels
- * - We fetch programs for a channel from /programs?channel=<name>  (this returns id)
- * - For each row: Negotiated Rate = Cost * (1 - discount/100), unless user manually overrides
- * - Manual overrides are kept in negotiatedRates[id]; changing channel discount will only
- *   re-calc rows that are NOT overridden.
- */
-
 const toNumber = v => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
 
 function NegotiatedRates({
@@ -37,6 +18,25 @@ function NegotiatedRates({
   const [manualOverride, setManualOverride] = useState({}); // { [id]: true } if user edited that row
   const [loadingChannels, setLoadingChannels] = useState(true);
   const [loadingPrograms, setLoadingPrograms] = useState(false);
+
+  const TG_OPTIONS = [
+  { key: "tvr_all", label: "All TG" },
+  { key: "tvr_abc_15_90", label: "SEC ABC | Age 15-90" },
+  { key: "tvr_abc_30_60", label: "SEC ABC | Age 30-60" },
+  { key: "tvr_abc_15_30", label: "SEC ABC | Age 15-30" },
+  { key: "tvr_abc_20_plus", label: "SEC ABC | Age 20+" },
+  { key: "tvr_ab_15_plus", label: "SEC AB | Age 15+" },
+  { key: "tvr_cd_15_plus", label: "SEC CD | Age 15+" },
+  { key: "tvr_ab_female_15_45", label: "SEC AB | Female Age 15-45" },
+  { key: "tvr_abc_15_60", label: "SEC ABC | Age 15-60" },
+  { key: "tvr_bcde_15_plus", label: "SEC BCDE | Age 15+" },
+  { key: "tvr_abcde_15_plus", label: "SEC ABCDE | Age 15+" },
+  { key: "tvr_abc_female_15_60", label: "SEC ABC | Female Age 15-60" },
+  { key: "tvr_abc_male_15_60", label: "SEC ABC | Male Age 15-60" }
+];
+
+  const [selectedTG, setSelectedTG] = useState("tvr_all");
+
 
   // --- Load channels
     useEffect(() => {
@@ -65,16 +65,20 @@ function NegotiatedRates({
     fetch(`https://optwebapp-production.up.railway.app/programs?channel=${encodeURIComponent(selectedChannel)}`)
       .then(res => res.json())
       .then(data => {
-        const rows = (data.programs || []).map(p => ({
-          id: p.id,                 // must come from this endpoint
-          day: p.day,
-          time: p.time,
-          program: p.program,
-          cost: toNumber(p.cost),
-          tvr: toNumber(p.tvr),
-          slot: p.slot,
-          channel: selectedChannel,
-        }));
+        const rows = (data.programs || []).map(p => {
+          const tvrValue = toNumber(p[selectedTG] ?? 0);   // Pick correct TG TVR
+
+          return {
+            id: p.id,
+            day: p.day,
+            time: p.time,
+            program: p.program,
+            cost: toNumber(p.cost),
+            tvr: tvrValue,           // NOW FIXED TVR FOR REST OF THE APP
+            slot: p.slot,
+            channel: selectedChannel,
+          };
+        });
 
         setPrograms(rows);
 
@@ -94,7 +98,7 @@ function NegotiatedRates({
         });
       })
       .finally(() => setLoadingPrograms(false));
-  }, [selectedChannel, selectedChannels]); // eslint-disable-line
+  }, [selectedChannel, selectedChannels ,selectedTG]); // eslint-disable-line
 
   // --- When the discount for the selected channel changes, recompute non-overridden rows
   useEffect(() => {
@@ -269,6 +273,19 @@ function NegotiatedRates({
           ))}
         </select>
 
+        <label style={styles.label}>Target Group:</label>
+        <select
+          value={selectedTG}
+          onChange={(e) => setSelectedTG(e.target.value)}
+          style={styles.select}
+        >
+          {TG_OPTIONS.map(tg => (
+            <option key={tg.key} value={tg.key}>
+              {tg.label}
+            </option>
+          ))}
+        </select>
+
         <label style={{ ...styles.label, marginLeft: 8 }}>Discount %:</label>
         <input
           type="number"
@@ -355,7 +372,7 @@ function NegotiatedRates({
       <div style={styles.buttonRow}>
         <button onClick={onBack} style={styles.backButton}>Back</button>
         <button
-          onClick={() => onProceed({ channelDiscounts, negotiatedRates })}
+          onClick={() => onProceed({ channelDiscounts, negotiatedRates , selectedTG })}
           style={styles.primaryButton}
         >
           Proceed

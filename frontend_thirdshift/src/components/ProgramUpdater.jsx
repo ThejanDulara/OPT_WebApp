@@ -13,7 +13,7 @@ function ProgramUpdater({ onBack }) {
       .then(data => {
         setChannels(data.channels || []);
         if (data.channels.includes('DERANA TV')) {
-          fetch(`https://optwebapp-production.up.railway.app/programs/DERANA TV`)
+          fetch(`https://optwebapp-production.up.railway.app/programs?channel=DERANA TV`)
             .then(res => res.json())
             .then(data => setPrograms(data.programs || []));
         }
@@ -23,7 +23,7 @@ function ProgramUpdater({ onBack }) {
   const handleChannelSelect = (e) => {
     const channel = e.target.value;
     setSelectedChannel(channel);
-    fetch(`https://optwebapp-production.up.railway.app/programs/${channel}`)
+    fetch(`https://optwebapp-production.up.railway.app/programs?channel=${channel}`)
       .then(res => res.json())
       .then(data => setPrograms(data.programs || []));
   };
@@ -35,7 +35,30 @@ function ProgramUpdater({ onBack }) {
   };
 
   const addNewProgram = () => {
-    setPrograms([...programs, { day: '', time: '', program: '', cost: 0, tvr: 0, slot: '' }]);
+        setPrograms([
+      ...programs,
+      {
+        day: '',
+        time: '',
+        program: '',
+        cost: 0,
+        slot: '',
+        tvr_all: 0,
+        tvr_abc_15_90: 0,
+        tvr_abc_30_60: 0,
+        tvr_abc_15_30: 0,
+        tvr_abc_20_plus: 0,
+        tvr_ab_15_plus: 0,
+        tvr_cd_15_plus: 0,
+        tvr_ab_female_15_45: 0,
+        tvr_abc_15_60: 0,
+        tvr_bcde_15_plus: 0,
+        tvr_abcde_15_plus: 0,
+        tvr_abc_female_15_60: 0,
+        tvr_abc_male_15_60: 0
+      }
+    ]);
+
   };
 
   const deleteProgram = (program, slot) => {
@@ -82,6 +105,21 @@ function ProgramUpdater({ onBack }) {
       });
   };
 
+  const downloadAllProgramsExcel = () => {
+    fetch('https://optwebapp-production.up.railway.app/export-all-programs')
+      .then(res => res.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'all_programs.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      })
+      .catch(() => alert('❌ Failed to download Excel.'));
+  };
+
   const getLogoPath = (channel) => `/logos/${channel}.png`;
 
   return (
@@ -125,91 +163,123 @@ function ProgramUpdater({ onBack }) {
 
       {selectedChannel && (
         <div style={styles.channelCard}>
-          <div style={styles.channelHeader}>
-            <div style={styles.channelInfo}>
-              <img
-                src={getLogoPath(selectedChannel)}
-                alt={selectedChannel}
-                style={styles.channelLogo}
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-              <h3 style={styles.channelName}>Programs for {selectedChannel}</h3>
-            </div>
+        <div style={styles.channelHeader}>
+          <div style={styles.channelInfo}>
+            <img
+              src={getLogoPath(selectedChannel)}
+              alt={selectedChannel}
+              style={styles.channelLogo}
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+            <h3 style={styles.channelName}>Programs for {selectedChannel}</h3>
           </div>
+
+          {/* 🔥 HIRU TV Note on SAME LINE (Right Side) */}
+          {selectedChannel === "HIRU TV" && (
+            <div style={styles.hiruNoteInline}>
+              <strong>HIRU TV Slots:</strong><br />
+              <strong>A1</strong> – 6.55 News |
+              <strong> A2</strong> – 9.55 News |
+              <strong> A3</strong> – PT WD Prog |
+              <strong> A4</strong> – PT WE Prog |
+              <strong> A5</strong> – PT B |
+              <strong> B</strong> – NPT
+            </div>
+          )}
+        </div>
 
           <div style={styles.tableContainer}>
             <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.tableHeader}>Day</th>
-                  <th style={styles.tableHeader}>Time</th>
-                  <th style={styles.tableHeader}>Program</th>
-                  <th style={styles.tableHeader}>Rate (30 Sec)</th>
-                  <th style={styles.tableHeader}>TVR (30 Sec)</th>
-                  <th style={styles.tableHeader}>Slot (PT[A]/NPT[B])</th>
-                  <th style={styles.tableHeader}>Delete</th>
-                </tr>
-              </thead>
+            <thead>
+              <tr>
+                <th style={{ ...styles.tableHeader, ...styles.columnWidths[0] }}>Day</th>
+                <th style={{ ...styles.tableHeader, ...styles.columnWidths[1] }}>Time</th>
+                <th style={{ ...styles.tableHeader, ...styles.columnWidths[2] }}>Program</th>
+                <th style={{ ...styles.tableHeader, ...styles.columnWidths[3] }}>Rate</th>
+                <th style={styles.tableHeader}>Slot</th>
+                <th style={styles.tableHeader}>TVR All</th>
+                <th style={styles.tableHeader}>ABC 15–90</th>
+                <th style={styles.tableHeader}>ABC 30–60</th>
+                <th style={styles.tableHeader}>ABC 15–30</th>
+                <th style={styles.tableHeader}>ABC 20+</th>
+                <th style={styles.tableHeader}>AB 15+</th>
+                <th style={styles.tableHeader}>CD 15+</th>
+                <th style={styles.tableHeader}>AB Female 15–45</th>
+                <th style={styles.tableHeader}>ABC 15–60</th>
+                <th style={styles.tableHeader}>BCDE 15+</th>
+                <th style={styles.tableHeader}>ABCDE 15+</th>
+                <th style={styles.tableHeader}>ABC Female 15–60</th>
+                <th style={styles.tableHeader}>ABC Male 15–60</th>
+                <th style={styles.tableHeader}>Delete</th>
+              </tr>
+            </thead>
               <tbody>
                 {programs.map((p, idx) => (
-                  <tr key={idx} style={styles.tableRow}>
-                    <td style={styles.tableCell}>
-                      <input
-                        type="text"
-                        value={p.day || ''}
-                        onChange={(e) => handleProgramChange(idx, 'day', e.target.value)}
-                        style={styles.inputCell}
-                      />
-                    </td>
-                    <td style={styles.tableCell}>
-                      <input
-                        type="text"
-                        value={p.time || ''}
-                        onChange={(e) => handleProgramChange(idx, 'time', e.target.value)}
-                        style={styles.inputCell}
-                      />
-                    </td>
-                    <td style={styles.tableCell}>
-                      <input
-                        type="text"
-                        value={p.program}
-                        onChange={(e) => handleProgramChange(idx, 'program', e.target.value)}
-                        style={styles.inputCell}
-                      />
-                    </td>
-                    <td style={styles.rightAlignedCell}>
-                      <input
-                        type="number"
-                        value={p.cost}
-                        onChange={(e) => handleProgramChange(idx, 'cost', parseFloat(e.target.value))}
-                        style={styles.inputCell}
-                      />
-                    </td>
-                    <td style={styles.rightAlignedCell}>
-                      <input
-                        type="number"
-                        value={p.tvr}
-                        onChange={(e) => handleProgramChange(idx, 'tvr', parseFloat(e.target.value))}
-                        style={styles.inputCell}
-                      />
-                    </td>
-                    <td style={styles.centerAlignedCell}>
-                      <input
-                        type="text"
-                        value={p.slot}
-                        onChange={(e) => handleProgramChange(idx, 'slot', e.target.value)}
-                        style={styles.inputCell}
-                      />
-                    </td>
-                    <td style={styles.centerAlignedCell}>
-                      <button
-                        style={styles.deleteButton}
-                        onClick={() => deleteProgram(p.program, p.slot)}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
+                <tr key={idx} style={styles.tableRow}>
+                  <td style={styles.tableCell}>
+                    <input type="text" value={p.day || ''} onChange={(e) => handleProgramChange(idx, 'day', e.target.value)} style={styles.inputCell}/>
+                  </td>
+                  <td style={styles.tableCell}>
+                    <input type="text" value={p.time || ''} onChange={(e) => handleProgramChange(idx, 'time', e.target.value)} style={styles.inputCell}/>
+                  </td>
+                  <td style={styles.tableCell}>
+                    <input type="text" value={p.program} onChange={(e) => handleProgramChange(idx, 'program', e.target.value)} style={styles.inputCell}/>
+                  </td>
+                  <td style={styles.rightAlignedCell}>
+                    <input type="number" value={p.cost} onChange={(e) => handleProgramChange(idx, 'cost', parseFloat(e.target.value))} style={styles.inputCell}/>
+                  </td>
+
+                  {/* SLOT */}
+                  <td style={styles.centerAlignedCell}>
+                    <input type="text" value={p.slot} onChange={(e) => handleProgramChange(idx, 'slot', e.target.value)} style={styles.inputCell}/>
+                  </td>
+
+                  {/* --- TVR FIELDS --- */}
+                  <td style={styles.rightAlignedCell}>
+                    <input type="number" value={p.tvr_all} onChange={(e) => handleProgramChange(idx, 'tvr_all', parseFloat(e.target.value))} style={styles.inputCell}/>
+                  </td>
+                  <td style={styles.rightAlignedCell}>
+                    <input type="number" value={p.tvr_abc_15_90} onChange={(e) => handleProgramChange(idx, 'tvr_abc_15_90', parseFloat(e.target.value))} style={styles.inputCell}/>
+                  </td>
+                  <td style={styles.rightAlignedCell}>
+                    <input type="number" value={p.tvr_abc_30_60} onChange={(e) => handleProgramChange(idx, 'tvr_abc_30_60', parseFloat(e.target.value))} style={styles.inputCell}/>
+                  </td>
+                  <td style={styles.rightAlignedCell}>
+                    <input type="number" value={p.tvr_abc_15_30} onChange={(e) => handleProgramChange(idx, 'tvr_abc_15_30', parseFloat(e.target.value))} style={styles.inputCell}/>
+                  </td>
+                  <td style={styles.rightAlignedCell}>
+                    <input type="number" value={p.tvr_abc_20_plus} onChange={(e) => handleProgramChange(idx, 'tvr_abc_20_plus', parseFloat(e.target.value))} style={styles.inputCell}/>
+                  </td>
+                  <td style={styles.rightAlignedCell}>
+                    <input type="number" value={p.tvr_ab_15_plus} onChange={(e) => handleProgramChange(idx, 'tvr_ab_15_plus', parseFloat(e.target.value))} style={styles.inputCell}/>
+                  </td>
+                  <td style={styles.rightAlignedCell}>
+                    <input type="number" value={p.tvr_cd_15_plus} onChange={(e) => handleProgramChange(idx, 'tvr_cd_15_plus', parseFloat(e.target.value))} style={styles.inputCell}/>
+                  </td>
+                  <td style={styles.rightAlignedCell}>
+                    <input type="number" value={p.tvr_ab_female_15_45} onChange={(e) => handleProgramChange(idx, 'tvr_ab_female_15_45', parseFloat(e.target.value))} style={styles.inputCell}/>
+                  </td>
+                  <td style={styles.rightAlignedCell}>
+                    <input type="number" value={p.tvr_abc_15_60} onChange={(e) => handleProgramChange(idx, 'tvr_abc_15_60', parseFloat(e.target.value))} style={styles.inputCell}/>
+                  </td>
+                  <td style={styles.rightAlignedCell}>
+                    <input type="number" value={p.tvr_bcde_15_plus} onChange={(e) => handleProgramChange(idx, 'tvr_bcde_15_plus', parseFloat(e.target.value))} style={styles.inputCell}/>
+                  </td>
+                  <td style={styles.rightAlignedCell}>
+                    <input type="number" value={p.tvr_abcde_15_plus} onChange={(e) => handleProgramChange(idx, 'tvr_abcde_15_plus', parseFloat(e.target.value))} style={styles.inputCell}/>
+                  </td>
+                  <td style={styles.rightAlignedCell}>
+                    <input type="number" value={p.tvr_abc_female_15_60} onChange={(e) => handleProgramChange(idx, 'tvr_abc_female_15_60', parseFloat(e.target.value))} style={styles.inputCell}/>
+                  </td>
+                  <td style={styles.rightAlignedCell}>
+                    <input type="number" value={p.tvr_abc_male_15_60} onChange={(e) => handleProgramChange(idx, 'tvr_abc_male_15_60', parseFloat(e.target.value))} style={styles.inputCell}/>
+                  </td>
+
+                  {/* DELETE */}
+                  <td style={styles.centerAlignedCell}>
+                    <button style={styles.deleteButton} onClick={() => deleteProgram(p.program, p.slot)}>Delete</button>
+                  </td>
+                </tr>
                 ))}
               </tbody>
             </table>
@@ -226,9 +296,15 @@ function ProgramUpdater({ onBack }) {
         </div>
       )}
 
-      <button onClick={onBack} style={styles.backButton}>
-        Back to Home
-      </button>
+        <div style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
+          <button onClick={onBack} style={styles.backButton}>
+            Back to Home
+          </button>
+
+          <button onClick={downloadAllProgramsExcel} style={styles.ExportButton}>
+            Download All Programs (Excel)
+          </button>
+        </div>
     </div>
   );
 }
@@ -250,6 +326,12 @@ const styles = {
     paddingBottom: '16px',
     borderBottom: '1px solid #e2e8f0',
   },
+    columnWidths: {
+      0: { minWidth: '120px' }, // Day
+      1: { minWidth: '130px' }, // Time
+      2: { minWidth: '260px' }, // Program
+      3: { minWidth: '140px' }, // Rate
+    },
   channelSelector: {
     marginBottom: '24px',
     display: 'flex',
@@ -269,6 +351,17 @@ const styles = {
     fontSize: '14px',
     minWidth: '200px',
   },
+
+    hiruNoteInline: {
+      backgroundColor: '#fff4e5',
+      padding: '8px 12px',
+      borderRadius: '6px',
+      border: '1px solid #f6ad55',
+      color: '#7b341e',
+      fontSize: '13px',
+      maxWidth: '650px',
+      lineHeight: '1.4',
+    },
   addButton: {
     padding: '8px 16px',
     backgroundColor: '#edf2f7',
@@ -343,16 +436,20 @@ const styles = {
     fontSize: '25px',
     fontWeight: '600',
   },
-  tableContainer: {
-    overflowX: 'auto',
-    borderRadius: '8px',
-    border: '1px solid #e2e8f0',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    fontSize: '16px',
-  },
+    tableContainer: {
+      width: '100%',
+      overflowX: 'auto',
+      overflowY: 'hidden',
+      borderRadius: '8px',
+      border: '1px solid #e2e8f0',
+      marginTop: '12px'
+    },
+    table: {
+      width: '100%',
+      borderCollapse: 'collapse',
+      fontSize: '16px',
+      whiteSpace: 'nowrap'
+    },
   tableHeader: {
     padding: '12px 16px',
     textAlign: 'center',
@@ -458,6 +555,21 @@ const styles = {
     padding: '10px 20px',
     backgroundColor: '#edf2f7',
     color: '#4a5568',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    ':hover': {
+      backgroundColor: '#e2e8f0',
+    },
+  },
+  ExportButton: {
+    marginTop: '24px',
+    padding: '10px 20px',
+    backgroundColor: '#38a169',
+    color: '#ffffff',
     border: 'none',
     borderRadius: '6px',
     fontSize: '14px',

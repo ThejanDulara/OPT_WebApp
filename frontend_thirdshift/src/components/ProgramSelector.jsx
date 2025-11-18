@@ -1,7 +1,7 @@
 import React, { useState, useEffect ,useRef } from 'react';
 
 
-function ProgramSelector({ onSubmit, onBack, negotiatedRates,selectedChannels }) {
+function ProgramSelector({ onSubmit, onBack, negotiatedRates,selectedChannels,selectedTG }) {
   const [programsByChannel, setProgramsByChannel] = useState({});
   const [selectedPrograms, setSelectedPrograms] = useState({});
 
@@ -16,7 +16,10 @@ function ProgramSelector({ onSubmit, onBack, negotiatedRates,selectedChannels })
             if (!selectedChannels.includes(p.channel)) return; // 🔥 filter only selected
 
             if (!grouped[p.channel]) grouped[p.channel] = [];
-            grouped[p.channel].push(p);
+            grouped[p.channel].push({
+              ...p,
+              tvr: p[selectedTG] ?? 0
+            });
 
             allSelected[p.id] = true; // auto-select
           });
@@ -26,7 +29,7 @@ function ProgramSelector({ onSubmit, onBack, negotiatedRates,selectedChannels })
 
           window.scrollTo({ top: 0, behavior: 'smooth' });
         });
-    }, [selectedChannels]);   // 🔥 added dependency
+    }, [selectedChannels, selectedTG ]);   // 🔥 added dependency
 
 
   const handleCheckboxChange = (programId) => {
