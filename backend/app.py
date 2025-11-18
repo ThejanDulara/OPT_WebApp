@@ -320,7 +320,7 @@ def run_optimization():
     channel_summary = df_full.groupby('Channel')['Total_Cost'].sum().reset_index()
     total_cost_all = df_full['Total_Cost'].sum()
     channel_summary['% of Total'] = (channel_summary['Total_Cost'] / total_cost_all * 100).round(2)
-
+    df_full = df_full.reset_index(drop=True)
     return jsonify({
         "success": True,
         "total_cost": round(total_cost_all, 2),
