@@ -365,14 +365,77 @@ def update_programs():
 
     for p in programs:
         cursor.execute(
-            "INSERT INTO programs (channel, day, time, program, cost, tvr, slot) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-            (channel, p['day'], p['time'], p['program'], p['cost'], p['tvr'], p['slot'])
+            """
+            INSERT INTO programs (
+                channel, day, time, program, cost, slot,
+                tvr_all,
+                tvr_abc_15_90,
+                tvr_abc_30_60,
+                tvr_abc_15_30,
+                tvr_abc_20_plus,
+                tvr_ab_15_plus,
+                tvr_cd_15_plus,
+                tvr_ab_female_15_45,
+                tvr_abc_15_60,
+                tvr_bcde_15_plus,
+                tvr_abcde_15_plus,
+                tvr_abc_female_15_60,
+                tvr_abc_male_15_60
+            )
+            VALUES (
+                %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s,
+                %s, %s, %s
+            )
+            """,
+            (
+                channel,
+                p.get('day'),
+                p.get('time'),
+                p.get('program'),
+                p.get('cost'),
+                p.get('slot'),
+
+                p.get('tvr_all'),
+                p.get('tvr_abc_15_90'),
+                p.get('tvr_abc_30_60'),
+                p.get('tvr_abc_15_30'),
+                p.get('tvr_abc_20_plus'),
+                p.get('tvr_ab_15_plus'),
+                p.get('tvr_cd_15_plus'),
+                p.get('tvr_ab_female_15_45'),
+                p.get('tvr_abc_15_60'),
+                p.get('tvr_bcde_15_plus'),
+                p.get('tvr_abcde_15_plus'),
+                p.get('tvr_abc_female_15_60'),
+                p.get('tvr_abc_male_15_60'),
+            )
         )
 
     conn.commit()
     conn.close()
     return jsonify({'message': 'Programs updated'})
 
+@app.route('/export-all-programs', methods=['GET'])
+def export_all_programs():
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM programs ORDER BY channel, slot, program;")
+    rows = cursor.fetchall()
+    conn.close()
+
+    df = pd.DataFrame(rows)
+    file_path = "/tmp/all_programs.xlsx"
+    df.to_excel(file_path, index=False)
+
+    with open(file_path, "rb") as f:
+        data = f.read()
+
+    return data, 200, {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": "attachment; filename=all_programs.xlsx"
+    }
 
 @app.route('/delete-program', methods=['POST'])
 def delete_program():
