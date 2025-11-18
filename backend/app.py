@@ -321,7 +321,6 @@ def run_optimization():
     total_cost_all = df_full['Total_Cost'].sum()
     channel_summary['% of Total'] = (channel_summary['Total_Cost'] / total_cost_all * 100).round(2)
     df_full = df_full.reset_index(drop=True)
-
     return jsonify({
         "success": True,
         "total_cost": round(total_cost_all, 2),
@@ -330,7 +329,7 @@ def run_optimization():
         "commercials_summary": commercials_summary,
         #"channel_summary": channel_summary.to_dict(orient='records'),
         "channel_summary": json.loads(channel_summary.to_json(orient='records')),
-        "df_result": json.loads(df_full.to_json(orient='records'))
+        "df_result": json.loads(df_full.astype(object).to_json(orient='records'))
         #"df_result": df_full.to_dict(orient='records')
 
     })
