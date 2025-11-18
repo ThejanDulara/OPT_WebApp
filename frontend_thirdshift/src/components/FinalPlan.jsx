@@ -18,6 +18,7 @@ export default function FinalPlan({
     `LKR ${Number(v ?? 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`,
   formatLKR_1 = (v) =>
     `${Number(v ?? 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`,
+  selectedTG = "", // ADD THIS
   onHome,
 }) {
   // ---- Normalize inputs (support both prop name styles) ----
@@ -68,6 +69,25 @@ export default function FinalPlan({
     const monthName = (mm) => {
       return new Date(2000, parseInt(mm)-1).toLocaleString("en-US", { month: "short" });
     };
+
+    // In FinalPlan.jsx - add this near the top with other helpers
+    const TG_MAPPING = {
+      "tvr_all": "All TG",
+      "tvr_abc_15_90": "SEC ABC | Age 15-90",
+      "tvr_abc_30_60": "SEC ABC | Age 30-60",
+      "tvr_abc_15_30": "SEC ABC | Age 15-30",
+      "tvr_abc_20_plus": "SEC ABC | Age 20+",
+      "tvr_ab_15_plus": "SEC AB | Age 15+",
+      "tvr_cd_15_plus": "SEC CD | Age 15+",
+      "tvr_ab_female_15_45": "SEC AB | Female Age 15-45",
+      "tvr_abc_15_60": "SEC ABC | Age 15-60",
+      "tvr_bcde_15_plus": "SEC BCDE | Age 15+",
+      "tvr_abcde_15_plus": "SEC ABCDE | Age 15+",
+      "tvr_abc_female_15_60": "SEC ABC | Female Age 15-60",
+      "tvr_abc_male_15_60": "SEC ABC | Male Age 15-60"
+    };
+
+    const getTGLabel = (tgKey) => TG_MAPPING[tgKey] || tgKey || 'Not specified';
 
   // ---------- Tables ----------
   // Main tables from optimization results
@@ -844,6 +864,7 @@ export default function FinalPlan({
         // SECTION 1: Header Info
         worksheet.addRow(["", `Client Name: ${clientName}`]);
         worksheet.addRow(["", `Brand Name: ${brandName}`]);
+        worksheet.addRow(["", `Target Group: ${getTGLabel(selectedTG)}`]); // UPDATED THIS LINE
         worksheet.addRow(["", `Ref No: ${refNo}`]);
         worksheet.addRow([]);
 
@@ -1984,6 +2005,16 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
                 value={brandName}
                 onChange={e => setBrandName(e.target.value)}
               />
+              {/* ADD THIS SECTION FOR TG DISPLAY */}
+            <label>Selected Target Group</label>
+            <div style={{
+              ...s.inputBox,
+              backgroundColor: '#f5f5f5',
+              color: '#666',
+              cursor: 'not-allowed'
+            }}>
+              {getTGLabel(selectedTG)}
+            </div>
 
               <label>Ref No</label>
               <input style={s.inputBox}

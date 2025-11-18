@@ -422,6 +422,7 @@ function App() {
                   (basePlanResult?.total_cost ?? 0)
                 }
                 propertyPrograms={propertyProgramsForFinal}
+                selectedTG={selectedTG} // ADD THIS LINE
                 onBack={() => navigate('/bonus-results')}
                 onHome={() => navigate('/')}
               />
