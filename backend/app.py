@@ -973,9 +973,10 @@ def optimize_bonus():
         df_ch['Total_NTVR'] = df_ch['Spots'] * df_ch['NTVR']
         df_ch = df_ch[df_ch['Spots'] > 0]
 
-        total_cost_ch = df_ch['Total_Cost'].sum()
-        total_ntvr_ch = df_ch['Total_NTVR'].sum()
-        cprp_ch = total_cost_ch / total_ntvr_ch if total_ntvr_ch else None
+        # Convert numpy types to native Python types
+        total_cost_ch = float(df_ch['Total_Cost'].sum())  # Convert to native float
+        total_ntvr_ch = float(df_ch['Total_NTVR'].sum())  # Convert to native float
+        cprp_ch = float(total_cost_ch / total_ntvr_ch) if total_ntvr_ch else None
 
         results.append({
             "channel": channel,
@@ -1016,7 +1017,6 @@ def optimize_bonus():
             ]
         }
     })
-
 
 #4
 if __name__ == '__main__':
