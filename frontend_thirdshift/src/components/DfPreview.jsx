@@ -266,11 +266,11 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
 
           <div style={styles.summaryGrid}>
             <div style={styles.summaryCard}>
-              <h4 style={styles.summaryTitle}>Total Budget</h4>
+              <h4 style={styles.summaryTitle}>Optimized Budget</h4>
               <p style={styles.summaryValue}>LKR {result.total_cost.toLocaleString()}</p>
             </div>
             <div style={styles.summaryCard}>
-              <h4 style={styles.summaryTitle}>Total GRP</h4>
+              <h4 style={styles.summaryTitle}>GRP</h4>
               <p style={styles.summaryValue}>{totalGRP.toFixed(2)}</p>
             </div>
             <div style={styles.summaryCard}>

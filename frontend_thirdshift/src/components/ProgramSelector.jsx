@@ -1,7 +1,7 @@
 import React, { useState, useEffect ,useRef } from 'react';
 
 
-function ProgramSelector({ onSubmit, onBack, negotiatedRates,selectedChannels,selectedTG }) {
+function ProgramSelector({ onSubmit, onBack, negotiatedRates,selectedChannels,selectedTG  ,initialSelectedProgramIds = []}) {
   const [programsByChannel, setProgramsByChannel] = useState({});
   const [selectedPrograms, setSelectedPrograms] = useState({});
 
@@ -10,27 +10,38 @@ function ProgramSelector({ onSubmit, onBack, negotiatedRates,selectedChannels,se
         .then(res => res.json())
         .then(data => {
           const grouped = {};
-          const allSelected = {};
+          const restored = {};
 
           data.programs.forEach(p => {
-            if (!selectedChannels.includes(p.channel)) return; // 🔥 filter only selected
+            if (!selectedChannels.includes(p.channel)) return;
 
             if (!grouped[p.channel]) grouped[p.channel] = [];
             grouped[p.channel].push({
               ...p,
-              tvr: p[selectedTG] ?? 0
+              tvr: p[selectedTG] ?? 0,
             });
 
-            allSelected[p.id] = true; // auto-select
+            // ⬇⬇ If previously selected, restore it ⬇⬇
+            if (initialSelectedProgramIds.includes(p.id)) restored[p.id] = true;
           });
 
           setProgramsByChannel(grouped);
-          setSelectedPrograms(allSelected);
+
+          // If empty (first time), auto-select all
+          if (initialSelectedProgramIds.length === 0) {
+            const auto = {};
+            data.programs.forEach(p => {
+              if (!selectedChannels.includes(p.channel)) return;
+              auto[p.id] = true;
+            });
+            setSelectedPrograms(auto);
+          } else {
+            setSelectedPrograms(restored);
+          }
 
           window.scrollTo({ top: 0, behavior: 'smooth' });
         });
-    }, [selectedChannels, selectedTG ]);   // 🔥 added dependency
-
+    }, [selectedChannels, selectedTG]);
 
   const handleCheckboxChange = (programId) => {
     setSelectedPrograms(prev => ({

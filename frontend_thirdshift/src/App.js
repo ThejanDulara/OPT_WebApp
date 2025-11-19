@@ -36,6 +36,7 @@ function App() {
   const [channelMoney, setChannelMoney] = useState({});
   const [benefitResult, setBenefitResult] = useState(null);
 
+
   const hasAnyComBenefit = useMemo(
     () =>
       Object.values(channelMoney || {}).some(
@@ -154,31 +155,41 @@ function App() {
         />
 
           {/** STEP 1 */}
-          <Route
-            path="/negotiated"
-            element={
-              <NegotiatedRates
-                channels={channels}   // 🔥 NEW LINE
-                onBack={() => navigate('/select-channels')}
-                selectedChannels={channels}
-                onProceed={({ channelDiscounts: cd = {}, negotiatedRates: nr = {},selectedTG: tg }) => {
-                  setChannelDiscounts(cd);
-                  setNegotiatedRates(nr);
-                  setSelectedTG(tg);
-                  navigate('/program-selector');
-                }}
-              />
-            }
-          />
+        <Route
+          path="/negotiated"
+          element={
+            <NegotiatedRates
+              channels={channels}
+              selectedChannels={channels}
 
+              /** ⬇⬇⬇ ADD THESE THREE LINES ⬇⬇⬇ */
+              initialChannelDiscounts={channelDiscounts}
+              initialNegotiatedRates={negotiatedRates}
+              initialTG={selectedTG}
+
+              onBack={() => navigate('/select-channels')}
+
+              onProceed={({ channelDiscounts: cd = {}, negotiatedRates: nr = {}, selectedTG: tg }) => {
+                setChannelDiscounts(cd);
+                setNegotiatedRates(nr);
+                setSelectedTG(tg);
+                navigate('/program-selector');
+              }}
+            />
+          }
+        />
           {/** STEP 2 */}
         <Route
           path="/program-selector"
           element={
             <ProgramSelector
               negotiatedRates={negotiatedRates}
-              selectedChannels={channels}   // 🔥 NEW PROP
-              selectedTG={selectedTG}   // ADD THIS
+              selectedChannels={channels}
+              selectedTG={selectedTG}
+
+              /** ⬇⬇⬇ ADD THIS ⬇⬇⬇ */
+              initialSelectedProgramIds={selectedProgramIds}
+
               onSubmit={handleProgramsSubmit}
               onBack={() => navigate('/negotiated')}
             />
@@ -385,10 +396,25 @@ function App() {
             }
           />
 
-          {/** STEP 11 */}
-          <Route
-            path="/final-plan"
-            element={
+        {/** STEP 11 */}
+        <Route
+          path="/final-plan"
+          element={(() => {
+
+            // ⭐ FIX: Convert durations ARRAY → OBJECT (if needed)
+            const mappedOptimizationInput = optimizationInput
+              ? {
+                  ...optimizationInput,
+                  durations: Array.isArray(optimizationInput.durations)
+                    ? optimizationInput.durations.reduce((m, d, i) => {
+                        m[`COM_${i + 1}`] = Number(d) || 0;
+                        return m;
+                      }, {})
+                    : optimizationInput.durations
+                }
+              : null;
+
+            return (
               <FinalPlan
                 mainResults={
                   basePlanForFinal
@@ -422,12 +448,15 @@ function App() {
                   (basePlanResult?.total_cost ?? 0)
                 }
                 propertyPrograms={propertyProgramsForFinal}
-                selectedTG={selectedTG} // ADD THIS LINE
+                selectedTG={selectedTG}
+                optimizationInput={mappedOptimizationInput}   // ⭐ FIXED VALUE GOES HERE
                 onBack={() => navigate('/bonus-results')}
                 onHome={() => navigate('/')}
               />
-            }
-          />
+            );
+          })()}
+        />
+
 
           {/** STEP 12 */}
           <Route

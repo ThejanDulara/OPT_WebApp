@@ -480,7 +480,7 @@ export default function ChannelBudgetSetup({
           <span style={enhancedStyles.summaryValue}>{formatLKR(totalProperty)}</span>
         </div>
         <div style={enhancedStyles.summaryRow}>
-          <span style={enhancedStyles.summaryLabel}>Optimizable Total (excl. Property):</span>
+          <span style={enhancedStyles.summaryLabel}>Optimizable Total (Spot Buying):</span>
           <span style={enhancedStyles.summaryValue}>{formatLKR(totalAvailable)}</span>
         </div>
         <div style={enhancedStyles.summaryRow}>

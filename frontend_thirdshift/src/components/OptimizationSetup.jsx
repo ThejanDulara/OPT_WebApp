@@ -201,25 +201,25 @@ function OptimizationSetup({ onSubmit, onBack, initialValues }) {
     },
   };
 
-  return (
-    <form onSubmit={handleSubmit} style={enhancedStyles.form}>
-      <h2 style={enhancedStyles.title}>Optimization Setup</h2>
+          return (
+            <form onSubmit={handleSubmit} style={enhancedStyles.form}>
+              <h2 style={enhancedStyles.title}>Optimization Setup</h2>
 
-      {/* Commercial Details */}
-      <div style={enhancedStyles.sectionContainer}>
-        <h3 style={enhancedStyles.sectionTitle}>Commercial Details</h3>
+              {/* Commercial Details */}
+              <div style={enhancedStyles.sectionContainer}>
+                <h3 style={enhancedStyles.sectionTitle}>Commercial Details</h3>
 
-        {/* Number of Commercials inside the section */}
-        <div style={enhancedStyles.numCommercialsInput}>
-          <span style={enhancedStyles.numCommercialsLabel}>Number of Commercials:</span>
-          <input
-            type="number"
-            value={numCommercials}
-            onChange={handleNumCommercialsChange}
-            min={1}
-            style={{ ...enhancedStyles.input, width: '80px' }}
-          />
-        </div>
+                {/* Number of Commercials inside the section */}
+                <div style={enhancedStyles.numCommercialsInput}>
+                  <span style={enhancedStyles.numCommercialsLabel}>Number of Commercials:</span>
+                  <input
+                    type="number"
+                    value={numCommercials}
+                    onChange={handleNumCommercialsChange}
+                    min={1}
+                    style={{ ...enhancedStyles.input, width: '80px' }}
+                  />
+                </div>
 
         <div>
           {durations.map((duration, idx) => (

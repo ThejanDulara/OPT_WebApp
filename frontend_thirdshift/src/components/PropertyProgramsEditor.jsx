@@ -12,10 +12,13 @@ function makeRow() {
     comName: '',
     day: '',
     time: '',
-    budget: 0,
-    duration: 0, // seconds
-    TVR: 0,
-    spots: 0,
+    pt_npt: '',
+    rateCardCost: '',
+    budget: '',
+    duration: '', // seconds
+    language: '',
+    TVR: '',
+    spots: '',
   };
 }
 
@@ -24,13 +27,16 @@ function computeComputed(row) {
   const TVR = num(row.TVR);
   const spots = iNum(row.spots);
   const budget = num(row.budget);
+  const rateCardCost = num(row.rateCardCost);
 
   const NTVR = (TVR / 30) * duration;      // NTVR = TVR/30*Duration
   const NCost = spots > 0 ? budget / spots : 0; // NCost = Budget/Spots
   const NGRP = NTVR * spots;               // NGRP = NTVR * Spots
   const GRP = TVR * spots;
 
-  return { NTVR, NCost, NGRP, GRP  };
+  const rateCardTotal = rateCardCost * spots;
+
+  return { NTVR, NCost, NGRP, GRP , rateCardTotal , totalBudget: budget,totalSaving: rateCardTotal - budget,cprp: NGRP > 0 ? budget / NGRP : 0};
 }
 
 export default function PropertyProgramsEditor({
@@ -96,7 +102,7 @@ export default function PropertyProgramsEditor({
 
   return (
     <div style={{ marginTop: 16 }}>
-      <h3 style={styles.sectionTitle}>Property breakdown (per channel)</h3>
+      <h3 style={styles.sectionTitle}>On cost breakdown (per channel)</h3>
 
       {visibleChannels.map((ch) => {
         const rows = propertyPrograms[ch] || [];
@@ -127,24 +133,36 @@ export default function PropertyProgramsEditor({
               <table style={{ ...styles.table, minWidth: 940 }}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>Name of the program</th>
-                    <th style={styles.th}>Com name</th>
+                    <th style={styles.th}>Program</th>
+                    <th style={styles.th}>Commercial name</th>
+                    <th style={styles.th}>Duration</th>
+                    <th style={styles.th}>Language</th>
                     <th style={styles.th}>Day</th>
                     <th style={styles.th}>Time</th>
+                    <th style={styles.th}>PT / NPT</th>
+                    <th style={styles.th}>Rate Card Cost</th>
                     <th style={styles.th}>On Cost</th>
+                    <th style={styles.th}>Rate Card Total</th>
+                    <th style={styles.th}>Total Budget</th>
+                    <th style={styles.th}>Total Saving</th>
                     <th style={styles.th}>NCost</th>
-                    <th style={styles.th}>Duration</th>
                     <th style={styles.th}>TVR</th>
                     <th style={styles.th}>NTVR</th>
-                    <th style={styles.th}>Spots</th>
                     <th style={styles.th}>GRP</th>
                     <th style={styles.th}>NGRP</th>
+                    <th style={styles.th}>CPRP</th>
+                    <th style={styles.th}>Spots</th>
                     <th style={styles.th}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((r) => {
-                    const { NTVR, NCost, NGRP ,GRP} = computeComputed(r);
+                    const { NTVR, NCost, NGRP, GRP, rateCardTotal} = computeComputed(r);
+                    const totalBudget = num(r.budget);
+                    const onCost = num(r.budget);
+                    const cprp = NGRP > 0 ? onCost / NGRP : 0;
+                    const totalSaving = rateCardTotal - totalBudget;
+
                     return (
                       <tr key={r.id}>
                         <td style={styles.td}>
@@ -163,6 +181,30 @@ export default function PropertyProgramsEditor({
                             style={{ ...styles.numberInput, width: 140 }}
                           />
                         </td>
+                        <td style={{ ...styles.td, textAlign: 'right' }}>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={r.duration}
+                            onChange={e => handleChange(ch, r.id, 'duration', e.target.value)}
+                            style={{ ...styles.numberInput, width: 110, textAlign: 'right' }}
+                          />
+                        </td>
+
+                        <td style={styles.td}>
+                          <select
+                            value={r.language}
+                            onChange={(e) => handleChange(ch, r.id, "language", e.target.value)}
+                            style={{ ...styles.numberInput, width: 130 }}
+                          >
+                            <option value="">Select</option>
+                            <option value="Sinhala">Sinhala</option>
+                            <option value="English">English</option>
+                            <option value="Tamil">Tamil</option>
+                          </select>
+                        </td>
+
                         <td style={styles.td}>
                           <input
                             type="text"
@@ -179,6 +221,29 @@ export default function PropertyProgramsEditor({
                             style={{ ...styles.numberInput, width: 100 }}
                           />
                         </td>
+                        <td style={styles.td}>
+                          <select
+                            value={r.pt_npt}
+                            onChange={(e) => handleChange(ch, r.id, "pt_npt", e.target.value)}
+                            style={{ ...styles.numberInput, width: 120 }}
+                          >
+                            <option value="">Select</option>
+                            <option value="A">{r.pt_npt === "A" ? "A" : "A (PT)"}</option>
+                            <option value="B">{r.pt_npt === "B" ? "B" : "B (NPT)"}</option>
+                          </select>
+                        </td>
+
+                        <td style={{ ...styles.td, textAlign: "right" }}>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={r.rateCardCost}
+                            onChange={(e) => handleChange(ch, r.id, "rateCardCost", e.target.value)}
+                            style={{ ...styles.numberInput, width: 120, textAlign: 'right' }}
+                          />
+                        </td>
+
                         <td style={{ ...styles.td, textAlign: 'right' }}>
                           <input
                             type="number"
@@ -189,18 +254,17 @@ export default function PropertyProgramsEditor({
                             style={{ ...styles.numberInput, width: 120, textAlign: 'right' }}
                           />
                         </td>
+                        <td style={{ ...styles.td, textAlign: 'right' ,width: 120}}>
+                          {fmt2(rateCardTotal)}     {/* ⭐ NEW */}
+                        </td>
+                        <td style={{ ...styles.td, textAlign: 'right', width: 120 }}>
+                          {fmt2(r.budget)}   {/* ⭐ SAME VALUE AS On Cost */}
+                        </td>
+                        <td style={{ ...styles.td, textAlign: 'right', width: 120 }}>
+                          {fmt2(totalSaving)}     {/* ⭐ NEW */}
+                        </td>
                         <td style={{ ...styles.td, textAlign: 'right', color: r.spots > 0 ? '#2d3748' : '#e53e3e' }}>
                           {fmt2(NCost)}
-                        </td>
-                        <td style={{ ...styles.td, textAlign: 'right' }}>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={r.duration}
-                            onChange={e => handleChange(ch, r.id, 'duration', e.target.value)}
-                            style={{ ...styles.numberInput, width: 110, textAlign: 'right' }}
-                          />
                         </td>
                         <td style={{ ...styles.td, textAlign: 'right' }}>
                           <input
@@ -216,6 +280,15 @@ export default function PropertyProgramsEditor({
                           {fmt2(NTVR)}
                         </td>
                         <td style={{ ...styles.td, textAlign: 'right' }}>
+                          {fmt2(GRP)}             {/* ⭐ NEW */}
+                        </td>
+                        <td style={{ ...styles.td, textAlign: 'right' }}>
+                          {fmt2(NGRP)}
+                        </td>
+                        <td style={{ ...styles.td, textAlign: 'right', width: 120 }}>
+                          {fmt2(cprp)}     {/* ⭐ NEW */}
+                        </td>
+                        <td style={{ ...styles.td, textAlign: 'right' }}>
                           <input
                             type="number"
                             step="1"
@@ -224,12 +297,6 @@ export default function PropertyProgramsEditor({
                             onChange={e => handleChange(ch, r.id, 'spots', e.target.value)}
                             style={{ ...styles.numberInput, width: 80, textAlign: 'right' }}
                           />
-                        </td>
-                        <td style={{ ...styles.td, textAlign: 'right' }}>
-                          {fmt2(GRP)}             {/* ⭐ NEW */}
-                        </td>
-                        <td style={{ ...styles.td, textAlign: 'right' }}>
-                          {fmt2(NGRP)}
                         </td>
                         <td style={{ ...styles.td }}>
                           <button
@@ -245,7 +312,7 @@ export default function PropertyProgramsEditor({
                   })}
                   {rows.length === 0 && (
                     <tr>
-                      <td colSpan={12} style={{ ...styles.td, textAlign: 'center', color: '#718096' }}>
+                      <td colSpan={20} style={{ ...styles.td, textAlign: 'center', color: '#718096' }}>
                         No programs yet. Click “Add row”.
                       </td>
                     </tr>

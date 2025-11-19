@@ -8,6 +8,7 @@ function NegotiatedRates({
   onProceed,
   initialChannelDiscounts,
   initialNegotiatedRates,
+  initialTG,
   selectedChannels,
 }) {
   const [channels, setChannels] = useState([]);
@@ -35,7 +36,7 @@ function NegotiatedRates({
   { key: "tvr_abc_male_15_60", label: "SEC ABC | Male Age 15-60" }
 ];
 
-  const [selectedTG, setSelectedTG] = useState("tvr_all");
+  const [selectedTG, setSelectedTG] = useState(initialTG || "tvr_all");
 
 
   // --- Load channels

@@ -249,49 +249,20 @@ const handleExportToExcel = () => {
 
         <div style={styles.summaryGrid}>
           <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>Optimized Budget (excl. Property)</h4>
+            <h4 style={styles.summaryTitle}>Optimized Budget</h4>
             <p style={styles.summaryValue}>{formatLKR(result.total_cost)}</p>
           </div>
           <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>NGRP (excl. Property)</h4>
-            <p style={styles.summaryValue}>{Number(result.total_rating).toFixed(2)}</p>
-          </div>
-          <div style={styles.summaryCard}>
-              <h4 style={styles.summaryTitle}>GRP (excl. Property)</h4>
+              <h4 style={styles.summaryTitle}>GRP</h4>
               <p style={styles.summaryValue}>{totalGRP_excl.toFixed(2)}</p>
           </div>
           <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>CPRP (excl. Property)</h4>
+            <h4 style={styles.summaryTitle}>NGRP</h4>
+            <p style={styles.summaryValue}>{Number(result.total_rating).toFixed(2)}</p>
+          </div>
+          <div style={styles.summaryCard}>
+            <h4 style={styles.summaryTitle}>CPRP</h4>
             <p style={styles.summaryValue}>{Number(result.cprp).toFixed(2)}</p>
-          </div>
-        </div>
-        {/* Existing summary cards (excl. property) remain unchanged */}
-
-        {/* New: inclusive totals (includes property) */}
-        <div style={styles.summaryGrid}>
-          <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>Total Budget (incl. Property)</h4>
-            <p style={styles.summaryValue}>
-              {formatLKR(inclusiveTotals?.totalBudgetIncl || result.total_cost)}
-            </p>
-          </div>
-
-          <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>NGRP (incl. Property)</h4>
-            <p style={styles.summaryValue}>
-              {Number(inclusiveTotals?.totalNGRPIncl || result.total_rating).toFixed(2)}
-            </p>
-          </div>
-          <div style={styles.summaryCard}>
-              <h4 style={styles.summaryTitle}>GRP (incl. Property)</h4>
-              <p style={styles.summaryValue}>{totalGRP_incl.toFixed(2)}</p>
-            </div>
-
-          <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>CPRP (incl. Property)</h4>
-            <p style={styles.summaryValue}>
-              {Number(inclusiveTotals?.cprpIncl || result.cprp).toFixed(2)}
-            </p>
           </div>
         </div>
 
