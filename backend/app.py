@@ -556,6 +556,7 @@ def optimize_by_budget_share():
             for i in prime_indices:
                 prob += x[i] == 0
             # Still continue to apply NPT constraints
+
             # do not add prime_cost constraints below (skip them)
         else:
             prob += prime_cost >= ((ch_prime_pct / 100.0) - 0.05) * ch_budget
