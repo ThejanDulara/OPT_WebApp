@@ -802,7 +802,11 @@ def optimize_by_benefit_share():
             if not indices:
                 continue
             slot_pct = float(ch_slot_pcts.get(slot, 0))
+
+            # If user sets slot percentage to 0 → LOCK THIS SLOT
             if slot_pct == 0:
+                for i in indices:
+                    prob += x[i] == 0  # Force-zero allocation
                 continue
             slot_cost = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in indices)
             lower = (slot_pct / 100.0) - 0.05
