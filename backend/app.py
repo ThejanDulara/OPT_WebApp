@@ -548,16 +548,26 @@ def optimize_by_budget_share():
         # NEW: prefer per-channel splits; fallback to global if invalid or not provided
         ch_prime_pct = float(prime_map.get(ch, prime_pct_global))
         ch_nonprime_pct = float(nonprime_map.get(ch, nonprime_pct_global))
-        if abs(ch_prime_pct + ch_nonprime_pct - 100.0) > 0.01:
-            # Fallback to global if user-provided split is invalid
-            ch_prime_pct = prime_pct_global
-            ch_nonprime_pct = nonprime_pct_global
 
-        # ±5% tolerance around the desired channel PT/NPT budgets
-        prob += prime_cost >= ((ch_prime_pct / 100.0) - 0.05) * ch_budget
-        prob += prime_cost <= ((ch_prime_pct / 100.0) + 0.05) * ch_budget
-        prob += nonprime_cost >= ((ch_nonprime_pct / 100.0) - 0.05) * ch_budget
-        prob += nonprime_cost <= ((ch_nonprime_pct / 100.0) + 0.05) * ch_budget
+        # ---- NEW: If user enters 0% PT or NPT, force-zero allocation ----
+
+        # If Prime % = 0 → forbid PT spots
+        if ch_prime_pct == 0:
+            for i in prime_indices:
+                prob += x[i] == 0
+            # Still continue to apply NPT constraints
+            # do not add prime_cost constraints below (skip them)
+        else:
+            prob += prime_cost >= ((ch_prime_pct / 100.0) - 0.05) * ch_budget
+            prob += prime_cost <= ((ch_prime_pct / 100.0) + 0.05) * ch_budget
+
+        # If Non-Prime % = 0 → forbid NPT spots
+        if ch_nonprime_pct == 0:
+            for i in nonprime_indices:
+                prob += x[i] == 0
+        else:
+            prob += nonprime_cost >= ((ch_nonprime_pct / 100.0) - 0.05) * ch_budget
+            prob += nonprime_cost <= ((ch_nonprime_pct / 100.0) + 0.05) * ch_budget
 
     # Use CBC with (optional) log files
     solver = PULP_CBC_CMD(msg=True, timeLimit=time_limit, keepFiles=True)
