@@ -745,6 +745,28 @@ const propertyGRPTotal = useMemo(() => {
 
     // ---------- Export ----------
     const handleExport = async () => {
+
+    const removeGridlines = (ws) => {
+      const MAX_ROWS = 300;   // safe full-page fill
+      const MAX_COLS = 50;    // up to column AX
+
+      for (let r = 1; r <= MAX_ROWS; r++) {
+        const row = ws.getRow(r);
+        for (let c = 1; c <= MAX_COLS; c++) {
+          const cell = row.getCell(c);
+
+          // only set white background if cell doesn't already have fill
+          if (!cell.fill) {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFFFFF' }
+            };
+          }
+        }
+      }
+    };
+
       const workbook = new ExcelJS.Workbook();
 
       // ---------- Build KPI sheet ----------
@@ -773,6 +795,7 @@ const propertyGRPTotal = useMemo(() => {
       ];
 
         const kpiSheet = workbook.addWorksheet('Final KPIs');
+
 
         // --- Add header ---
         const header = kpiSheet.addRow(['KPI', 'Value']);
@@ -814,6 +837,9 @@ const propertyGRPTotal = useMemo(() => {
           });
         });
 
+
+
+        removeGridlines(kpiSheet);
         // --- Auto-fit Metric column width ---
         let maxMetricLen = 0;
         kpiRows.forEach((r) => {
@@ -940,8 +966,6 @@ const propertyGRPTotal = useMemo(() => {
       channelList.forEach((ch) => {
         const sheetTitle = `Channel - ${ch}`.substring(0, 31); // Excel sheet name limit
         const worksheet = workbook.addWorksheet(sheetTitle);
-
-        worksheet.properties.showGridLines = false;
 
             // ====================== TOP DETAIL SECTION (Start from Column B) ======================
             const topRows = [
@@ -1372,12 +1396,12 @@ const propertyGRPTotal = useMemo(() => {
           worksheet.addRow(['(No bonus program rows)']);
         }
 
-// find area where actual program rows begin
-const firstProgramRow = worksheet._rows.find(r => {
-  if (!r) return false;
-  const v = r.getCell(1).value;
-  return typeof v === 'string' && !v.includes("Property") && !v.includes("Bonus") && v.trim() !== "" && !isNaN(v.match(/\d/));
-})?.number || 10;
+            // find area where actual program rows begin
+            const firstProgramRow = worksheet._rows.find(r => {
+              if (!r) return false;
+              const v = r.getCell(1).value;
+              return typeof v === 'string' && !v.includes("Property") && !v.includes("Bonus") && v.trim() !== "" && !isNaN(v.match(/\d/));
+            })?.number || 10;
 
         // === APPLY WEEKEND COLUMN SHADING ===
         dateList.forEach((dt, idx) => {
@@ -1608,10 +1632,12 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
           };
         }
         });
+    removeGridlines(worksheet);
       });
 
     if (combinedChannelRows?.length) {
       const summarySheet = workbook.addWorksheet('Channel Summary (All-In)');
+      summarySheet.properties.showGridLines = false;
 
       const summaryHeaders = [
         'Channel', 'Cost', 'Property value', 'Total Cost',
@@ -1679,6 +1705,7 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
       summarySheet.columns.forEach((col) => {
         col.width = 13;
       });
+      removeGridlines(summarySheet);
     }
 
 
