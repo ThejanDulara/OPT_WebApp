@@ -35,6 +35,7 @@ function App() {
   const [selectedTG, setSelectedTG] = useState("tvr_all");
   const [channelMoney, setChannelMoney] = useState({});
   const [benefitResult, setBenefitResult] = useState(null);
+  const [allocatorState, setAllocatorState] = useState(null);
 
 
   const hasAnyComBenefit = useMemo(
@@ -64,6 +65,8 @@ function App() {
   const [bonusReadyRows, setBonusReadyRows] = useState([]);
 
   const [selectedBonusPrograms, setSelectedBonusPrograms] = useState({});
+  const [benefitState, setBenefitState] = useState(null);
+  const [bonusSetupState, setBonusSetupState] = useState(null);
 
 
   // ---- Navigation helper replacements ----
@@ -145,9 +148,10 @@ function App() {
           path="/select-channels"
           element={
             <ChannelSelector
+              initialSelectedChannels={channels}   // ⭐ RESTORE SELECTION WHEN COMING BACK
               onBack={() => navigate('/')}
               onProceed={(chs) => {
-                setChannels(chs);       // 🔥 store selected channels globally
+                setChannels(chs);
                 navigate('/negotiated');
               }}
             />
@@ -233,7 +237,9 @@ function App() {
                 <ChannelRatingAllocator
                   channels={channels}
                   dfFull={dfFull}
-                  optimizationInput={optimizationInput}
+                  optimizationInput={optimizationInput || {}}
+                  initialState={allocatorState}   // ⭐ ADD THIS
+                  onSaveState={setAllocatorState} // ⭐ ADD THIS
                   onBack={() => navigate('/df-preview')}
                   onResultReady={handleBasePlanReady}
                   onProceedToBonus={() =>
@@ -275,7 +281,10 @@ function App() {
                           ? "Proceed to Commercial Benefit Optimization"
                           : "Proceed to Bonus Program Optimization"
                       }
-                      onHome={() => navigate('/')}
+                      onBackToInputs={() => {
+                          setShowResults(false);   // ⭐ hide results section
+                          navigate('/df-preview');  // ⭐ go back to form
+                        }}
                       onExport={() => {}}
                     />
                   </div>
@@ -293,7 +302,12 @@ function App() {
                 dfFull={dfFull}
                 channelMoney={channelMoney}
                 optimizationInput={optimizationInput}
-                onBack={() => navigate('/base-plan')}
+                initialState={benefitState}
+                onSaveState={setBenefitState}
+                  onBack={() => {
+                    setShowResults(false);
+                    navigate('/base-plan');
+                  }}
                 onProceedToBonus={handleProceedToBonusSelector}
                 onHome={() => navigate('/')}
                 onResultReady={handleBenefitResultReady}
@@ -328,6 +342,8 @@ function App() {
                 channels={channels}
                 channelMoney={channelMoney}
                 optimizationInput={optimizationInput}
+                initialState={bonusSetupState}
+                onSaveState={setBonusSetupState}
                 onBack={() => navigate('/bonus-selector')}
                 onProceed={handleBonusSharesSubmit}
               />

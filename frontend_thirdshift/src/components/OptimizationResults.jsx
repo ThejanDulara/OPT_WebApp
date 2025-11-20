@@ -12,6 +12,7 @@ export default function OptimizationResults({
   channels,
   propertyPrograms,
   onProceedToBonus,
+  onBackToInputs,
   onHome,
   onExport,
   channelBaseBudgets,
@@ -362,6 +363,13 @@ const handleExportToExcel = () => {
             ))}
           </tbody>
         </table>
+
+        <button
+          onClick={onBackToInputs}
+          style={styles.backHomeButton}
+        >
+          Go Back
+        </button>
 
         <button onClick={handleExportToExcel} style={styles.exportButton}>
           Export Plan to Excel

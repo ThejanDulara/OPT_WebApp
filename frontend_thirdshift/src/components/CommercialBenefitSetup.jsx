@@ -12,42 +12,43 @@ export default function CommercialBenefitSetup({
   onResultReady,
   onProceedToBonus,
   onHome,
+  initialState,
+  onSaveState,
 }) {
-  const [primePct, setPrimePct] = useState(80);
-  const [nonPrimePct, setNonPrimePct] = useState(20);
-  const [maxSpots, setMaxSpots] = useState(optimizationInput?.maxSpots || 10);
-  const [timeLimit, setTimeLimit] = useState(optimizationInput?.timeLimit || 120);
-  const [budgetProportions, setBudgetProportions] = useState(
-    optimizationInput?.budgetProportions ||
-    Array(optimizationInput?.numCommercials || 1).fill(
-      (100 / (optimizationInput?.numCommercials || 1)).toFixed(2)
-    )
-  );
+    const safeInit = initialState || {};
+
+    const [primePct, setPrimePct] = useState(safeInit.primePct ?? 80);
+    const [nonPrimePct, setNonPrimePct] = useState(safeInit.nonPrimePct ?? 20);
+    const [maxSpots, setMaxSpots] = useState(safeInit.maxSpots ?? (optimizationInput?.maxSpots || 10));
+    const [timeLimit, setTimeLimit] = useState(safeInit.timeLimit ?? (optimizationInput?.timeLimit || 120));
+    const [budgetProportions, setBudgetProportions] = useState(
+      safeInit.budgetProportions ??
+      optimizationInput?.budgetProportions ??
+      Array(optimizationInput?.numCommercials || 1).fill((100 / (optimizationInput?.numCommercials || 1)).toFixed(2))
+    );
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [stopRequested, setStopRequested] = useState(false);
 
   const [result, setResult] = useState(null);
 
   // Per-channel splits
-  const [channelSplits, setChannelSplits] = useState(() => {
-    const seed = {};
-    (channels || []).forEach(ch => {
-      if (ch === 'HIRU TV') {
-        const avgPrime = 80 / 5;
-        seed[ch] = {
-          A1: avgPrime,
-          A2: avgPrime,
-          A3: avgPrime,
-          A4: avgPrime,
-          A5: avgPrime,
-          B: 20
-        };
-      } else {
-        seed[ch] = { prime: 80, nonprime: 20 };
-      }
+    const [channelSplits, setChannelSplits] = useState(() => {
+      if (safeInit.channelSplits) return safeInit.channelSplits;   // ⭐ RESTORE SAVED STATE
+
+      // default initialization
+      const seed = {};
+      (channels || []).forEach(ch => {
+        if (ch === 'HIRU TV') {
+          const avgPrime = 80 / 5;
+          seed[ch] = { A1: avgPrime, A2: avgPrime, A3: avgPrime, A4: avgPrime, A5: avgPrime, B: 20 };
+        } else {
+          seed[ch] = { prime: 80, nonprime: 20 };
+        }
+      });
+      return seed;
     });
-    return seed;
-  });
+
 
   const toNum = (v) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
   const formatLKR = (n) => `Rs. ${Number(n || 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`;
@@ -94,6 +95,11 @@ export default function CommercialBenefitSetup({
     }
     return () => { if (id) clearInterval(id); };
   }, [isProcessing, timeLimit]);
+
+    useEffect(() => {
+      // Hide old results when user enters this page again
+      setResult(null);
+    }, []);
 
   const applyGlobalToAllChannels = () => {
     const next = {};
@@ -228,6 +234,18 @@ export default function CommercialBenefitSetup({
       channel_slot_pct_map,
       budget_proportions: budgetProportions.map(p => parseFloat(p))
     };
+
+    // ⭐⭐⭐ SAVE CURRENT STATE BEFORE OPTIMIZING ⭐⭐⭐
+    if (typeof onSaveState === "function") {
+      onSaveState({
+        primePct,
+        nonPrimePct,
+        maxSpots,
+        timeLimit,
+        budgetProportions,
+        channelSplits
+      });
+    }
 
     setIsProcessing(true);
     setStopRequested(false);
@@ -503,7 +521,8 @@ export default function CommercialBenefitSetup({
         <CommercialBenefitResults
           result={result}
           onProceedToBonus={onProceedToBonus}   // 👈 pass from props
-          onHome={onHome}                       // 👈 pass from props
+          onHome={onHome}
+          onBack={onBack}                 // 👈 pass from props
           formatLKR={formatLKR}
         />
       </div>

@@ -58,6 +58,13 @@ function NegotiatedRates({
 
     }, [selectedChannels]);
 
+    useEffect(() => {
+      if (initialNegotiatedRates) {
+        setNegotiatedRates(initialNegotiatedRates);
+      }
+    }, [initialNegotiatedRates]);
+
+
   // --- Load programs when channel changes (use query param endpoint to get `id`)
   useEffect(() => {
     if (!selectedChannel) return;
@@ -83,16 +90,20 @@ function NegotiatedRates({
 
         setPrograms(rows);
 
+
         // Seed negotiated rates for any missing ids (respect existing overrides and restores)
         setNegotiatedRates(prev => {
           const next = { ...prev };
           const disc = toNumber(channelDiscounts[selectedChannel] ?? 30) / 100;
+
           rows.forEach(r => {
-            const existing = (initialNegotiatedRates && initialNegotiatedRates[r.id] != null)
-              ? initialNegotiatedRates[r.id]
-              : next[r.id];
-            if (existing == null && !manualOverride[r.id]) {
-              next[r.id] = +(r.cost * (1 - disc)).toFixed(2);
+            const existing =
+              initialNegotiatedRates?.[r.id] ?? prev[r.id];
+
+            if (existing != null) {
+              next[r.id] = existing;   // ⭐ Restore previous value
+            } else if (!manualOverride[r.id]) {
+              next[r.id] = +(r.cost * (1 - disc)).toFixed(2);  // only for new programs
             }
           });
           return next;

@@ -2246,6 +2246,13 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
 
       {/* Actions */}
       <div style={{marginTop: '24px'}}>
+      <button
+          type="button"
+          onClick={() => window.history.back()}
+          style={s.backHomeButton}
+        >
+          Go Back
+        </button>
         <button type="button" onClick={() => setShowExportDialog(true)} style={s.exportButton}>
           Export Final Plan to Excel
         </button>

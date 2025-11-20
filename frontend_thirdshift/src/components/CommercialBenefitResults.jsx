@@ -7,6 +7,7 @@ export default function CommercialBenefitResults({
   result,
   onProceedToBonus,
   onHome,
+  onBack,
   formatLKR
 }) {
   if (!result) return null;
@@ -52,6 +53,7 @@ export default function CommercialBenefitResults({
     label: { color: '#4a5568', fontWeight: '500', fontSize: '14px' },
     tableContainer: { overflowX: 'auto', borderRadius: '8px', marginTop: '0 table:' },
     deviationWarning: { background: '#fff5f5', color: '#c53030' },
+    backButton: { padding: '12px 24px', background: '#edf2f7', color: '#2d3748', border: '1px solid #cbd5e0', borderRadius: 6, fontSize: 16, fontWeight: 500, cursor: 'pointer' ,marginRight: '20px'},
     note: { fontSize: '13px', color: '#666', marginTop: '12px', fontStyle: 'italic', textAlign: 'center' }
   };
 
@@ -444,6 +446,11 @@ const handleExportToExcel = () => {
             ))}
           </>
         )}
+
+            {/* Action Buttons */}
+        <button onClick={onBack} style={styles.backButton}>
+          Go Back
+        </button>
 
         {/* Action Buttons */}
         <button onClick={handleExportToExcel} style={styles.exportButton}>
