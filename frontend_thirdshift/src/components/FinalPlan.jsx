@@ -1225,83 +1225,96 @@ const propertyGRPTotal = useMemo(() => {
             commercialHeaderRows.push(commercialHeaderRowIndex);
 
 
-            if (mergedPrograms.length > 0) {
-              mergedPrograms.forEach(r => {
-                // --- base values ---
-                const program   = toStr(r.Program);
-                const day       = toStr(r.Day ?? r.Date ?? '');
-                const time      = toStr(r.Time ?? '');
-                const slot      = toStr(r.Slot ?? 'A');
+    // In the commercial section where you add program rows, replace this part:
+    if (mergedPrograms.length > 0) {
+      mergedPrograms.forEach(r => {
+        // --- base values ---
+        const program   = toStr(r.Program);
+        const day       = toStr(r.Day ?? r.Date ?? '');
+        const time      = toStr(r.Time ?? '');
+        const slot      = toStr(r.Slot ?? 'A');
 
-                const cost      = num(r.Cost ?? r.NCost ?? r.Total_Cost ?? 0);      // Cost (LKR)
-                const ncost     = num(r.NCost ?? r.Cost ?? 0);                       // NCost (LKR)
-                const tvr       = num(r.TVR ?? r.NTVR ?? 0);                         // TVR
-                const ntvr      = num(r.NTVR ?? r.TVR ?? 0);                         // NTVR
-                const spots     = num(r.Spots ?? 0);                                 // Spots
+        const cost      = num(r.Cost ?? r.NCost ?? r.Total_Cost ?? 0);      // Cost (LKR)
+        const ncost     = num(r.NCost ?? r.Cost ?? 0);                       // NCost (LKR)
+        const tvr       = num(r.TVR ?? r.NTVR ?? 0);                         // TVR
+        const ntvr      = num(r.NTVR ?? r.TVR ?? 0);                         // NTVR
+        const spots     = num(r.Spots ?? 0);                                 // Spots
 
-                const totalBudget   = num(r.Total_Cost ?? 0);                        // Total Budget (LKR)
-                const ngrp          = num(r.Total_Rating ?? r.Total_NTVR ?? 0);      // NGRP
-                const cprp          = ngrp > 0 ? totalBudget / ngrp : 0;             // CPRP
+        const totalBudget   = num(r.Total_Cost ?? 0);                        // Total Budget (LKR)
+        const ngrp          = num(r.Total_Rating ?? r.Total_NTVR ?? 0);      // NGRP
+        const cprp          = ngrp > 0 ? totalBudget / ngrp : 0;             // CPRP
 
-                // Duration: from optimization results (per-row) or 0 if missing
-                const duration      = commDuration;            // seconds
+        // Duration: from optimization results (per-row) or 0 if missing
+        const duration      = commDuration;            // seconds
 
-                // Nrate = Cost (LKR) / 30 * Duration
-                const nrate = (cost / 30) * commDuration;
+        // Nrate = Cost (LKR) / 30 * Duration
+        const nrate = (cost / 30) * commDuration;
 
-                // Rate Card Total = Nrate * Spots
-                const rateCardTotal = nrate * spots;
+        // Rate Card Total = Nrate * Spots
+        const rateCardTotal = nrate * spots;
 
-                // Total Saving = Rate Card Total - Total Budget
-                const totalSaving   = rateCardTotal - totalBudget;
+        // Total Saving = Rate Card Total - Total Budget
+        const totalSaving   = rateCardTotal - totalBudget;
 
-                // Commercial name + language from dialog
-                const comName       = commercialNames[commercialKey] || `Commercial ${idx + 1}`;
-                const lang          = commercialLanguages[commercialKey] || "";
+        // Commercial name + language from dialog
+        const comName       = commercialNames[commercialKey] || `Commercial ${idx + 1}`;
+        const lang          = commercialLanguages[commercialKey] || "";
 
-                worksheet.addRow([
-                  // Program
-                  program,
-                  // Com name
-                  comName,
-                  // Duration
-                  Number(duration),
-                  // Language
-                  lang,
-                  // Day
-                  day,
-                  // Time
-                  time,
-                  // PT / NPT
-                  slot,
-                  // Nrate
-                  Number(nrate),
-                  // NCost (LKR)
-                  Number(ncost),
-                  // Rate Card Total (LKR)
-                  Number(rateCardTotal),
-                  // Total Budget (LKR)
-                  Number(totalBudget),
-                  // Total Saving (LKR)
-                  Number(totalSaving),
-                  // TVR
-                  Number(tvr),
-                  // NTVR
-                  Number(ntvr),
-                  // GRP
-                  Number(tvr * spots),
-                  // NGRP
-                  Number(ngrp),
-                  // CPRP
-                  Number(cprp),
-                  // Spots
-                  Number(spots),
-                ]);
-              });
-            } else {
-              worksheet.addRow(['(No program rows for this commercial)']);
-            }
-        });
+        const rowData = [
+          // Program
+          program,
+          // Com name
+          comName,
+          // Duration
+          Number(duration),
+          // Language
+          lang,
+          // Day
+          day,
+          // Time
+          time,
+          // PT / NPT
+          slot,
+          // Nrate
+          Number(nrate),
+          // NCost (LKR)
+          Number(ncost),
+        ];
+
+        if (exportWithFormulas) {
+          // For formulas export, add formulas instead of calculated values
+          rowData.push(
+            { formula: `H${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // Rate Card Total (LKR) - Column J
+            { formula: `I${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // Total Budget (LKR) - This is the correction!
+            { formula: `J${worksheet.rowCount + 1}-K${worksheet.rowCount + 1}` }, // Total Saving (LKR)
+            Number(tvr), // TVR - Keep as value
+            Number(ntvr), // NTVR - Keep as value
+            { formula: `M${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // GRP
+            { formula: `N${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // NGRP
+            { formula: `K${worksheet.rowCount + 1}/P${worksheet.rowCount + 1}` }, // CPRP
+            Number(spots) // Spots - Keep as value
+          );
+        } else {
+          // For normal export, use calculated values
+          rowData.push(
+            Number(rateCardTotal), // Rate Card Total (LKR)
+            Number(totalBudget),   // Total Budget (LKR)
+            Number(totalSaving),   // Total Saving (LKR)
+            Number(tvr),           // TVR
+            Number(ntvr),          // NTVR
+            Number(tvr * spots),   // GRP
+            Number(ngrp),          // NGRP
+            Number(cprp),          // CPRP
+            Number(spots)          // Spots
+          );
+        }
+
+        worksheet.addRow(rowData);
+      });
+    }
+    });
+
+
 
         // FINAL SECTION: Bonus Programs
         const bonusRows = (bonusByProgram || []).filter(r => toStr(r.Channel) === ch);
@@ -1314,6 +1327,7 @@ const propertyGRPTotal = useMemo(() => {
           fgColor: { argb: 'FABF8F' }  //
         };
 
+        // In the bonus section, replace the row creation with:
         if (bonusRows.length > 0) {
           bonusRows.forEach(r => {
             // --- Identify commercial key from the row ---
@@ -1349,7 +1363,7 @@ const propertyGRPTotal = useMemo(() => {
             const rateCardTotal = nrate * spots;
             const totalSaving   = rateCardTotal - totalBudget;
 
-            worksheet.addRow([
+            const rowData = [
               program,
               comName,
               Number(duration),
@@ -1359,19 +1373,37 @@ const propertyGRPTotal = useMemo(() => {
               slot,
               Number(nrate),
               Number(ncost),
-              Number(rateCardTotal),
-              Number(totalBudget),
-              Number((totalSaving).toFixed(2)),
-              Number(tvr),
-              Number(ntvr),
-              Number(tvr * spots),
-              Number(ngrp),
-              Number(cprp),
-              Number(spots),
-            ]);
+            ];
+
+            // Add the formula columns based on exportWithFormulas flag
+            if (exportWithFormulas) {
+              rowData.push(
+                { formula: `H${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // Rate Card Total (LKR)
+                Number(totalBudget), // Total Budget (LKR)
+                { formula: `J${worksheet.rowCount + 1}-K${worksheet.rowCount + 1}` }, // Total Saving (LKR)
+                Number(tvr), // TVR
+                Number(ntvr), // NTVR
+                { formula: `M${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // GRP
+                { formula: `N${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // NGRP
+                { formula: `K${worksheet.rowCount + 1}/P${worksheet.rowCount + 1}` }, // CPRP
+                Number(spots) // Spots
+              );
+            } else {
+              rowData.push(
+                Number(rateCardTotal), // Rate Card Total (LKR)
+                Number(totalBudget),   // Total Budget (LKR)
+                Number(totalSaving),   // Total Saving (LKR)
+                Number(tvr),           // TVR
+                Number(ntvr),          // NTVR
+                Number(tvr * spots),   // GRP
+                Number(ngrp),          // NGRP
+                Number(cprp),          // CPRP
+                Number(spots)          // Spots
+              );
+            }
+
+            worksheet.addRow(rowData);
           });
-        } else {
-          worksheet.addRow(['(No bonus program rows)']);
         }
 
         // ============ ADD THIS RIGHT HERE ============
@@ -1870,13 +1902,18 @@ const propertyGRPTotal = useMemo(() => {
 
 
       // ---------- Save ----------
-      try {
-        const buffer = await workbook.xlsx.writeBuffer();
-        saveAs(new Blob([buffer]), 'Final_Plan_By_Channel.xlsx');
-      } catch (error) {
-        console.error('Error exporting Excel file:', error);
-        alert('Error exporting Excel file. Please try again.');
-      }
+    // In the save section, modify the filename:
+    const filename = exportWithFormulas
+      ? 'Final_Plan_With_Formulas.xlsx'
+      : 'Final_Plan_By_Channel.xlsx';
+
+    try {
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(new Blob([buffer]), filename);
+    } catch (error) {
+      console.error('Error exporting Excel file:', error);
+      alert('Error exporting Excel file. Please try again.');
+    }
     };
 
 
@@ -1961,6 +1998,7 @@ const propertyGRPTotal = useMemo(() => {
   const [tvBudget, setTvBudget] = useState("");
   const [durationName, setDurationName] = useState("");
   const [commercialLanguages, setCommercialLanguages] = useState({});
+  const [exportWithFormulas, setExportWithFormulas] = useState(false);
 
 
     const today = new Date();
@@ -2631,18 +2669,29 @@ const propertyGRPTotal = useMemo(() => {
 
 
               <div style={{marginTop:"20px", textAlign:"right"}}>
-                <button style={s.backHomeButton} onClick={() => setShowExportDialog(false)}>
-                  Cancel
-                </button>
-                <button
-                  style={s.primaryButton}
-                  onClick={() => {
-                    setShowExportDialog(false);
-                    handleExport();
-                  }}
-                >
-                  Export
-                </button>
+              <button style={s.backHomeButton} onClick={() => setShowExportDialog(false)}>
+                Cancel
+              </button>
+              <button
+                style={s.primaryButton}
+                onClick={() => {
+                  setShowExportDialog(false);
+                  setExportWithFormulas(false); // Reset for normal export
+                  handleExport();
+                }}
+              >
+                Export
+              </button>
+              <button
+                style={{...s.primaryButton, backgroundColor: '#2d3748', marginLeft: '10px'}}
+                onClick={() => {
+                  setShowExportDialog(false);
+                  setExportWithFormulas(true); // Set flag for formulas export
+                  handleExport();
+                }}
+              >
+                Export with Formulas
+              </button>
               </div>
             </div>
           </div>
