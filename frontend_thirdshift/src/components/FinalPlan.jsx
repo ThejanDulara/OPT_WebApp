@@ -1169,42 +1169,102 @@ const propertyGRPTotal = useMemo(() => {
           cell.font = { bold: true };
         });
 
-        // Property Benefits Section
+// Property Benefits Section
         const propHeaderRow = worksheet.addRow([`Property Benefits`]);
 
         propHeaderRow.getCell(1).fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: 'FABF8F' }  //
+          fgColor: { argb: 'FABF8F' }
         };
 
         const propRows = (flatPropertyPrograms || []).filter(r => toStr(r.Channel) === ch);
+
         if (propRows.length > 0) {
           propRows.forEach(r => {
-                worksheet.addRow([
-                  toStr(r['Name of the program']),
-                  toStr(r['Com name']),
-                  Number(num(r.Duration)),
-                  toStr(r.Language ?? ""),
-                  toStr(r.Day),
-                  toStr(r.Time),
-                  toStr(r.PTNPT ?? ""),
-                  Number(num(r.RateCardCost)),
-                  0,
-                  Number(num(r.RateCardCost) * num(r.Spots)), // RateCardTotal
-                  Number(num(r.Budget)),                       // TotalBudget
-                  Number((num(r.RateCardCost) * num(r.Spots)) - num(r.Budget)), // TotalSaving
-                  Number(num(r.TVR)),
-                  Number(num(r.NTVR)),
-                  Number(num(r.TVR) * num(r.Spots)),   // GRP
-                  Number(num(r.NGRP)),
-                  Number(num(r.CPRP)),
-                  Number(num(r.Spots)),
-                ]);
+            // Calculate basic values needed for both Value and Formula modes
+            const rateCardCost = num(r.RateCardCost);
+            const budget = num(r.Budget);
+            const spots = num(r.Spots);
+            const tvr = num(r.TVR);
+            const ntvr = num(r.NTVR);
+
+            // 1. Prepare the first 9 columns (Static Data)
+            // Columns A to I
+            const rowData = [
+              toStr(r['Name of the program']), // A
+              toStr(r['Com name']),            // B
+              Number(num(r.Duration)),         // C
+              toStr(r.Language ?? ""),         // D
+              toStr(r.Day),                    // E
+              toStr(r.Time),                   // F
+              toStr(r.PTNPT ?? ""),            // G
+              Number(rateCardCost),            // H (Rate Card Cost)
+              0,                               // I (Negotiated Value)
+            ];
+
+            if (useFormulas) {
+              // --- FORMULA MODE ---
+              // Determine the Row Index this new row will occupy
+              const idx = worksheet.rowCount + 1;
+
+              rowData.push(
+                // Col J: Rate Card Total = RateCardCost(H) * Spots(R)
+                { formula: `H${idx}*R${idx}` },
+
+                // Col K: Total Budget (Static Input for Property)
+                Number(budget),
+
+                // Col L: Total Saving = RateCardTotal(J) - TotalBudget(K)
+                { formula: `J${idx}-K${idx}` },
+
+                // Col M: TVR (Static Value)
+                Number(tvr),
+
+                // Col N: NTVR (Static Value)
+                Number(ntvr),
+
+                // Col O: GRP = TVR(M) * Spots(R)
+                { formula: `M${idx}*R${idx}` },
+
+                // Col P: NGRP = NTVR(N) * Spots(R)
+                { formula: `N${idx}*R${idx}` },
+
+                // Col Q: CPRP = TotalBudget(K) / NGRP(P)
+                // Wrapped in IFERROR to handle division by zero
+                { formula: `IFERROR(K${idx}/P${idx}, 0)` },
+
+                // Col R: Spots (Static Value)
+                Number(spots)
+              );
+            } else {
+              // --- VALUE MODE (Existing Logic) ---
+              const rateCardTotal = rateCardCost * spots;
+              const totalSaving = rateCardTotal - budget;
+              const grp = tvr * spots;
+              const ngrp = num(r.NGRP); // or ntvr * spots
+              const cprp = num(r.CPRP);
+
+              rowData.push(
+                Number(rateCardTotal), // J
+                Number(budget),        // K
+                Number(totalSaving),   // L
+                Number(tvr),           // M
+                Number(ntvr),          // N
+                Number(grp),           // O
+                Number(ngrp),          // P
+                Number(cprp),          // Q
+                Number(spots)          // R
+              );
+            }
+
+            worksheet.addRow(rowData);
           });
         } else {
           worksheet.addRow(['(No property rows)']);
         }
+
+
         const commercialHeaderRows = [];
         // SECTION: Commercial Programs (Main + Benefit merged)
         let headerAdded = false;
