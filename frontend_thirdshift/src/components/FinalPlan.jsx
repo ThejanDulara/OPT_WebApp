@@ -744,7 +744,7 @@ const propertyGRPTotal = useMemo(() => {
     ]);
 
     // ---------- Export ----------
-    const handleExport = async () => {
+    const handleExport = async (useFormulas = false) => {
 
     const removeGridlines = (ws) => {
       const MAX_ROWS = 300;   // safe full-page fill
@@ -1281,7 +1281,7 @@ const propertyGRPTotal = useMemo(() => {
           Number(ncost),
         ];
 
-        if (exportWithFormulas) {
+        if (useFormulas) {
           // For formulas export, add formulas instead of calculated values
           rowData.push(
             { formula: `H${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // Rate Card Total (LKR) - Column J
@@ -1376,7 +1376,7 @@ const propertyGRPTotal = useMemo(() => {
             ];
 
             // Add the formula columns based on exportWithFormulas flag
-            if (exportWithFormulas) {
+            if (useFormulas) {
               rowData.push(
                 { formula: `H${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // Rate Card Total (LKR)
                 Number(totalBudget), // Total Budget (LKR)
@@ -1500,7 +1500,7 @@ const propertyGRPTotal = useMemo(() => {
 
         let totalRowValues = [];
 
-        if (exportWithFormulas) {
+        if (useFormulas){
           totalRowValues = [
             "Total", // Col 1
             "",      // Col 2
@@ -1957,7 +1957,8 @@ const propertyGRPTotal = useMemo(() => {
 
       // ---------- Save ----------
     // In the save section, modify the filename:
-    const filename = exportWithFormulas
+    // NEW (use the argument)
+    const filename = useFormulas
       ? 'Final_Plan_With_Formulas.xlsx'
       : 'Final_Plan_By_Channel.xlsx';
 
@@ -2052,7 +2053,6 @@ const propertyGRPTotal = useMemo(() => {
   const [tvBudget, setTvBudget] = useState("");
   const [durationName, setDurationName] = useState("");
   const [commercialLanguages, setCommercialLanguages] = useState({});
-  const [exportWithFormulas, setExportWithFormulas] = useState(false);
 
 
     const today = new Date();
@@ -2722,7 +2722,7 @@ const propertyGRPTotal = useMemo(() => {
                 })}
 
 
-              <div style={{marginTop:"20px", textAlign:"right"}}>
+             <div style={{marginTop:"20px", textAlign:"right"}}>
               <button style={s.backHomeButton} onClick={() => setShowExportDialog(false)}>
                 Cancel
               </button>
@@ -2730,8 +2730,8 @@ const propertyGRPTotal = useMemo(() => {
                 style={s.primaryButton}
                 onClick={() => {
                   setShowExportDialog(false);
-                  setExportWithFormulas(false); // Reset for normal export
-                  handleExport();
+                  // setExportWithFormulas(false);  <-- REMOVE THIS
+                  handleExport(false); // <-- PASS FALSE DIRECTLY
                 }}
               >
                 Export
@@ -2740,14 +2740,14 @@ const propertyGRPTotal = useMemo(() => {
                 style={{...s.primaryButton, backgroundColor: '#2d3748', marginLeft: '10px'}}
                 onClick={() => {
                   setShowExportDialog(false);
-                  setExportWithFormulas(true); // Set flag for formulas export
-                  handleExport();
+                  // setExportWithFormulas(true); <-- REMOVE THIS
+                  handleExport(true); // <-- PASS TRUE DIRECTLY
                 }}
               >
                 Export with Formulas
               </button>
-              </div>
             </div>
+         </div>
           </div>
         )}
     </div>
