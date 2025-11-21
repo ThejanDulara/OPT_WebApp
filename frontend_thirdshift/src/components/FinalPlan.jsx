@@ -867,7 +867,7 @@ const propertyGRPTotal = useMemo(() => {
       'Language',
       'Day',
       'Time',
-      'PT [A] / NPT [B]',
+      'A - PT/B - NPT',
       'Rate Card Value',
       'Negotiated Value',
       'Rate Card Total',
@@ -1464,7 +1464,7 @@ const propertyGRPTotal = useMemo(() => {
           "",      // Column 5: Day
           "",      // Column 6: Time
           "",      // Column 7: PT/NPT
-          Number(totalRowData.rateCardValue),        // Column 8: Rate Card Value
+          "",       // Column 8: Rate Card Value
           "",                                        // Column 9: Negotiated Value
           Number(totalRowData.rateCardTotal),        // Column 10: Rate Card Total
           Number(totalRowData.totalBudget),          // Column 11: Total Budget
