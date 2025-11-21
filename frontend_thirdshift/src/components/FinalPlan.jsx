@@ -1957,10 +1957,20 @@ const propertyGRPTotal = useMemo(() => {
 
       // ---------- Save ----------
     // In the save section, modify the filename:
-    // NEW (use the argument)
-    const filename = useFormulas
-      ? 'Final_Plan_With_Formulas.xlsx'
-      : 'Final_Plan_By_Channel.xlsx';
+// ---------- Save (Updated Filename Logic) ----------
+
+    // 1. Prepare file parts
+    const clientPart = clientName ? `_${clientName}` : "";
+    // Create a period string like "_2023-10-01_to_2023-10-07"
+    const periodPart = `_${fromDate}_to_${toDate}`;
+
+    // 2. Determine base name based on the formula flag
+    const baseName = useFormulas
+      ? 'Final_Plan_By_Channel_With_Formulas'
+      : 'Final_Plan_By_Channel';
+
+    // 3. Combine them: Name + Client + Period + Extension
+    const filename = `${baseName}${clientPart}${periodPart}.xlsx`;
 
     try {
       const buffer = await workbook.xlsx.writeBuffer();
