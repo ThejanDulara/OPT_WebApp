@@ -1178,6 +1178,7 @@ const propertyGRPTotal = useMemo(() => {
           fgColor: { argb: 'FABF8F' }
         };
 
+
         const propRows = (flatPropertyPrograms || []).filter(r => toStr(r.Channel) === ch);
 
         if (propRows.length > 0) {
