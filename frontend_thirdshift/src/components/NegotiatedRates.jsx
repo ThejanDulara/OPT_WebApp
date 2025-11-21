@@ -302,7 +302,6 @@ function NegotiatedRates({
         <input
           type="number"
           min="0"
-          step="0.01"
           value={channelDiscounts[selectedChannel] ?? 30}
           onChange={handleDiscountChange}
           style={styles.input}
@@ -362,7 +361,6 @@ function NegotiatedRates({
                   <td style={{ ...styles.td, ...styles.right }}>
                     <input
                       type="number"
-                      step="0.01"
                       value={negotiatedRates[p.id] ?? 0}
                       onChange={e => handleNegotiatedRateChange(p.id, e.target.value)}
                       style={styles.inputCell}

@@ -345,7 +345,6 @@ export default function ChannelBudgetSetup({
                     <label style={{ ...styles.label, minWidth: '100px' }}>Budget Share:</label>
                     <input
                       type="number"
-                      step="0.01"
                       value={budgetShares[ch] ?? ''}
                       onChange={e => handleInputChange(ch, e.target.value)}
                       style={{ ...styles.numberInput, width: '70px' }}
@@ -362,7 +361,6 @@ export default function ChannelBudgetSetup({
                         <label style={{ ...styles.label, minWidth: '100px' }}>Property Amount:</label>
                         <input
                           type="number"
-                          step="0.01"
                           value={propertyAmounts[ch] ?? 0}
                           onChange={e => handlePropertyAmount(ch, e.target.value)}
                           style={{ ...styles.numberInput, width: '120px' }}
@@ -421,7 +419,6 @@ export default function ChannelBudgetSetup({
                       <span style={{ ...styles.label, minWidth: '80px' }}>Prime Time:</span>
                       <input
                         type="number"
-                        step="0.01"
                         value={channelSplits[ch]?.prime ?? primePct}
                         onChange={e => handleChannelSplitChange(ch, 'prime', e.target.value)}
                         style={{ ...styles.numberInput, width: '70px', borderColor: hasErr ? '#e53e3e' : '#e2e8f0' }}
@@ -436,7 +433,6 @@ export default function ChannelBudgetSetup({
                       <span style={{ ...styles.label, minWidth: '80px' }}>Non-Prime Time:</span>
                       <input
                         type="number"
-                        step="0.01"
                         value={channelSplits[ch]?.nonprime ?? nonPrimePct}
                         onChange={e => handleChannelSplitChange(ch, 'nonprime', e.target.value)}
                         style={{ ...styles.numberInput, width: '70px', borderColor: hasErr ? '#e53e3e' : '#e2e8f0' }}
@@ -504,7 +500,6 @@ export default function ChannelBudgetSetup({
               <label style={enhancedStyles.overrideLabel}>Prime Time % (global default):</label>
               <input
                 type="number"
-                step="0.01"
                 value={primePct}
                 onChange={e => setPrimePct(parseFloat(e.target.value))}
                 style={styles.numberInput}
@@ -515,7 +510,6 @@ export default function ChannelBudgetSetup({
               <label style={enhancedStyles.overrideLabel}>Non-Prime Time % (global default):</label>
               <input
                 type="number"
-                step="0.01"
                 value={nonPrimePct}
                 onChange={e => setNonPrimePct(parseFloat(e.target.value))}
                 style={styles.numberInput}
@@ -563,7 +557,6 @@ export default function ChannelBudgetSetup({
                 <label style={{ ...styles.label, minWidth: '110px' }}>Commercial {idx + 1}:</label>
                 <input
                   type="number"
-                  step="0.01"
                   value={val}
                   onChange={e => handleBudgetProportionChange(idx, e.target.value)}
                   style={{ ...styles.numberInput, width: '80px' }}

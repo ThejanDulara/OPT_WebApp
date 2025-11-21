@@ -356,7 +356,6 @@ export default function CommercialBenefitSetup({
                       <span style={{ ...styles.label, minWidth: 90 }}>Prime Time:</span>
                       <input
                         type="number"
-                        step="0.01"
                         value={toNum(splits.prime ?? primePct)}
                         onChange={e => handleChannelSplitChange(ch, 'prime', e.target.value)}
                         style={{ ...styles.numberInput, width: 70, borderColor: hasErr ? '#e53e3e' : '#e2e8f0' }}
@@ -369,7 +368,6 @@ export default function CommercialBenefitSetup({
                       <span style={{ ...styles.label, minWidth: 90 }}>Non-Prime:</span>
                       <input
                         type="number"
-                        step="0.01"
                         value={toNum(splits.nonprime ?? nonPrimePct)}
                         onChange={e => handleChannelSplitChange(ch, 'nonprime', e.target.value)}
                         style={{ ...styles.numberInput, width: 70, borderColor: hasErr ? '#e53e3e' : '#e2e8f0' }}
@@ -398,7 +396,6 @@ export default function CommercialBenefitSetup({
                           <span style={{ ...styles.label, minWidth: 120 }}>{slotLabels[slot]}:</span>
                           <input
                             type="number"
-                            step="0.01"
                             value={pct}
                             onChange={e => handleChannelSplitChange(ch, slot, e.target.value)}
                             style={{ ...styles.numberInput, width: 70, borderColor: hasErr ? '#e53e3e' : '#e2e8f0' }}
@@ -435,12 +432,12 @@ export default function CommercialBenefitSetup({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <label style={{ minWidth: 250, fontWeight: 500, color: '#2d3748' }}>Prime Time % (global default):</label>
-              <input type="number" step="0.01" value={primePct} onChange={e => setPrimePct(parseFloat(e.target.value))} style={styles.numberInput} />
+              <input type="number" value={primePct} onChange={e => setPrimePct(parseFloat(e.target.value))} style={styles.numberInput} />
               <span style={styles.percentSymbol}>%</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <label style={{ minWidth: 250, fontWeight: 500, color: '#2d3748' }}>Non-Prime Time % (global default):</label>
-              <input type="number" step="0.01" value={nonPrimePct} onChange={e => setNonPrimePct(parseFloat(e.target.value))} style={styles.numberInput} />
+              <input type="number" value={nonPrimePct} onChange={e => setNonPrimePct(parseFloat(e.target.value))} style={styles.numberInput} />
               <span style={styles.percentSymbol}>%</span>
             </div>
             <button type="button" onClick={applyGlobalToAllChannels} style={{ marginTop: 8, padding: '6px 10px', border: '1px solid #cbd5e0', background: '#edf2f7', borderRadius: 6, cursor: 'pointer' }}>
@@ -473,7 +470,6 @@ export default function CommercialBenefitSetup({
                 <label style={{ ...styles.label, minWidth: 110 }}>Commercial {idx + 1}:</label>
                 <input
                   type="number"
-                  step="0.01"
                   value={val}
                   onChange={e => handleBudgetProportionChange(idx, e.target.value)}
                   style={styles.smallInput}
