@@ -867,13 +867,12 @@ const propertyGRPTotal = useMemo(() => {
       'Language',
       'Day',
       'Time',
-      'PT / NPT',
-      'Rate Card Cost (LKR)',
-      'On Cost (LKR)',
-      'Rate Card Total (LKR)',
-      'Total Budget (LKR)',
-      'Total Saving (LKR)',
-      'NCost (LKR)',
+      'PT [A] / NPT [B]',
+      'Rate Card Value',
+      'Negotiated Value',
+      'Rate Card Total',
+      'Total Budget',
+      'Total Saving',
       'TVR',
       'NTVR',
       'GRP',
@@ -890,12 +889,11 @@ const propertyGRPTotal = useMemo(() => {
       'Day',
       'Time',
       'PT [A] / NPT [B]',
-      'Cost (LKR)',
       'Nrate',
+      'NCost (LKR)',
       'Rate Card Total (LKR)',
       'Total Budget (LKR)',
       'Total Saving (LKR)',
-      'NCost (LKR)',
       'TVR',
       'NTVR',
       'GRP',
@@ -1192,11 +1190,10 @@ const propertyGRPTotal = useMemo(() => {
                   toStr(r.Time),
                   toStr(r.PTNPT ?? ""),
                   Number(num(r.RateCardCost)),
-                  Number(num(r.Budget)),
+                  0,
                   Number(num(r.RateCardCost) * num(r.Spots)), // RateCardTotal
                   Number(num(r.Budget)),                       // TotalBudget
                   Number((num(r.RateCardCost) * num(r.Spots)) - num(r.Budget)), // TotalSaving
-                  Number(num(r.NCost)),
                   Number(num(r.TVR)),
                   Number(num(r.NTVR)),
                   Number(num(r.TVR) * num(r.Spots)),   // GRP
@@ -1221,22 +1218,6 @@ const propertyGRPTotal = useMemo(() => {
           const mergedPrograms = mergeProgramsForExport(mainPrograms, benefitPrograms);
 
           worksheet.addRow([]);
-
-            if (!headerAdded) {
-              const progHeaderRow = worksheet.addRow(progHeaders);
-
-              // ASH color for each header cell
-              progHeaderRow.eachCell((cell) => {
-                cell.fill = {
-                  type: 'pattern',
-                  pattern: 'solid',
-                  fgColor: { argb: 'D9D9D9' } // ASH
-                };
-                cell.font = { bold: true };
-              });
-
-              headerAdded = true;
-            }
 
           const customName = commercialNames[commercialKey] || `Commercial ${idx + 1}`;
             const commercialHeaderRow = worksheet.addRow([`${customName}`]);
@@ -1293,18 +1274,16 @@ const propertyGRPTotal = useMemo(() => {
                   time,
                   // PT / NPT
                   slot,
-                  // Cost (LKR)
-                  Number(cost),
                   // Nrate
                   Number(nrate),
+                  // NCost (LKR)
+                  Number(ncost),
                   // Rate Card Total (LKR)
                   Number(rateCardTotal),
                   // Total Budget (LKR)
                   Number(totalBudget),
                   // Total Saving (LKR)
                   Number(totalSaving),
-                  // NCost (LKR)
-                  Number(ncost),
                   // TVR
                   Number(tvr),
                   // NTVR
@@ -1354,12 +1333,12 @@ const propertyGRPTotal = useMemo(() => {
             const slot      = 'B';
 
             const cost      = num(r.Cost ?? r.NCost ?? r.Total_Cost ?? 0);
-            const ncost     = num(r.NCost ?? r.Cost ?? 0);
+            const ncost       = 0;
             const tvr       = num(r.TVR ?? r.NTVR ?? 0);
             const ntvr      = num(r.NTVR ?? r.TVR ?? 0);
             const spots     = num(r.Spots ?? 0);
 
-            const totalBudget   = num(r.Total_Cost ?? 0);
+            const totalBudget = 0;
             const ngrp          = num(r.Total_Rating ?? r.Total_NTVR ?? 0);
             const cprp          = ngrp > 0 ? totalBudget / ngrp : 0;
 
@@ -1378,12 +1357,11 @@ const propertyGRPTotal = useMemo(() => {
               day,
               time,
               slot,
-              Number(cost),
               Number(nrate),
+              Number(ncost),
               Number(rateCardTotal),
               Number(totalBudget),
               Number((totalSaving).toFixed(2)),
-              Number(ncost),
               Number(tvr),
               Number(ntvr),
               Number(tvr * spots),
@@ -1396,6 +1374,161 @@ const propertyGRPTotal = useMemo(() => {
           worksheet.addRow(['(No bonus program rows)']);
         }
 
+        // ============ ADD THIS RIGHT HERE ============
+        // ---------- CALCULATE TOTALS FOR TOTAL ROW ----------
+        const totalRowData = {
+          rateCardValue: 0,
+          rateCardTotal: 0,
+          totalBudget: 0,
+          totalSaving: 0,
+          grp: 0,
+          ngrp: 0,
+          spots: 0
+        };
+
+        // Calculate totals from all sections (Property + Commercials + Bonus)
+        // Property section
+        propRows.forEach(r => {
+          const rateCardValue = num(r.RateCardCost);
+          const spots = num(r.Spots);
+          const rateCardTotal = rateCardValue * spots;
+          const totalBudget = num(r.Budget);
+
+          totalRowData.rateCardValue += rateCardValue;
+          totalRowData.rateCardTotal += rateCardTotal;
+          totalRowData.totalBudget += totalBudget;
+          totalRowData.totalSaving += (rateCardTotal - totalBudget);
+          totalRowData.grp += num(r.TVR) * spots;
+          totalRowData.ngrp += num(r.NGRP);
+          totalRowData.spots += spots;
+        });
+
+        // Commercial sections (Main + Benefit)
+        allCommercialKeys.forEach((commercialKey, idx) => {
+          const mainPrograms = (mainCommercialData?.[commercialKey]?.programs || [])
+            .filter(r => toStr(r.Channel) === ch);
+          const benefitPrograms = (benefitCommercialData?.[commercialKey]?.programs || [])
+            .filter(r => toStr(r.Channel) === ch);
+
+          const mergedPrograms = mergeProgramsForExport(mainPrograms, benefitPrograms);
+
+          mergedPrograms.forEach(r => {
+            const cost = num(r.Cost ?? r.NCost ?? r.Total_Cost ?? 0);
+            const duration = commercialDurations[commercialKey] || 0;
+            const spots = num(r.Spots ?? 0);
+            const nrate = (cost / 30) * duration;
+            const rateCardTotal = nrate * spots;
+            const totalBudget = num(r.Total_Cost ?? 0);
+            const ngrp = num(r.Total_Rating ?? r.Total_NTVR ?? 0);
+            const tvr = num(r.TVR ?? r.NTVR ?? 0);
+
+            totalRowData.rateCardValue += nrate;
+            totalRowData.rateCardTotal += rateCardTotal;
+            totalRowData.totalBudget += totalBudget;
+            totalRowData.totalSaving += (rateCardTotal - totalBudget);
+            totalRowData.grp += tvr * spots;
+            totalRowData.ngrp += ngrp;
+            totalRowData.spots += spots;
+          });
+        });
+
+        // Bonus section
+        bonusRows.forEach(r => {
+          const cost = num(r.Cost ?? r.NCost ?? r.Total_Cost ?? 0);
+          const duration = num(r.Duration ?? r.duration ?? 0);
+          const spots = num(r.Spots ?? 0);
+          const nrate = (cost / 30) * duration;
+          const rateCardTotal = nrate * spots;
+          const totalBudget = 0; // Bonus has totalBudget = 0
+          const ngrp = num(r.Total_Rating ?? r.Total_NTVR ?? 0);
+          const tvr = num(r.TVR ?? r.NTVR ?? 0);
+
+          totalRowData.rateCardValue += nrate;
+          totalRowData.rateCardTotal += rateCardTotal;
+          totalRowData.totalBudget += totalBudget;
+          totalRowData.totalSaving += (rateCardTotal - totalBudget);
+          totalRowData.grp += tvr * spots;
+          totalRowData.ngrp += ngrp;
+          totalRowData.spots += spots;
+        });
+
+        // Calculate CPRP
+        const cprp = totalRowData.ngrp > 0 ? totalRowData.totalBudget / totalRowData.ngrp : 0;
+
+        // Add Total Row after bonus section
+        const totalRow = worksheet.addRow([
+          "Total", // Column 1: Program/Name
+          "",      // Column 2: Commercial name
+          "",      // Column 3: Duration
+          "",      // Column 4: Language
+          "",      // Column 5: Day
+          "",      // Column 6: Time
+          "",      // Column 7: PT/NPT
+          Number(totalRowData.rateCardValue),        // Column 8: Rate Card Value
+          "",                                        // Column 9: Negotiated Value
+          Number(totalRowData.rateCardTotal),        // Column 10: Rate Card Total
+          Number(totalRowData.totalBudget),          // Column 11: Total Budget
+          Number(totalRowData.totalSaving),          // Column 12: Total Saving
+          "",                                        // Column 13: TVR
+          "",                                        // Column 14: NTVR
+          Number(totalRowData.grp),                  // Column 15: GRP
+          Number(totalRowData.ngrp),                 // Column 16: NGRP
+          Number(cprp),                              // Column 17: CPRP
+          Number(totalRowData.spots),                // Column 18: Spots
+          // Empty cells for date columns will be automatically added
+        ]);
+
+        // Color the total row with the same orange color as commercial headers (first 18 columns only)
+        for (let c = 1; c <= 18; c++) {
+          const cell = totalRow.getCell(c);
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FABF8F' } // Same orange color as commercial headers
+          };
+          cell.font = { bold: true };
+        }
+        // ============ END OF ADDED CODE ============
+
+            // === APPLY BONUS ROW STYLING ===
+            let bonusStartRow = -1;
+            let totalRowNumber = -1;
+            worksheet.eachRow((row, rowNumber) => {
+              if (row.getCell(1).value === 'Bonus Programs') {
+                bonusStartRow = rowNumber + 1; // data starts 2 rows below
+              }
+              if (row.getCell(1).value === 'Total') {
+                totalRowNumber = rowNumber;
+              }
+            });
+
+            if (bonusStartRow > 0 && bonusRows.length > 0) {
+              const bonusEndRow = bonusStartRow + bonusRows.length - 1;
+              for (let r = bonusStartRow; r <= bonusEndRow; r++) {
+                const row = worksheet.getRow(r);
+                row.eachCell((cell) => {
+                  cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFDEEFFA' } // Light blue
+                  };
+                });
+              }
+
+              // Apply orange color to the total row (override the light blue)
+              if (totalRowNumber > 0) {
+                for (let c = 1; c <= 18; c++) {
+                  const cell = worksheet.getRow(totalRowNumber).getCell(c);
+                  cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FABF8F' } // Orange color
+                  };
+                  cell.font = { bold: true };
+                }
+              }
+            }
+
             // find area where actual program rows begin
             const firstProgramRow = worksheet._rows.find(r => {
               if (!r) return false;
@@ -1405,37 +1538,29 @@ const propertyGRPTotal = useMemo(() => {
 
         // === APPLY WEEKEND COLUMN SHADING ===
         dateList.forEach((dt, idx) => {
-          const col = 20 + idx; // ExcelJS columns are 1-based, starting after 12 offset columns + 1
+          const col = 19 + idx; // ExcelJS columns are 1-based, starting after 12 offset columns + 1
           const day = new Date(dt).getDay();
           if (day !== 0 && day !== 6) return; // not weekend
 
-for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
-          const row = worksheet.getRow(r);
+          // Stop at the row before the total row (bonus section ends before total row)
+          const lastRowForDates = totalRow.number - 1;
 
-        // === SKIP HEADER ROWS (Property, Commercial, Bonus) ===
+          for (let r = firstProgramRow; r <= lastRowForDates; r++) {
+            const row = worksheet.getRow(r);
 
-        // FINAL FIX: skip commercial header rows
-        if (commercialHeaderRows.includes(r)) {
-            continue;
-        }
+            // === SKIP HEADER ROWS (Property, Commercial, Bonus) ===
+            // FINAL FIX: skip commercial header rows
+            if (commercialHeaderRows.includes(r)) {
+              continue;
+            }
 
-
-          // Apply weekend shading
-          const cell = row.getCell(col);
-          cell.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'D8E4BC' } // Light green
-          };
-        }
-
-        });
-
-        // === APPLY BONUS ROW STYLING ===
-        let bonusStartRow = -1;
-        worksheet.eachRow((row, rowNumber) => {
-          if (row.getCell(1).value === 'Bonus Programs') {
-            bonusStartRow = rowNumber + 1; // data starts 2 rows below
+            // Apply weekend shading
+            const cell = row.getCell(col);
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'D8E4BC' } // Light green
+            };
           }
         });
 
@@ -1463,7 +1588,7 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
         worksheet.getColumn(6).width = 10;
 
         // Date columns (start at column M = 13)
-        const firstDateCol = 20;
+        const firstDateCol = 19;
         dateList.forEach((_, idx) => {
           worksheet.getColumn(firstDateCol + idx).width = 3;
         });
@@ -1480,6 +1605,7 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
         // Starting row for date section (first row with dates)
         const firstDateRow = r3.number + 1;   // date header rows end at r3
 
+
         // === VERTICAL BORDER at START (first date column) ===
         for (let r = firstDateRow; r <= worksheet.rowCount; r++) {
           const cell = worksheet.getRow(r).getCell(startCol);
@@ -1490,24 +1616,40 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
         }
 
         // === VERTICAL BORDER at END (last date column) ===
-        for (let r = firstDateRow; r <= worksheet.rowCount; r++) {
-          const cell = worksheet.getRow(r).getCell(lastCol);
-          cell.border = {
-            ...cell.border,
-            right: { style: 'thin' }
-          };
-        }
-        // ⭐ Vertical borders for first 20 columns (header → end of bonus section)
+    //    for (let r = firstDateRow; r <= worksheet.rowCount; r++) {
+      //    const cell = worksheet.getRow(r).getCell(lastCol);
+     //     cell.border = {
+       //     ...cell.border,
+     //       right: { style: 'thin' }
+      //    };
+      //  }
+
+        // ⭐ Vertical borders for first 20 columns (header → end of bonus section, excluding total row)
         const bonusEndRow = bonusStartRow + bonusRows.length -1 ;
 
         for (let r = firstBorderRow; r <= bonusEndRow; r++) {
           const row = worksheet.getRow(r);
-          for (let c = 1; c <= 19; c++) {
+          for (let c = 1; c <= 18; c++) {
             const cell = row.getCell(c);
             cell.border = {
               ...cell.border,
               left:  { style: 'thin' },
               right: { style: 'thin' }
+            };
+          }
+        }
+
+        // Apply borders to total row separately (only first 18 columns)
+        if (totalRowNumber > 0) {
+          const totalRowObj = worksheet.getRow(totalRowNumber);
+          for (let c = 1; c <= 18; c++) {
+            const cell = totalRowObj.getCell(c);
+            cell.border = {
+              ...cell.border,
+              left:  { style: 'thin' },
+              right: { style: 'thin' },
+              top: { style: 'thin' },
+              bottom: { style: 'thin' }
             };
           }
         }
@@ -1540,50 +1682,68 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
           cell.font = { bold: true };
         }
 
-        // --- 1) HORIZONTAL THIN BORDERS ---
-        for (let r = firstBorderRow; r <= lastRow; r++) {
-          const row = worksheet.getRow(r);
-          for (let c = 1; c <= lastCol; c++) {
-            const cell = row.getCell(c);
-            cell.border = {
-              ...cell.border,
-              top: { style: 'thin' },
-              bottom: { style: 'thin' }
-            };
-          }
-        }
+    // --- 1) HORIZONTAL THIN BORDERS ---
+    for (let r = firstBorderRow; r <= lastRow; r++) {
+      const row = worksheet.getRow(r);
 
-        // --- 2) VERTICAL DOTTED BORDERS (INSIDE DATE AREA ONLY) ---
-        for (let r = firstBorderRow; r <= lastRow; r++) {
-          const row = worksheet.getRow(r);
-
-          for (let c = firstBorderCol + 1; c <= lastCol - 1; c++) {   // <<<<<< FIX HERE
-            const cell = row.getCell(c);
-            cell.border = {
-              ...cell.border,
-              left: { style: 'dotted' },
-              right: { style: 'dotted' }
-            };
-          }
+      // For total row, only apply borders to first 18 columns
+      if (r === totalRowNumber) {
+        for (let c = 1; c <= 18; c++) {
+          const cell = row.getCell(c);
+          cell.border = {
+            ...cell.border,
+            top: { style: 'thin' },
+            bottom: { style: 'thin' }
+          };
         }
+      } else {
+        // For all other rows, apply borders to all columns
+        for (let c = 1; c <= lastCol; c++) {
+          const cell = row.getCell(c);
+          cell.border = {
+            ...cell.border,
+            top: { style: 'thin' },
+            bottom: { style: 'thin' }
+          };
+        }
+      }
+    }
+
+    // --- 2) VERTICAL DOTTED BORDERS (INSIDE DATE AREA ONLY) ---
+    // Stop at the row before the total row (bonus section ends before total row)
+    const lastRowForDateBorders = totalRow.number - 1;
+
+    for (let r = firstBorderRow; r <= lastRowForDateBorders; r++) {
+      const row = worksheet.getRow(r);
+
+      for (let c = firstBorderCol + 1; c <= lastCol - 1; c++) {
+        const cell = row.getCell(c);
+        cell.border = {
+          ...cell.border,
+          left: { style: 'dotted' },
+          right: { style: 'dotted' }
+        };
+      }
+    }
 
     // --- 3) SOLID LEFT BORDER (OVERRIDE dotted) ---
-        for (let r = firstDateRow; r <= lastRow; r++) {
-          const cell = worksheet.getRow(r).getCell(firstBorderCol);
-          cell.border = {
-            ...cell.border,
-            left: { style: 'thin' }  // override dotted
-          };
-        }
+    for (let r = firstDateRow; r <= lastRowForDateBorders; r++) {
+      const cell = worksheet.getRow(r).getCell(firstBorderCol);
+      cell.border = {
+        ...cell.border,
+        left: { style: 'thin' }  // override dotted
+      };
+    }
 
-        // --- 4) SOLID RIGHT BORDER (OVERRIDE dotted) ---
-        for (let r = firstDateRow; r <= lastRow; r++) {
-          const cell = worksheet.getRow(r).getCell(lastCol);
-          cell.border = {
-            ...cell.border,
-            right: { style: 'thin' } // override dotted
-          };
-        }
+    // --- 4) SOLID RIGHT BORDER (OVERRIDE dotted) ---
+    for (let r = firstDateRow; r <= lastRowForDateBorders; r++) {
+      const cell = worksheet.getRow(r).getCell(lastCol);
+      cell.border = {
+        ...cell.border,
+        right: { style: 'thin' } // override dotted
+      };
+    }
+
     // === APPLY SOLID BORDER TO DATE HEADER ROWS (r1, r2, r3) ===
         [r1, r2, r3].forEach((row) => {
           // Solid LEFT BORDER
