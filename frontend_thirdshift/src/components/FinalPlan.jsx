@@ -1407,6 +1407,7 @@ const propertyGRPTotal = useMemo(() => {
         }
 
         // ============ ADD THIS RIGHT HERE ============
+  // ============ ADD THIS RIGHT HERE (UPDATED) ============
         // ---------- CALCULATE TOTALS FOR TOTAL ROW ----------
         const totalRowData = {
           rateCardValue: 0,
@@ -1418,7 +1419,7 @@ const propertyGRPTotal = useMemo(() => {
           spots: 0
         };
 
-        // Calculate totals from all sections (Property + Commercials + Bonus)
+        // ... (Keep your existing loop logic to calculate totalRowData values for fallback) ...
         // Property section
         propRows.forEach(r => {
           const rateCardValue = num(r.RateCardCost);
@@ -1436,31 +1437,28 @@ const propertyGRPTotal = useMemo(() => {
         });
 
         // Commercial sections (Main + Benefit)
-        allCommercialKeys.forEach((commercialKey, idx) => {
-          const mainPrograms = (mainCommercialData?.[commercialKey]?.programs || [])
-            .filter(r => toStr(r.Channel) === ch);
-          const benefitPrograms = (benefitCommercialData?.[commercialKey]?.programs || [])
-            .filter(r => toStr(r.Channel) === ch);
-
+        allCommercialKeys.forEach((commercialKey) => {
+          const mainPrograms = (mainCommercialData?.[commercialKey]?.programs || []).filter(r => toStr(r.Channel) === ch);
+          const benefitPrograms = (benefitCommercialData?.[commercialKey]?.programs || []).filter(r => toStr(r.Channel) === ch);
           const mergedPrograms = mergeProgramsForExport(mainPrograms, benefitPrograms);
 
           mergedPrograms.forEach(r => {
-            const cost = num(r.Cost ?? r.NCost ?? r.Total_Cost ?? 0);
-            const duration = commercialDurations[commercialKey] || 0;
-            const spots = num(r.Spots ?? 0);
-            const nrate = (cost / 30) * duration;
-            const rateCardTotal = nrate * spots;
-            const totalBudget = num(r.Total_Cost ?? 0);
-            const ngrp = num(r.Total_Rating ?? r.Total_NTVR ?? 0);
-            const tvr = num(r.TVR ?? r.NTVR ?? 0);
+             const cost = num(r.Cost ?? r.NCost ?? r.Total_Cost ?? 0);
+             const duration = commercialDurations[commercialKey] || 0;
+             const spots = num(r.Spots ?? 0);
+             const nrate = (cost / 30) * duration;
+             const rateCardTotal = nrate * spots;
+             const totalBudget = num(r.Total_Cost ?? 0);
+             const ngrp = num(r.Total_Rating ?? r.Total_NTVR ?? 0);
+             const tvr = num(r.TVR ?? r.NTVR ?? 0);
 
-            totalRowData.rateCardValue += nrate;
-            totalRowData.rateCardTotal += rateCardTotal;
-            totalRowData.totalBudget += totalBudget;
-            totalRowData.totalSaving += (rateCardTotal - totalBudget);
-            totalRowData.grp += tvr * spots;
-            totalRowData.ngrp += ngrp;
-            totalRowData.spots += spots;
+             totalRowData.rateCardValue += nrate;
+             totalRowData.rateCardTotal += rateCardTotal;
+             totalRowData.totalBudget += totalBudget;
+             totalRowData.totalSaving += (rateCardTotal - totalBudget);
+             totalRowData.grp += tvr * spots;
+             totalRowData.ngrp += ngrp;
+             totalRowData.spots += spots;
           });
         });
 
@@ -1471,7 +1469,7 @@ const propertyGRPTotal = useMemo(() => {
           const spots = num(r.Spots ?? 0);
           const nrate = (cost / 30) * duration;
           const rateCardTotal = nrate * spots;
-          const totalBudget = 0; // Bonus has totalBudget = 0
+          const totalBudget = 0;
           const ngrp = num(r.Total_Rating ?? r.Total_NTVR ?? 0);
           const tvr = num(r.TVR ?? r.NTVR ?? 0);
 
@@ -1484,32 +1482,88 @@ const propertyGRPTotal = useMemo(() => {
           totalRowData.spots += spots;
         });
 
-        // Calculate CPRP
+        // Calculate CPRP (JS Calculation Fallback)
         const cprp = totalRowData.ngrp > 0 ? totalRowData.totalBudget / totalRowData.ngrp : 0;
 
-        // Add Total Row after bonus section
-        const totalRow = worksheet.addRow([
-          "Total", // Column 1: Program/Name
-          "",      // Column 2: Commercial name
-          "",      // Column 3: Duration
-          "",      // Column 4: Language
-          "",      // Column 5: Day
-          "",      // Column 6: Time
-          "",      // Column 7: PT/NPT
-          "",       // Column 8: Rate Card Value
-          "",                                        // Column 9: Negotiated Value
-          Number(totalRowData.rateCardTotal),        // Column 10: Rate Card Total
-          Number(totalRowData.totalBudget),          // Column 11: Total Budget
-          Number(totalRowData.totalSaving),          // Column 12: Total Saving
-          "",                                        // Column 13: TVR
-          "",                                        // Column 14: NTVR
-          Number(totalRowData.grp),                  // Column 15: GRP
-          Number(totalRowData.ngrp),                 // Column 16: NGRP
-          Number(cprp),                              // Column 17: CPRP
-          Number(totalRowData.spots),                // Column 18: Spots
-          // Empty cells for date columns will be automatically added
-        ]);
 
+        // --- NEW FORMULA LOGIC STARTS HERE ---
+
+        // 1. Determine the data range
+        // The header is at `propHeaderRow.number`. Data starts immediately after.
+        const startRow = propHeaderRow.number + 1;
+
+        // The current last row in the sheet is the end of the data
+        const endRow = worksheet.rowCount;
+
+        // The Total row will be the NEXT row
+        const totalRowIndex = endRow + 1;
+
+        let totalRowValues = [];
+
+        if (exportWithFormulas) {
+          totalRowValues = [
+            "Total", // Col 1
+            "",      // Col 2
+            "",      // Col 3
+            "",      // Col 4
+            "",      // Col 5
+            "",      // Col 6
+            "",      // Col 7
+            "",      // Col 8 (Rate Card Value - usually empty in total)
+            "",      // Col 9 (Negotiated Value)
+
+            // Col 10 (J): Rate Card Total -> SUM(Jstart:Jend)
+            { formula: `SUM(J${startRow}:J${endRow})` },
+
+            // Col 11 (K): Total Budget -> SUM(Kstart:Kend)
+            { formula: `SUM(K${startRow}:K${endRow})` },
+
+            // Col 12 (L): Total Saving -> SUM(Lstart:Lend)
+            { formula: `SUM(L${startRow}:L${endRow})` },
+
+            "",      // Col 13 (TVR)
+            "",      // Col 14 (NTVR)
+
+            // Col 15 (O): GRP -> SUM(Ostart:Oend)
+            { formula: `SUM(O${startRow}:O${endRow})` },
+
+            // Col 16 (P): NGRP -> SUM(Pstart:Pend)
+            { formula: `SUM(P${startRow}:P${endRow})` },
+
+            // Col 17 (Q): CPRP -> Total Budget / Total NGRP -> K_total / P_total
+            { formula: `IFERROR(K${totalRowIndex}/P${totalRowIndex}, 0)` },
+
+            // Col 18 (R): Spots -> SUM(Rstart:Rend)
+            { formula: `SUM(R${startRow}:R${endRow})` }
+          ];
+        } else {
+          // Normal Export (Values)
+          totalRowValues = [
+            "Total",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            Number(totalRowData.rateCardTotal),        // Col 10
+            Number(totalRowData.totalBudget),          // Col 11
+            Number(totalRowData.totalSaving),          // Col 12
+            "",
+            "",
+            Number(totalRowData.grp),                  // Col 15
+            Number(totalRowData.ngrp),                 // Col 16
+            Number(cprp),                              // Col 17
+            Number(totalRowData.spots)                 // Col 18
+          ];
+        }
+
+        // Add Total Row
+        const totalRow = worksheet.addRow(totalRowValues);
+
+        // ... (Keep the rest of the styling logic below unchanged) ...
         // Color the total row with the same orange color as commercial headers (first 18 columns only)
         for (let c = 1; c <= 18; c++) {
           const cell = totalRow.getCell(c);
