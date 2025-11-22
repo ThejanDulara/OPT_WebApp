@@ -37,9 +37,29 @@ function ProgramUpdater({ onBack }) {
       .then(data => setPrograms(data.programs || []));
   };
 
+  // --- UPDATED INPUT HANDLER WITH SLOT RESTRICTION ---
   const handleProgramChange = (originalIndex, field, value) => {
+    let finalValue = value;
+
+    // Logic specifically for the 'slot' column
+    if (field === 'slot') {
+      // 1. Force Uppercase
+      finalValue = value.toUpperCase();
+
+      // 2. Validate Pattern
+      // Regex explanation: ^(A[1-5]?|B)?$
+      // - Allows empty string (for deleting)
+      // - Allows 'B'
+      // - Allows 'A'
+      // - Allows 'A' followed by '1' through '5'
+      // - Blocks anything else (like 'C', 'A6', 'AB', etc.)
+      const isValid = /^(A[1-5]?|B)?$/.test(finalValue);
+
+      if (!isValid) return; // Stop here if invalid (don't update state)
+    }
+
     const updated = [...programs];
-    updated[originalIndex][field] = value;
+    updated[originalIndex][field] = finalValue;
     setPrograms(updated);
   };
 
@@ -74,9 +94,8 @@ function ProgramUpdater({ onBack }) {
       .catch(() => alert('❌ Delete failed.'));
   };
 
-  // --- UPDATED SAVE FUNCTION ---
   const saveChanges = () => {
-    setIsSaving(true); // 1. Disable button and show loading
+    setIsSaving(true);
 
     fetch('https://optwebapp-production.up.railway.app/update-programs', {
       method: 'POST',
@@ -87,7 +106,7 @@ function ProgramUpdater({ onBack }) {
       .then(data => alert('✅ Programs updated successfully!'))
       .catch(() => alert('❌ Failed to update programs.'))
       .finally(() => {
-        setIsSaving(false); // 2. Re-enable button regardless of success/fail
+        setIsSaving(false);
       });
   };
 
@@ -288,9 +307,17 @@ function ProgramUpdater({ onBack }) {
                   <td style={styles.rightAlignedCell}>
                     <input type="number" value={p.cost} onChange={(e) => handleProgramChange(p.originalIndex, 'cost', parseFloat(e.target.value))} style={styles.inputCell}/>
                   </td>
+
+                  {/* --- SLOT INPUT (RESTRICTED) --- */}
                   <td style={styles.centerAlignedCell}>
-                    <input type="text" value={p.slot} onChange={(e) => handleProgramChange(p.originalIndex, 'slot', e.target.value)} style={styles.inputCell}/>
+                    <input
+                      type="text"
+                      value={p.slot || ''}
+                      onChange={(e) => handleProgramChange(p.originalIndex, 'slot', e.target.value)}
+                      style={styles.inputCell}
+                    />
                   </td>
+
                   <td style={styles.rightAlignedCell}>
                     <input type="number" value={p.tvr_all} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_all', parseFloat(e.target.value))} style={styles.inputCell}/>
                   </td>
@@ -352,15 +379,14 @@ function ProgramUpdater({ onBack }) {
               ➕ Add Program
             </button>
 
-            {/* --- UPDATED SAVE BUTTON --- */}
             <button
                 onClick={saveChanges}
                 style={{
                     ...styles.primaryButton,
-                    opacity: isSaving ? 0.7 : 1, // Dim button when saving
-                    cursor: isSaving ? 'not-allowed' : 'pointer', // Change cursor
+                    opacity: isSaving ? 0.7 : 1,
+                    cursor: isSaving ? 'not-allowed' : 'pointer',
                 }}
-                disabled={isSaving} // Prevent re-click
+                disabled={isSaving}
             >
               {isSaving ? '⏳ Saving...' : 'Save Changes'}
             </button>
