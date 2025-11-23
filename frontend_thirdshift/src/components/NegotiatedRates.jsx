@@ -1,7 +1,14 @@
 // NegotiatedRates.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 const toNumber = v => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
+
+const SPECIAL_CHANNELS = [
+  "SHAKTHI TV",
+  "SHAKTHI NEWS",
+  "SIRASA TV",
+  "SIRASA NEWS",
+];
 
 function NegotiatedRates({
   onBack,
@@ -21,60 +28,64 @@ function NegotiatedRates({
   const [loadingPrograms, setLoadingPrograms] = useState(false);
 
   const TG_OPTIONS = [
-  { key: "tvr_all", label: "All TG" },
-  { key: "tvr_abc_15_90", label: "SEC ABC | Age 15-90" },
-  { key: "tvr_abc_30_60", label: "SEC ABC | Age 30-60" },
-  { key: "tvr_abc_15_30", label: "SEC ABC | Age 15-30" },
-  { key: "tvr_abc_20_plus", label: "SEC ABC | Age 20+" },
-  { key: "tvr_ab_15_plus", label: "SEC AB | Age 15+" },
-  { key: "tvr_cd_15_plus", label: "SEC CD | Age 15+" },
-  { key: "tvr_ab_female_15_45", label: "SEC AB | Female Age 15-45" },
-  { key: "tvr_abc_15_60", label: "SEC ABC | Age 15-60" },
-  { key: "tvr_bcde_15_plus", label: "SEC BCDE | Age 15+" },
-  { key: "tvr_abcde_15_plus", label: "SEC ABCDE | Age 15+" },
-  { key: "tvr_abc_female_15_60", label: "SEC ABC | Female Age 15-60" },
-  { key: "tvr_abc_male_15_60", label: "SEC ABC | Male Age 15-60" }
-];
+    { key: "tvr_all",              label: "All TG" },
+    { key: "tvr_abc_15_90",        label: "SEC ABC | Age 15-90" },
+    { key: "tvr_abc_30_60",        label: "SEC ABC | Age 30-60" },
+    { key: "tvr_abc_15_30",        label: "SEC ABC | Age 15-30" },
+    { key: "tvr_abc_20_plus",      label: "SEC ABC | Age 20+" },
+    { key: "tvr_ab_15_plus",       label: "SEC AB | Age 15+" },
+    { key: "tvr_cd_15_plus",       label: "SEC CD | Age 15+" },
+    { key: "tvr_ab_female_15_45",  label: "SEC AB | Female Age 15-45" },
+    { key: "tvr_abc_15_60",        label: "SEC ABC | Age 15-60" },
+    { key: "tvr_bcde_15_plus",     label: "SEC BCDE | Age 15+" },
+    { key: "tvr_abcde_15_plus",    label: "SEC ABCDE | Age 15+" },
+    { key: "tvr_abc_female_15_60", label: "SEC ABC | Female Age 15-60" },
+    { key: "tvr_abc_male_15_60",   label: "SEC ABC | Male Age 15-60" },
+  ];
 
   const [selectedTG, setSelectedTG] = useState(initialTG || "tvr_all");
 
+  // --- Load channels & seed discounts ---
+  useEffect(() => {
+    if (!selectedChannels || selectedChannels.length === 0) return;
 
-  // --- Load channels
-    useEffect(() => {
-      if (!selectedChannels || selectedChannels.length === 0) return;
+    setChannels(selectedChannels);
+    setLoadingChannels(false);
 
-      setChannels(selectedChannels);
-      setLoadingChannels(false);
-
-      // Seed 30% discounts or restore previous
-      const base = {};
-      selectedChannels.forEach(ch => {
+    const base = {};
+    selectedChannels.forEach(ch => {
+      if (SPECIAL_CHANNELS.includes(ch)) {
+        base[ch] = 0; // special channels: default discount = 0
+      } else {
         base[ch] = initialChannelDiscounts?.[ch] ?? 30;
-      });
-      setChannelDiscounts(base);
-
-      // Select the first channel by default
-      setSelectedChannel(selectedChannels[0]);
-
-    }, [selectedChannels]);
-
-    useEffect(() => {
-      if (initialNegotiatedRates) {
-        setNegotiatedRates(initialNegotiatedRates);
       }
-    }, [initialNegotiatedRates]);
+    });
+    setChannelDiscounts(base);
 
+    // Select the first channel by default
+    setSelectedChannel(selectedChannels[0]);
+  }, [selectedChannels, initialChannelDiscounts]);
 
-  // --- Load programs when channel changes (use query param endpoint to get `id`)
+  // Restore negotiated rates if coming back
+  useEffect(() => {
+    if (initialNegotiatedRates) {
+      setNegotiatedRates(initialNegotiatedRates);
+    }
+  }, [initialNegotiatedRates]);
+
+  // --- Load programs when channel or TG changes ---
   useEffect(() => {
     if (!selectedChannel) return;
     setLoadingPrograms(true);
+
+    const isSpecialChannel = SPECIAL_CHANNELS.includes(selectedChannel);
 
     fetch(`https://optwebapp-production.up.railway.app/programs?channel=${encodeURIComponent(selectedChannel)}`)
       .then(res => res.json())
       .then(data => {
         const rows = (data.programs || []).map(p => {
           const tvrValue = toNumber(p[selectedTG] ?? 0);   // Pick correct TG TVR
+          const dbNet    = isSpecialChannel ? toNumber(p.net_cost) : null;
 
           return {
             id: p.id,
@@ -82,52 +93,77 @@ function NegotiatedRates({
             time: p.time,
             program: p.program,
             cost: toNumber(p.cost),
-            tvr: tvrValue,           // NOW FIXED TVR FOR REST OF THE APP
+            tvr: tvrValue,
             slot: p.slot,
             channel: selectedChannel,
+            dbNet,         // DB net_cost for special channels
+            isSpecial: isSpecialChannel,
           };
         });
 
         setPrograms(rows);
 
-
-        // Seed negotiated rates for any missing ids (respect existing overrides and restores)
+        // Seed negotiated rates
         setNegotiatedRates(prev => {
           const next = { ...prev };
           const disc = toNumber(channelDiscounts[selectedChannel] ?? 30) / 100;
 
           rows.forEach(r => {
-            const existing =
-              initialNegotiatedRates?.[r.id] ?? prev[r.id];
+            const existing = initialNegotiatedRates?.[r.id] ?? prev[r.id];
 
             if (existing != null) {
-              next[r.id] = existing;   // ⭐ Restore previous value
+              // Restore previous value
+              next[r.id] = existing;
+            } else if (r.isSpecial) {
+              // For special channels, use DB net_cost (fallback to cost)
+              const baseNet = r.dbNet && !Number.isNaN(r.dbNet) ? r.dbNet : r.cost;
+              next[r.id] = baseNet;
             } else if (!manualOverride[r.id]) {
-              next[r.id] = +(r.cost * (1 - disc)).toFixed(2);  // only for new programs
+              // Normal channels → discounted cost
+              next[r.id] = +(r.cost * (1 - disc)).toFixed(2);
             }
           });
+
           return next;
         });
       })
       .finally(() => setLoadingPrograms(false));
-  }, [selectedChannel, selectedChannels ,selectedTG]); // eslint-disable-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChannel, selectedTG]);
 
-  // --- When the discount for the selected channel changes, recompute non-overridden rows
+  // --- Recompute negotiated rates when discount for selected channel changes (non-special only) ---
   useEffect(() => {
     if (!selectedChannel || programs.length === 0) return;
-    const discPct = toNumber(channelDiscounts[selectedChannel] ?? 30);
-    const disc = discPct / 100;
+
+    const isSpecialChannel = SPECIAL_CHANNELS.includes(selectedChannel);
 
     setNegotiatedRates(prev => {
       const next = { ...prev };
+
+      if (isSpecialChannel) {
+        // For special channels, discount changes don't matter → always go back to DB net_cost if no manual override
+        programs.forEach(r => {
+          if (!manualOverride[r.id]) {
+            const baseNet = r.dbNet && !Number.isNaN(r.dbNet) ? r.dbNet : r.cost;
+            next[r.id] = baseNet;
+          }
+        });
+        return next;
+      }
+
+      // Normal channels: apply discount to non-overridden rows
+      const discPct = toNumber(channelDiscounts[selectedChannel] ?? 30);
+      const disc = discPct / 100;
+
       programs.forEach(r => {
         if (!manualOverride[r.id]) {
           next[r.id] = +(r.cost * (1 - disc)).toFixed(2);
         }
       });
+
       return next;
     });
-    // eslint-disable-next-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelDiscounts[selectedChannel]]);
 
   const handleChannelSelect = e => {
@@ -149,10 +185,23 @@ function NegotiatedRates({
   };
 
   const resetRowToDiscount = (row) => {
-    const discPct = toNumber(channelDiscounts[row.channel] ?? 30);
-    const disc = discPct / 100;
-    const calc = +(row.cost * (1 - disc)).toFixed(2);
-    setNegotiatedRates(prev => ({ ...prev, [row.id]: calc }));
+    setNegotiatedRates(prev => {
+      const next = { ...prev };
+
+      if (row.isSpecial) {
+        // Reset to DB net_cost (or cost) for special channels
+        const baseNet = row.dbNet && !Number.isNaN(row.dbNet) ? row.dbNet : row.cost;
+        next[row.id] = baseNet;
+      } else {
+        const discPct = toNumber(channelDiscounts[row.channel] ?? 30);
+        const disc = discPct / 100;
+        const calc = +(row.cost * (1 - disc)).toFixed(2);
+        next[row.id] = calc;
+      }
+
+      return next;
+    });
+
     setManualOverride(prev => {
       const copy = { ...prev };
       delete copy[row.id];
@@ -267,6 +316,8 @@ function NegotiatedRates({
 
   const getLogoPath = (channel) => `/logos/${channel}.png`;
 
+  const isSpecialSelected = SPECIAL_CHANNELS.includes(selectedChannel);
+
   return (
     <div style={styles.form}>
       <h2 style={styles.title}>Set Negotiated Rates (Per Channel Discounts)</h2>
@@ -304,8 +355,14 @@ function NegotiatedRates({
           min="0"
           value={channelDiscounts[selectedChannel] ?? 30}
           onChange={handleDiscountChange}
-          style={styles.input}
+          readOnly={isSpecialSelected}   // 🔒 Prevent editing
+          style={{
+            ...styles.input,
+            cursor: isSpecialSelected ? "not-allowed" : "text",
+            backgroundColor: "white",  // keep same styling
+          }}
         />
+
       </div>
 
       {/* Channel header with logo */}
@@ -356,7 +413,9 @@ function NegotiatedRates({
                   <td style={styles.td}>{p.time}</td>
                   <td style={styles.td}>{p.program}</td>
                   <td style={{ ...styles.td, ...styles.right }}>{formatLKR(p.cost)}</td>
-                  <td style={{ ...styles.td, ...styles.right }}>{p.tvr?.toFixed?.(2) ?? toNumber(p.tvr).toFixed(2)}</td>
+                  <td style={{ ...styles.td, ...styles.right }}>
+                    {p.tvr?.toFixed?.(2) ?? toNumber(p.tvr).toFixed(2)}
+                  </td>
                   <td style={{ ...styles.td, ...styles.center }}>{p.slot}</td>
                   <td style={{ ...styles.td, ...styles.right }}>
                     <input
@@ -367,7 +426,11 @@ function NegotiatedRates({
                     />
                   </td>
                   <td style={{ ...styles.td, ...styles.center }}>
-                    <button type="button" style={styles.smallButton} onClick={() => resetRowToDiscount(p)}>
+                    <button
+                      type="button"
+                      style={styles.smallButton}
+                      onClick={() => resetRowToDiscount(p)}
+                    >
                       Reset
                     </button>
                   </td>
@@ -382,7 +445,7 @@ function NegotiatedRates({
       <div style={styles.buttonRow}>
         <button onClick={onBack} style={styles.backButton}>Back</button>
         <button
-          onClick={() => onProceed({ channelDiscounts, negotiatedRates , selectedTG })}
+          onClick={() => onProceed({ channelDiscounts, negotiatedRates, selectedTG })}
           style={styles.primaryButton}
         >
           Proceed

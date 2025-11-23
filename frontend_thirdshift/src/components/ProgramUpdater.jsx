@@ -1,5 +1,12 @@
 import React, { useEffect, useState, useMemo } from 'react';
 
+const SPECIAL_CHANNELS = [
+  "SHAKTHI TV",
+  "SHAKTHI NEWS",
+  "SIRASA TV",
+  "SIRASA NEWS",
+];
+
 function ProgramUpdater({ onBack }) {
   const [channels, setChannels] = useState([]);
   const [selectedChannel, setSelectedChannel] = useState('DERANA TV');
@@ -69,7 +76,7 @@ function ProgramUpdater({ onBack }) {
     setPrograms([
       ...programs,
       {
-        day: '', time: '', program: '', cost: 0, slot: '',
+        day: '', time: '', program: '', cost: 0, net_cost: 0, slot: '',
         tvr_all: 0, tvr_abc_15_90: 0, tvr_abc_30_60: 0, tvr_abc_15_30: 0,
         tvr_abc_20_plus: 0, tvr_ab_15_plus: 0, tvr_cd_15_plus: 0,
         tvr_ab_female_15_45: 0, tvr_abc_15_60: 0, tvr_bcde_15_plus: 0,
@@ -164,6 +171,8 @@ function ProgramUpdater({ onBack }) {
       });
   }, [programs, searchTerm, slotFilter]);
 
+  const isSpecialChannel = SPECIAL_CHANNELS.includes(selectedChannel);
+
   return (
     <div style={styles.form}>
       <h2 style={styles.title}>Program Manager</h2>
@@ -222,17 +231,19 @@ function ProgramUpdater({ onBack }) {
               <h3 style={styles.channelName}>Programs for {selectedChannel}</h3>
             </div>
 
-            {selectedChannel === "HIRU TV" && (
-              <div style={styles.hiruNoteInline}>
-                <strong>HIRU TV Slots:</strong><br />
-                <strong>A1</strong> – 6.55 News |
-                <strong> A2</strong> – 9.55 News |
-                <strong> A3</strong> – PT WD Prog |
-                <strong> A4</strong> – PT WE Prog |
-                <strong> A5</strong> – PT B |
-                <strong> B</strong> – NPT
-              </div>
-            )}
+            <div style={styles.infoColumn}>
+                {/* General Slot Definition for ALL Channels */}
+                <div style={styles.hiruNoteInline}>
+                    Slot A - Prime time | Slot B - Non Prime time
+                </div>
+
+                {/* Specific Note for HIRU TV */}
+                {selectedChannel === "HIRU TV" && (
+                <div style={{...styles.hiruNoteInline, marginTop: '8px'}}>
+                    <strong>HIRU TV Specifics:</strong> A1 (6.55 News) | A2 (9.55 News) | A3 (WD PT) | A4 (WE PT) | A5 (PT B)
+                </div>
+                )}
+            </div>
           </div>
 
           <div style={styles.filterBar}>
@@ -272,7 +283,9 @@ function ProgramUpdater({ onBack }) {
                 <th style={{ ...styles.tableHeader, ...styles.columnWidths[0] }}>Day</th>
                 <th style={{ ...styles.tableHeader, ...styles.columnWidths[1] }}>Time</th>
                 <th style={{ ...styles.tableHeader, ...styles.columnWidths[2] }}>Program</th>
-                <th style={{ ...styles.tableHeader, ...styles.columnWidths[3] }}>Rate</th>
+                <th style={{ ...styles.tableHeader, ...styles.columnWidths[3] }}>Rate Card (30 Sec)</th>
+                {/* New Negotiated Rate Column */}
+                <th style={{ ...styles.tableHeader, minWidth: '140px' }}>Neg. Rate (30 Sec)</th>
                 <th style={styles.tableHeader}>Slot</th>
                 <th style={styles.tableHeader}>TVR All</th>
                 <th style={styles.tableHeader}>ABC 15–90</th>
@@ -306,6 +319,23 @@ function ProgramUpdater({ onBack }) {
                   </td>
                   <td style={styles.rightAlignedCell}>
                     <input type="number" value={p.cost} onChange={(e) => handleProgramChange(p.originalIndex, 'cost', parseFloat(e.target.value))} style={styles.inputCell}/>
+                  </td>
+
+                  {/* Negotiated Rate Input */}
+                  <td style={styles.rightAlignedCell}>
+                    <input
+                        type="number"
+                        value={p.net_cost || ''}
+                        disabled={!isSpecialChannel}
+                        placeholder={!isSpecialChannel ? "-" : "0.00"}
+                        onChange={(e) => handleProgramChange(p.originalIndex, 'net_cost', parseFloat(e.target.value))}
+                        style={{
+                            ...styles.inputCell,
+                            backgroundColor: isSpecialChannel ? 'white' : '#edf2f7',
+                            cursor: isSpecialChannel ? 'text' : 'not-allowed',
+                            color: isSpecialChannel ? 'black' : '#a0aec0'
+                        }}
+                    />
                   </td>
 
                   {/* --- SLOT INPUT (RESTRICTED) --- */}
@@ -365,7 +395,7 @@ function ProgramUpdater({ onBack }) {
                 ))}
                 {filteredPrograms.length === 0 && (
                     <tr>
-                        <td colSpan="20" style={{textAlign: 'center', padding: '20px', color: '#718096'}}>
+                        <td colSpan="22" style={{textAlign: 'center', padding: '20px', color: '#718096'}}>
                             No programs found matching your filters.
                         </td>
                     </tr>
@@ -458,6 +488,14 @@ const styles = {
     fontSize: '13px',
     lineHeight: '1.4',
     maxWidth: '600px',
+  },
+  infoColumn: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '4px',
+      flex: 1,
+      alignItems: 'flex-end',
+      marginLeft: 'auto',
   },
   hiruNoteInline: {
       backgroundColor: '#fff4e5',
