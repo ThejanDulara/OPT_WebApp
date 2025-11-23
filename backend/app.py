@@ -80,8 +80,15 @@ def generate_df():
     num_commercials = data.get('num_commercials')
     durations = data.get('durations')
 
-    negotiated_rates = data.get('negotiated_rates', {})     # { programId: value }
-    channel_discounts = data.get('channel_discounts', {})   # { channel: pct }
+    negotiated_rates = data.get('negotiated_rates', {})  # { programId: value }
+    channel_discounts = data.get('channel_discounts', {})  # { channel: pct }
+
+    SPECIAL_CHANNELS = [
+        "SHAKTHI TV",
+        "SHAKTHI NEWS",
+        "SIRASA TV",
+        "SIRASA NEWS"
+    ]
 
     ALLOWED_TGS = [
         "tvr_all",
@@ -105,21 +112,32 @@ def generate_df():
     if not program_ids or not num_commercials or not durations:
         return jsonify({"error": "Missing required data"}), 400
 
-    # 1) Fetch selected programs from DB (include id so overrides work)
+    # -----------------------------
+    # 1) Fetch selected programs
+    # -----------------------------
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     fmt = ','.join(['%s'] * len(program_ids))
-    cursor.execute(f"SELECT id, channel, day, time, program, cost, {tg} AS tvr, slot FROM programs WHERE id IN ({fmt})", tuple(program_ids))
+
+    cursor.execute(
+        f"""
+        SELECT 
+            id, channel, day, time, program, cost, {tg} AS tvr, slot, net_cost
+        FROM programs 
+        WHERE id IN ({fmt})
+        """,
+        tuple(program_ids)
+    )
+
     rows = cursor.fetchall()
     conn.close()
 
     if not rows:
         return jsonify({"error": "No programs found for given IDs"}), 400
 
-    # 2) Build df directly from dict rows (no custom columns list)
     df = pd.DataFrame(rows)
 
-    # Standardize column names
+    # Standardize
     df.rename(columns={
         'id': 'Id',
         'channel': 'Channel',
@@ -128,41 +146,72 @@ def generate_df():
         'program': 'Program',
         'cost': 'Cost',
         'tvr': 'TVR',
-        'slot': 'Slot'
+        'slot': 'Slot',
+        'net_cost': 'Net_Cost'
     }, inplace=True)
 
-    # Ensure numeric
     df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce').fillna(0.0)
-    df['TVR']  = pd.to_numeric(df['TVR'],  errors='coerce').fillna(0.0)
+    df['TVR'] = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
+    df['Net_Cost'] = pd.to_numeric(df['Net_Cost'], errors='coerce')  # can be NULL
 
-    # 3) Effective/Negotiated rate
+    # --------------------------------------------------
+    # 2) EFFECTIVE NEGOTIATED RATE LOGIC (UPDATED)
+    # --------------------------------------------------
     def effective_cost(row):
         pid = row['Id']
-        ch  = row['Channel']
+        ch = row['Channel']
         base = float(row['Cost'])
+        db_net_cost = row['Net_Cost']
+
+        # -------------------------
+        # RULE 1: If user edited → use user value
+        # -------------------------
         if pid in negotiated_rates and negotiated_rates[pid] is not None:
             return float(negotiated_rates[pid])
+
+        # -------------------------
+        # RULE 2: SPECIAL CHANNELS
+        #       → use NET COST from DB
+        # -------------------------
+        if ch in SPECIAL_CHANNELS:
+            if db_net_cost is not None:
+                return float(db_net_cost)
+            else:
+                return base  # fallback if DB missing
+
+        # -------------------------
+        # RULE 3: Normal channels
+        #       → apply discount %
+        # -------------------------
         disc_pct = float(channel_discounts.get(ch, 30.0))
         return round(base * (1.0 - disc_pct / 100.0), 2)
 
     df['Negotiated_Rate'] = df.apply(effective_cost, axis=1)
 
-    # 4) Expand by commercials; compute NTVR/NCost
+    # -----------------------------------------
+    # 3) EXPAND for commercials
+    # -----------------------------------------
     df_list = []
     for c in range(int(num_commercials)):
         temp = df.copy()
         temp['Commercial'] = c
         duration = float(durations[c])
-        temp['NTVR']  = (temp['TVR'] / 30.0) * duration
+
+        temp['NTVR'] = (temp['TVR'] / 30.0) * duration
         temp['NCost'] = (temp['Negotiated_Rate'] / 30.0) * duration
+
         df_list.append(temp)
 
     df_full = pd.concat(df_list, ignore_index=True)
-    cols_to_round = ['Cost', 'TVR', 'Negotiated_Rate', 'NTVR', 'NCost']
-    for col in cols_to_round:
+
+    # Round
+    for col in ['Cost', 'TVR', 'Negotiated_Rate', 'NTVR', 'NCost']:
         df_full[col] = pd.to_numeric(df_full[col], errors='coerce').fillna(0.0).round(2)
 
-    return jsonify({"df_full": json.loads(df_full.to_json(orient='records'))})
+    return jsonify({
+        "df_full": json.loads(df_full.to_json(orient='records'))
+    })
+
 
 @app.route('/generate-bonus-df', methods=['POST'])
 def generate_bonus_df():
