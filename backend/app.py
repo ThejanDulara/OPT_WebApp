@@ -414,12 +414,26 @@ def update_programs():
     channel = data['channel']
     programs = data['programs']
 
+    SPECIAL_CHANNELS = [
+        "SHAKTHI TV",
+        "SHAKTHI NEWS",
+        "SIRASA TV",
+        "SIRASA NEWS",
+    ]
+
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # Delete old programs for this channel
     cursor.execute("DELETE FROM programs WHERE channel = %s", (channel,))
 
     for p in programs:
+        # net_cost only applies for the 4 special channels
+        if channel in SPECIAL_CHANNELS:
+            net_cost = p.get('net_cost')
+        else:
+            net_cost = None
+
         cursor.execute(
             """
             INSERT INTO programs (
@@ -436,13 +450,15 @@ def update_programs():
                 tvr_bcde_15_plus,
                 tvr_abcde_15_plus,
                 tvr_abc_female_15_60,
-                tvr_abc_male_15_60
+                tvr_abc_male_15_60,
+                net_cost
             )
             VALUES (
                 %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
-                %s, %s, %s
+                %s, %s, %s,
+                %s
             )
             """,
             (
@@ -466,6 +482,8 @@ def update_programs():
                 p.get('tvr_abcde_15_plus'),
                 p.get('tvr_abc_female_15_60'),
                 p.get('tvr_abc_male_15_60'),
+
+                net_cost
             )
         )
 
