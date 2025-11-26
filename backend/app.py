@@ -796,15 +796,25 @@ def optimize_by_budget_share():
 
 @app.route('/optimize-by-benefit-share', methods=['POST'])
 def optimize_by_benefit_share():
-    """
-    Same as /optimize-by-budget-share, but expects budget_shares built
-    from Commercial Benefit amounts. Constraints and objective are identical.
-    """
     data = request.get_json()
     df_full = pd.DataFrame(data.get('df_full'))
+
+    # ✅ Check required columns *first*
+    required_cols = {'NCost', 'NTVR', 'Channel', 'Slot'}
+    missing = required_cols - set(df_full.columns)
+    if missing:
+        return jsonify({
+            "success": False,
+            "error": f"Missing columns in df_full: {sorted(missing)}"
+        }), 400
+
     budget_shares = data.get('budget_shares') or {}
     benefit_channels = list(budget_shares.keys())
-    df_full = df_full[df_full['Channel'].isin(benefit_channels)].copy()
+
+    # ✅ Now it's safe to use df_full['Channel']
+    if benefit_channels:
+        df_full = df_full[df_full['Channel'].isin(benefit_channels)].copy()
+
     total_budget = float(data.get('budget', 0))
     budget_bound = float(data.get('budget_bound', 0))
     num_commercials = int(data.get('num_commercials', 1))
@@ -817,7 +827,10 @@ def optimize_by_benefit_share():
     channel_slot_pct_map = data.get('channel_slot_pct_map') or {}
 
     if df_full.empty or not budget_shares:
-        return jsonify({"error": "Missing data"}), 400
+        return jsonify({
+            "success": False,
+            "error": "Missing data"
+        }), 400
 
     required_cols = {'NCost', 'NTVR', 'Channel', 'Slot'}
     missing = required_cols - set(df_full.columns)
