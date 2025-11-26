@@ -25,9 +25,24 @@ import FinalPlan from './components/FinalPlan';
 
 import CommercialBenefitSetup from './components/CommercialBenefitSetup';
 import ScrollToTop from "./components/ScrollToTop";
+import CalculatorWidget from "./components/CalculatorWidget";
+import {  useLocation } from "react-router-dom";
+
 
 function App() {
   const navigate = useNavigate();
+
+  const location = useLocation();
+
+    // Pages where calculator should NOT appear
+    const noCalculatorRoutes = [
+      "/",                     // Front page
+      "/select-channels",      // Channel selection
+      "/program-updater"       // Program updater
+    ];
+
+    // Check if current path is in the skip list
+    const hideCalculator = noCalculatorRoutes.includes(location.pathname);
 
   // Keep ALL states EXACTLY as before
   const [negotiatedRates, setNegotiatedRates] = useState({});
@@ -130,6 +145,7 @@ function App() {
       <Header />
       <ScrollToTop />
       <main style={{ padding: '20px', minHeight: '80vh' }}>
+        {!hideCalculator && <CalculatorWidget />}
 
         {/** ROUTING STARTS HERE */}
         <Routes>

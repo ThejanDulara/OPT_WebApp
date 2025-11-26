@@ -197,10 +197,16 @@ function ProgramUpdater({ onBack }) {
         </button>
 
         <div style={styles.instructionBox}>
-            <strong>Note:</strong> Always make sure to use the SRL Program name.
-            If it is a new program, please edit the name once you get data from SRL.
-            And please use the given format when updating the time column.
+          <ul style={{ margin: 0, paddingLeft: '20px', listStyleType: 'disc' }}>
+            <li style={{ listStyleType: 'none', fontWeight: 'bold', marginBottom: '6px' }}>
+              Note
+            </li>
+            <li>Always make sure to use the SRL Program name.</li>
+            <li>If it is a new program, please edit the name once you get data from SRL.</li>
+            <li>Please use the given format when updating the time column.</li>
+          </ul>
         </div>
+
       </div>
 
       {isAddingChannel && (
