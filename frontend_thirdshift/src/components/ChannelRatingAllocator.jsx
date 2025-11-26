@@ -313,11 +313,80 @@ function ChannelRatingAllocator({
       channel_nonprime_pct_map[ch] = toNumber(channelSplits[ch]?.nonprime ?? nonPrimePct);
     });
 
-    const adjustedShares = {};
-    if (totalAvailable <= 0) {
-      alert('All budget is consumed by property amounts. Nothing left to optimize.');
+    const adjustedShares = {};   // ⭐ ADD THIS BACK
+
+if (totalAvailable <= 0) {
+      // ⭐ Save state before leaving
+      if (typeof onSaveState === "function") {
+        onSaveState({
+          budgetShares,
+          maxSpots,
+          timeLimit,
+          primePct,
+          nonPrimePct,
+          channelSplits,
+          hasProperty,
+          propertyAmounts,
+          propertyPrograms,
+          propertyPercents,
+          budgetProportions
+        });
+      }
+
+      // 🎯 FIX: Prepare and send property-only results (since optimization plan is empty)
+      const mockMainCost = 0;
+      const mockMainRating = 0;
+
+      const totalBudgetIncl = mockMainCost + toNumber(totalProperty);
+      const totalNGRPIncl = mockMainRating + toNumber(propertyNGRPTotal);
+      const cprpIncl = totalNGRPIncl > 0 ? totalBudgetIncl / totalNGRPIncl : 0;
+
+      const inclusiveTotals = {
+        totalBudgetIncl,
+        totalNGRPIncl,
+        cprpIncl,
+      };
+
+      const mockResult = {
+        total_cost: mockMainCost,
+        total_rating: mockMainRating,
+        df_result: [],
+        channel_summary: [],
+        commercials_summary: [],
+        // Mocking success status for a property-only plan
+        is_optimal: true,
+        hit_time_limit: false,
+      };
+
+      const adaptedForFinal = {
+        tables: {
+          by_program: [],
+          by_channel: [],
+        },
+        commercials_summary: [],
+        totals: {
+          // Set these to the inclusive totals to ensure the final plan component gets the full budget/rating
+          total_budget_incl_property: totalBudgetIncl,
+          total_cost_incl_property: totalBudgetIncl,
+          total_rating: totalNGRPIncl,
+        },
+        inclusiveTotals,
+      };
+
+      // Call onResultReady to pass the data (property programs, inclusive totals) before proceeding
+      onResultReady?.({
+        raw: mockResult,
+        final: adaptedForFinal,
+        inclusiveTotals,
+        propertyPrograms,
+      });
+      // 🎯 END FIX
+
+      alert('All budget is consumed by property amounts. Proceeding to next step.');
+      onProceedToBonus?.();
       return;
     }
+
     channels.forEach(ch => {
       const available = toNumber(channelMoney[ch]?.available);
       adjustedShares[ch] = (available / totalAvailable) * 100.0;
