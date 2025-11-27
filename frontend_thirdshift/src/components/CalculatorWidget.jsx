@@ -171,18 +171,19 @@ export default function NeumorphicCalculator() {
     },
     screen: {
       width: "100%",
-      height: "100px",
+      minHeight: "100px",
+      maxHeight: "120px",
       marginBottom: "25px",
       borderRadius: "20px",
       background: colors.bg,
-      // Inset Shadow (concave) for the screen
       boxShadow: `inset 6px 6px 12px ${colors.shadowDark}, inset -6px -6px 12px ${colors.shadowLight}`,
       display: "flex",
       flexDirection: "column",
       justifyContent: "center",
       alignItems: "flex-end",
-      padding: "0 20px",
+      padding: "10px 20px",
       boxSizing: "border-box",
+      overflow: "hidden",            // 🔥 Prevent overflow
     },
     historyText: {
       fontSize: "14px",
@@ -191,9 +192,13 @@ export default function NeumorphicCalculator() {
       height: "20px",
     },
     mainText: {
-      fontSize: "36px",
       fontWeight: "600",
       color: colors.text,
+      maxWidth: "100%",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+      fontSize: display.length > 10 ? "24px" : "36px", // 🔥 Automatically shrink
     },
     grid: {
       display: "grid",

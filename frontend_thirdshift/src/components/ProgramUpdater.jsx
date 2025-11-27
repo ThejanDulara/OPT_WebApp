@@ -76,7 +76,7 @@ function ProgramUpdater({ onBack }) {
     setPrograms([
       ...programs,
       {
-        day: '', time: '', program: '', cost: 0, net_cost: 0, slot: '',
+        day: '', time: '', program: '', cost: 0, net_cost: 0, cargills_rate: 0, slot: '',
         tvr_all: 0, tvr_abc_15_90: 0, tvr_abc_30_60: 0, tvr_abc_15_30: 0,
         tvr_abc_20_plus: 0, tvr_ab_15_plus: 0, tvr_cd_15_plus: 0,
         tvr_ab_female_15_45: 0, tvr_abc_15_60: 0, tvr_bcde_15_plus: 0,
@@ -172,6 +172,7 @@ function ProgramUpdater({ onBack }) {
   }, [programs, searchTerm, slotFilter]);
 
   const isSpecialChannel = SPECIAL_CHANNELS.includes(selectedChannel);
+  const isDeranaTV = selectedChannel === "DERANA TV";
 
   return (
     <div style={styles.form}>
@@ -290,6 +291,12 @@ function ProgramUpdater({ onBack }) {
                 <th style={{ ...styles.tableHeader, ...styles.columnWidths[1] }}>Time</th>
                 <th style={{ ...styles.tableHeader, ...styles.columnWidths[2] }}>Program</th>
                 <th style={{ ...styles.tableHeader, ...styles.columnWidths[3] }}>Rate Card (30 Sec)</th>
+
+                {/* Cargills Rate Column - Only for DERANA TV */}
+                {isDeranaTV && (
+                  <th style={{ ...styles.tableHeader, minWidth: '140px' }}>Cargills Rate (30 Sec)</th>
+                )}
+
                 {/* New Negotiated Rate Column */}
                 <th style={{ ...styles.tableHeader, minWidth: '140px' }}>Neg. Rate (30 Sec)</th>
                 <th style={styles.tableHeader}>Slot</th>
@@ -326,6 +333,18 @@ function ProgramUpdater({ onBack }) {
                   <td style={styles.rightAlignedCell}>
                     <input type="number" value={p.cost} onChange={(e) => handleProgramChange(p.originalIndex, 'cost', parseFloat(e.target.value))} style={styles.inputCell}/>
                   </td>
+
+                  {/* Cargills Rate Input - Only for DERANA TV */}
+                  {isDeranaTV && (
+                    <td style={styles.rightAlignedCell}>
+                      <input
+                        type="number"
+                        value={p.cargills_rate || ''}
+                        onChange={(e) => handleProgramChange(p.originalIndex, 'cargills_rate', parseFloat(e.target.value))}
+                        style={styles.inputCell}
+                      />
+                    </td>
+                  )}
 
                   {/* Negotiated Rate Input */}
                   <td style={styles.rightAlignedCell}>
@@ -401,7 +420,7 @@ function ProgramUpdater({ onBack }) {
                 ))}
                 {filteredPrograms.length === 0 && (
                     <tr>
-                        <td colSpan="22" style={{textAlign: 'center', padding: '20px', color: '#718096'}}>
+                        <td colSpan={isDeranaTV ? "23" : "22"} style={{textAlign: 'center', padding: '20px', color: '#718096'}}>
                             No programs found matching your filters.
                         </td>
                     </tr>

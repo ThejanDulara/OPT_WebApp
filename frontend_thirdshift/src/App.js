@@ -82,6 +82,7 @@ function App() {
   const [selectedBonusPrograms, setSelectedBonusPrograms] = useState({});
   const [benefitState, setBenefitState] = useState(null);
   const [bonusSetupState, setBonusSetupState] = useState(null);
+  const [selectedClient, setSelectedClient] = useState("Other");
 
 
   // ---- Navigation helper replacements ----
@@ -186,13 +187,16 @@ function App() {
               initialChannelDiscounts={channelDiscounts}
               initialNegotiatedRates={negotiatedRates}
               initialTG={selectedTG}
+              initialClient={selectedClient}
+              selectedClient={selectedClient}
 
               onBack={() => navigate('/select-channels')}
 
-              onProceed={({ channelDiscounts: cd = {}, negotiatedRates: nr = {}, selectedTG: tg }) => {
+              onProceed={({ channelDiscounts: cd = {}, negotiatedRates: nr = {}, selectedTG: tg ,  selectedClient: sc }) => {
                 setChannelDiscounts(cd);
                 setNegotiatedRates(nr);
                 setSelectedTG(tg);
+                setSelectedClient(sc);
                 navigate('/program-selector');
               }}
             />
@@ -239,6 +243,7 @@ function App() {
                 negotiatedRates={negotiatedRates}
                 channelDiscounts={channelDiscounts}
                 selectedTG={selectedTG}
+                selectedClient={selectedClient}
                 onReady={handleDfReady}
                 goBack={() => navigate('/optimization-setup')}
               />

@@ -4,7 +4,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
-function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRates ,channelDiscounts ,selectedTG}) {
+function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRates ,channelDiscounts ,selectedTG ,selectedClient,}) {
   const [dfFull, setDfFull] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -53,7 +53,8 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
       durations: optimizationInput.durations,
       negotiated_rates: negotiatedRates,       // { [programId]: number }
       channel_discounts: channelDiscounts,      // { [channel]: number }
-      target_group: selectedTG || "tvr_all"
+      target_group: selectedTG || "tvr_all",
+      selected_client: selectedClient || "Other",
     };
 
     fetch('https://optwebapp-production.up.railway.app/generate-df', {
@@ -70,7 +71,7 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
         setError('Failed to fetch optimization table');
         setLoading(false);
       });
-  }, [programIds, optimizationInput]);
+  }, [programIds, optimizationInput ,selectedClient]);
 
   const handleStartOptimization = () => {
     setIsProcessing(true);
