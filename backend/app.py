@@ -452,6 +452,12 @@ def update_programs():
         else:
             net_cost = None
 
+        # cargills_rate only applies for DERANA TV
+        if channel == "DERANA TV":
+            cargills_rate = p.get('cargills_rate')
+        else:
+            cargills_rate = None
+
         cursor.execute(
             """
             INSERT INTO programs (
@@ -469,14 +475,15 @@ def update_programs():
                 tvr_abcde_15_plus,
                 tvr_abc_female_15_60,
                 tvr_abc_male_15_60,
-                net_cost
+                net_cost,
+                cargills_rate
             )
             VALUES (
                 %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
                 %s, %s, %s,
-                %s
+                %s, %s
             )
             """,
             (
@@ -501,7 +508,8 @@ def update_programs():
                 p.get('tvr_abc_female_15_60'),
                 p.get('tvr_abc_male_15_60'),
 
-                net_cost
+                net_cost,
+                cargills_rate
             )
         )
 
