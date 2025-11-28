@@ -159,7 +159,6 @@ export default function BonusDfPreview({
       }
     });
     return unique;
-    return rows;
   }, [channels, selectedBonusPrograms, commercialKeys, durMap]);
 
 
@@ -187,9 +186,15 @@ export default function BonusDfPreview({
       return safe;
     }, [readyRowsUnsorted, commercialOrder]);
 
-  useEffect(() => {
-    setBonusReadyRows(readyRows);
-  }, [readyRows, setBonusReadyRows]);
+    // FIX: Replace the infinite loop useEffect with this:
+    const prevReadyRowsRef = useRef();
+    useEffect(() => {
+      // Only update if readyRows actually changed (deep comparison)
+      if (JSON.stringify(prevReadyRowsRef.current) !== JSON.stringify(readyRows)) {
+        prevReadyRowsRef.current = readyRows;
+        setBonusReadyRows(readyRows);
+      }
+    }, [readyRows, setBonusReadyRows]);
 
   // Channel preview (counts + targets)
   const previewSummary = useMemo(() => {
@@ -529,3 +534,5 @@ export default function BonusDfPreview({
     </div>
   );
 }
+
+

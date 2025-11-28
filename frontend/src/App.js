@@ -24,15 +24,34 @@ import BonusResults from './components/BonusResults';
 import FinalPlan from './components/FinalPlan';
 
 import CommercialBenefitSetup from './components/CommercialBenefitSetup';
+import ScrollToTop from "./components/ScrollToTop";
+import CalculatorWidget from "./components/CalculatorWidget";
+import {  useLocation } from "react-router-dom";
+
 
 function App() {
   const navigate = useNavigate();
 
+  const location = useLocation();
+
+    // Pages where calculator should NOT appear
+    const noCalculatorRoutes = [
+      "/",                     // Front page
+      "/select-channels",      // Channel selection
+      "/program-updater"       // Program updater
+    ];
+
+    // Check if current path is in the skip list
+    const hideCalculator = noCalculatorRoutes.includes(location.pathname);
+
   // Keep ALL states EXACTLY as before
   const [negotiatedRates, setNegotiatedRates] = useState({});
   const [channelDiscounts, setChannelDiscounts] = useState({});
+  const [selectedTG, setSelectedTG] = useState("tvr_all");
   const [channelMoney, setChannelMoney] = useState({});
   const [benefitResult, setBenefitResult] = useState(null);
+  const [allocatorState, setAllocatorState] = useState(null);
+
 
   const hasAnyComBenefit = useMemo(
     () =>
@@ -61,6 +80,10 @@ function App() {
   const [bonusReadyRows, setBonusReadyRows] = useState([]);
 
   const [selectedBonusPrograms, setSelectedBonusPrograms] = useState({});
+  const [benefitState, setBenefitState] = useState(null);
+  const [bonusSetupState, setBonusSetupState] = useState(null);
+  const [selectedClient, setSelectedClient] = useState("Other");
+
 
   // ---- Navigation helper replacements ----
 
@@ -121,8 +144,9 @@ function App() {
   return (
     <div>
       <Header />
-
+      <ScrollToTop />
       <main style={{ padding: '20px', minHeight: '80vh' }}>
+        {!hideCalculator && <CalculatorWidget />}
 
         {/** ROUTING STARTS HERE */}
         <Routes>
@@ -141,9 +165,10 @@ function App() {
           path="/select-channels"
           element={
             <ChannelSelector
+              initialSelectedChannels={channels}   // ⭐ RESTORE SELECTION WHEN COMING BACK
               onBack={() => navigate('/')}
               onProceed={(chs) => {
-                setChannels(chs);       // 🔥 store selected channels globally
+                setChannels(chs);
                 navigate('/negotiated');
               }}
             />
@@ -151,29 +176,44 @@ function App() {
         />
 
           {/** STEP 1 */}
-          <Route
-            path="/negotiated"
-            element={
-              <NegotiatedRates
-                channels={channels}   // 🔥 NEW LINE
-                onBack={() => navigate('/select-channels')}
-                selectedChannels={channels}
-                onProceed={({ channelDiscounts: cd = {}, negotiatedRates: nr = {} }) => {
-                  setChannelDiscounts(cd);
-                  setNegotiatedRates(nr);
-                  navigate('/program-selector');
-                }}
-              />
-            }
-          />
+        <Route
+          path="/negotiated"
+          element={
+            <NegotiatedRates
+              channels={channels}
+              selectedChannels={channels}
 
+              /** ⬇⬇⬇ ADD THESE THREE LINES ⬇⬇⬇ */
+              initialChannelDiscounts={channelDiscounts}
+              initialNegotiatedRates={negotiatedRates}
+              initialTG={selectedTG}
+              initialClient={selectedClient}
+              selectedClient={selectedClient}
+
+              onBack={() => navigate('/select-channels')}
+
+              onProceed={({ channelDiscounts: cd = {}, negotiatedRates: nr = {}, selectedTG: tg ,  selectedClient: sc }) => {
+                setChannelDiscounts(cd);
+                setNegotiatedRates(nr);
+                setSelectedTG(tg);
+                setSelectedClient(sc);
+                navigate('/program-selector');
+              }}
+            />
+          }
+        />
           {/** STEP 2 */}
         <Route
           path="/program-selector"
           element={
             <ProgramSelector
               negotiatedRates={negotiatedRates}
-              selectedChannels={channels}   // 🔥 NEW PROP
+              selectedChannels={channels}
+              selectedTG={selectedTG}
+
+              /** ⬇⬇⬇ ADD THIS ⬇⬇⬇ */
+              initialSelectedProgramIds={selectedProgramIds}
+
               onSubmit={handleProgramsSubmit}
               onBack={() => navigate('/negotiated')}
             />
@@ -188,6 +228,7 @@ function App() {
                 onSubmit={handleOptimizationSubmit}
                 onBack={() => navigate('/program-selector')}
                 initialValues={optimizationInput}
+                selectedTG={selectedTG}
               />
             }
           />
@@ -201,6 +242,8 @@ function App() {
                 optimizationInput={optimizationInput}
                 negotiatedRates={negotiatedRates}
                 channelDiscounts={channelDiscounts}
+                selectedTG={selectedTG}
+                selectedClient={selectedClient}
                 onReady={handleDfReady}
                 goBack={() => navigate('/optimization-setup')}
               />
@@ -215,7 +258,9 @@ function App() {
                 <ChannelRatingAllocator
                   channels={channels}
                   dfFull={dfFull}
-                  optimizationInput={optimizationInput}
+                  optimizationInput={optimizationInput || {}}
+                  initialState={allocatorState}   // ⭐ ADD THIS
+                  onSaveState={setAllocatorState} // ⭐ ADD THIS
                   onBack={() => navigate('/df-preview')}
                   onResultReady={handleBasePlanReady}
                   onProceedToBonus={() =>
@@ -257,7 +302,10 @@ function App() {
                           ? "Proceed to Commercial Benefit Optimization"
                           : "Proceed to Bonus Program Optimization"
                       }
-                      onHome={() => navigate('/')}
+                      onBackToInputs={() => {
+                          setShowResults(false);   // ⭐ hide results section
+                          navigate('/df-preview');  // ⭐ go back to form
+                        }}
                       onExport={() => {}}
                     />
                   </div>
@@ -275,7 +323,12 @@ function App() {
                 dfFull={dfFull}
                 channelMoney={channelMoney}
                 optimizationInput={optimizationInput}
-                onBack={() => navigate('/base-plan')}
+                initialState={benefitState}
+                onSaveState={setBenefitState}
+                  onBack={() => {
+                    setShowResults(false);
+                    navigate('/base-plan');
+                  }}
                 onProceedToBonus={handleProceedToBonusSelector}
                 onHome={() => navigate('/')}
                 onResultReady={handleBenefitResultReady}
@@ -310,6 +363,8 @@ function App() {
                 channels={channels}
                 channelMoney={channelMoney}
                 optimizationInput={optimizationInput}
+                initialState={bonusSetupState}
+                onSaveState={setBonusSetupState}
                 onBack={() => navigate('/bonus-selector')}
                 onProceed={handleBonusSharesSubmit}
               />
@@ -378,10 +433,25 @@ function App() {
             }
           />
 
-          {/** STEP 11 */}
-          <Route
-            path="/final-plan"
-            element={
+        {/** STEP 11 */}
+        <Route
+          path="/final-plan"
+          element={(() => {
+
+            // ⭐ FIX: Convert durations ARRAY → OBJECT (if needed)
+            const mappedOptimizationInput = optimizationInput
+              ? {
+                  ...optimizationInput,
+                  durations: Array.isArray(optimizationInput.durations)
+                    ? optimizationInput.durations.reduce((m, d, i) => {
+                        m[`COM_${i + 1}`] = Number(d) || 0;
+                        return m;
+                      }, {})
+                    : optimizationInput.durations
+                }
+              : null;
+
+            return (
               <FinalPlan
                 mainResults={
                   basePlanForFinal
@@ -415,11 +485,15 @@ function App() {
                   (basePlanResult?.total_cost ?? 0)
                 }
                 propertyPrograms={propertyProgramsForFinal}
+                selectedTG={selectedTG}
+                optimizationInput={mappedOptimizationInput}   // ⭐ FIXED VALUE GOES HERE
                 onBack={() => navigate('/bonus-results')}
                 onHome={() => navigate('/')}
               />
-            }
-          />
+            );
+          })()}
+        />
+
 
           {/** STEP 12 */}
           <Route

@@ -159,7 +159,6 @@ export default function BonusDfPreview({
       }
     });
     return unique;
-    return rows;
   }, [channels, selectedBonusPrograms, commercialKeys, durMap]);
 
 
@@ -187,9 +186,15 @@ export default function BonusDfPreview({
       return safe;
     }, [readyRowsUnsorted, commercialOrder]);
 
-  useEffect(() => {
-    setBonusReadyRows(readyRows);
-  }, [readyRows, setBonusReadyRows]);
+    // FIX: Replace the infinite loop useEffect with this:
+    const prevReadyRowsRef = useRef();
+    useEffect(() => {
+      // Only update if readyRows actually changed (deep comparison)
+      if (JSON.stringify(prevReadyRowsRef.current) !== JSON.stringify(readyRows)) {
+        prevReadyRowsRef.current = readyRows;
+        setBonusReadyRows(readyRows);
+      }
+    }, [readyRows, setBonusReadyRows]);
 
   // Channel preview (counts + targets)
   const previewSummary = useMemo(() => {
@@ -266,7 +271,10 @@ export default function BonusDfPreview({
         // toast + smooth scroll
         toast.success('Bonus optimization complete! Scrolling to results…');
         setTimeout(() => {
-          resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          resultRef.current?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
         }, 300);
       }
     } catch (e) {
@@ -401,7 +409,7 @@ export default function BonusDfPreview({
                 <th style={s.th}>Day</th>
                 <th style={s.th}>Time</th>
                 <th style={s.th}>Program</th>
-                <th style={s.th}>Rate (DB)</th>
+                <th style={s.th}>Rate Card</th>
                 <th style={s.th}>TVR</th>
                 <th style={s.th}>NCost</th>
                 <th style={s.th}>NTVR</th>
@@ -510,12 +518,18 @@ export default function BonusDfPreview({
       {optError ? <div style={s.errorMsg}>⚠️ {optError}</div> : null}
 
         {optResult ? (
-          <BonusResults
-            result={optResult}
-            formatLKR={formatLKR}
-            onBackToSetup={onBackToSetup}
-            onProceedToFinalPlan={onProceedToFinalPlan}
-          />
+          <>
+            {/* ✅ Scroll anchor for smooth scrolling */}
+            <div ref={resultRef} style={{ height: 1 }}></div>
+
+            <BonusResults
+              result={optResult}
+              resultRef={null}
+              formatLKR={formatLKR}
+              onBackToSetup={onBackToSetup}
+              onProceedToFinalPlan={onProceedToFinalPlan}
+            />
+          </>
         ) : null}
     </div>
   );

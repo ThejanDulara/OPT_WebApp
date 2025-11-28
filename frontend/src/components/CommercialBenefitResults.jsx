@@ -7,6 +7,7 @@ export default function CommercialBenefitResults({
   result,
   onProceedToBonus,
   onHome,
+  onBack,
   formatLKR
 }) {
   if (!result) return null;
@@ -52,6 +53,7 @@ export default function CommercialBenefitResults({
     label: { color: '#4a5568', fontWeight: '500', fontSize: '14px' },
     tableContainer: { overflowX: 'auto', borderRadius: '8px', marginTop: '0 table:' },
     deviationWarning: { background: '#fff5f5', color: '#c53030' },
+    backButton: { padding: '12px 24px', background: '#edf2f7', color: '#2d3748', border: '1px solid #cbd5e0', borderRadius: 6, fontSize: 16, fontWeight: 500, cursor: 'pointer' ,marginRight: '20px'},
     note: { fontSize: '13px', color: '#666', marginTop: '12px', fontStyle: 'italic', textAlign: 'center' }
   };
 
@@ -72,37 +74,123 @@ export default function CommercialBenefitResults({
     return val;
   };
 
-  // Export to Excel
-  const handleExportToExcel = () => {
-    const wb = XLSX.utils.book_new();
+// =========================
+//  EXPORT TO EXCEL — FINAL FIXED VERSION
+//  (A1–A5 %, B %, PT %, NPT % correctly populated)
+// =========================
+const handleExportToExcel = () => {
+  const wb = XLSX.utils.book_new();
 
-    const channelData = channelSummary.map(row => ({
-      Channel: row.Channel,
-      'Total Budget': row.Total_Cost,
-      'Budget %': row['% Cost'],
-      NGRP: row.Total_Rating,
-      'NGRP %': row['% Rating'],
-      'PT Budget': row['Prime Cost'],
-      'NPT Budget': row['Non-Prime Cost'],
-      'A1 Cost': row['A1 Cost'] || 0,
-      'A2 Cost': row['A2 Cost'] || 0,
-      'A3 Cost': row['A3 Cost'] || 0,
-      'A4 Cost': row['A4 Cost'] || 0,
-      'A5 Cost': row['A5 Cost'] || 0,
-      'B Cost': row['B Cost'] || 0,
+  // ---- GRP PER CHANNEL ----
+  const grpByChannel = channelSummary.reduce((acc, row) => {
+    const ch = row.Channel;
+
+    const details = (commercialsSummary || [])
+      .flatMap(c => c.details || [])
+      .filter(r => r.Channel === ch);
+
+    const grp = details.reduce(
+      (s, r) => s + Number(r.TVR || 0) * Number(r.Spots || 0),
+      0
+    );
+
+    acc[ch] = grp;
+    return acc;
+  }, {});
+
+  const totalGRP = Object.values(grpByChannel).reduce((a, b) => a + b, 0);
+
+
+  // ==============================
+  // 1) CHANNEL SUMMARY — MATCH UI EXACTLY
+  // ==============================
+  const channelData = channelSummary.map(row => {
+    const ch = row.Channel;
+    const grp = grpByChannel[ch] || 0;
+    const grpPct = totalGRP > 0 ? (grp / totalGRP) * 100 : 0;
+
+    const total = row.Total_Cost || 0;
+
+    // replicate UI logic for percentages
+    const pct = (amount) =>
+      total > 0 ? ((amount / total) * 100).toFixed(2) + "%" : "0.00%";
+
+    // cost breakdown
+    const A1 = row["A1 Cost"] || 0;
+    const A2 = row["A2 Cost"] || 0;
+    const A3 = row["A3 Cost"] || 0;
+    const A4 = row["A4 Cost"] || 0;
+    const A5 = row["A5 Cost"] || 0;
+    const B  = row["B Cost"]  || 0;
+    const PT = row["Prime Cost"] || 0;
+    const NPT = row["Non-Prime Cost"] || 0;
+
+    return {
+      Channel: ch,
+      "Total Budget": row.Total_Cost,
+      "Budget %": row["% Cost"]?.toFixed(2) + "%",
+
+      GRP: grp.toFixed(2),
+      "GRP %": grpPct.toFixed(2) + "%",
+
+      NGRP: row.Total_Rating?.toFixed(2),
+      "NGRP %": row["% Rating"]?.toFixed(2) + "%",
+
+      // calculated A1–A5 percentages
+      "A1 %": pct(A1),
+      "A2 %": pct(A2),
+      "A3 %": pct(A3),
+      "A4 %": pct(A4),
+      "A5 %": pct(A5),
+
+      // B %
+      "B %": pct(B),
+
+      // total PT/NPT %
+      "PT %": pct(PT),
+      "NPT %": pct(NPT)
+    };
+  });
+
+  const wsChannel = XLSX.utils.json_to_sheet(channelData);
+  XLSX.utils.book_append_sheet(wb, wsChannel, "Channel Summary");
+
+
+  // ==============================
+  // 2) COMMERCIAL SHEETS — MATCH UI EXACTLY
+  // ==============================
+  commercialsSummary.forEach((c, idx) => {
+    const rows = (c.details || []).map(r => ({
+      Channel: r.Channel,
+      Program: r.Program,
+      Day: r.Day,
+      Time: r.Time,
+      Slot: r.Slot,
+      Cost: Number(r.Cost || 0).toFixed(2),
+      TVR: Number(r.TVR || 0).toFixed(2),
+      NCost: Number(r.NCost || 0).toFixed(2),
+      NTVR: Number(r.NTVR || 0).toFixed(2),
+      Total_Cost: Number(r.Total_Cost || 0).toFixed(2),
+      GRP: (Number(r.TVR || 0) * Number(r.Spots || 0)).toFixed(2),
+      Total_Rating: Number(r.Total_Rating || 0).toFixed(2),
+      Spots: r.Spots
     }));
-    const wsChannel = XLSX.utils.json_to_sheet(channelData);
-    XLSX.utils.book_append_sheet(wb, wsChannel, 'Channel Summary');
 
-    commercialsSummary.forEach((c, i) => {
-      const ws = XLSX.utils.json_to_sheet(c.details || []);
-      XLSX.utils.book_append_sheet(wb, ws, `Commercial ${i + 1}`);
-    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, `Commercial ${idx + 1}`);
+  });
 
-    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
-    saveAs(blob, 'Commercial_Benefit_Optimization_Results.xlsx');
-  };
+
+  // ==============================
+  // 3) SAVE FILE
+  // ==============================
+  const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([excelBuffer], {
+    type: "application/octet-stream",
+  });
+  saveAs(blob, "Commercial_Benefit_Optimization_Results.xlsx");
+};
+
 
     // ---- GRP PER CHANNEL ----
     const grpByChannel = channelSummary.reduce((acc, row) => {
@@ -132,15 +220,15 @@ export default function CommercialBenefitResults({
         {/* KPI Cards */}
         <div style={styles.summaryGrid}>
           <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>Total Budget </h4>
+            <h4 style={styles.summaryTitle}>Optimized Budget </h4>
             <p style={styles.summaryValue}>{formatLKR(totalCost)}</p>
           </div>
              <div style={styles.summaryCard}>
-              <h4 style={styles.summaryTitle}>Total GRP</h4>
+              <h4 style={styles.summaryTitle}>GRP</h4>
               <p style={styles.summaryValue}>{totalGRP.toFixed(2)}</p>
             </div>
           <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>Total NGRP</h4>
+            <h4 style={styles.summaryTitle}>NGRP</h4>
             <p style={styles.summaryValue}>{totalRating.toFixed(2)}</p>
           </div>
           <div style={styles.summaryCard}>
@@ -359,13 +447,14 @@ export default function CommercialBenefitResults({
           </>
         )}
 
+            {/* Action Buttons */}
+        <button onClick={onBack} style={styles.backButton}>
+          Go Back
+        </button>
+
         {/* Action Buttons */}
         <button onClick={handleExportToExcel} style={styles.exportButton}>
           Export to Excel
-        </button>
-
-        <button onClick={onHome} style={styles.backHomeButton}>
-          Go Back to Home
         </button>
 
         <button

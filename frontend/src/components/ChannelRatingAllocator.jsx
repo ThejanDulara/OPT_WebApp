@@ -11,14 +11,18 @@ function ChannelRatingAllocator({
   channels,
   dfFull,
   optimizationInput,
+  initialState,     // ⭐ NEW
+  onSaveState,      // ⭐ NEW
   onBack,
   onProceedToBonus,
   onChannelMoney,
   onResultReady
 }) {
   const [budgetShares, setBudgetShares] = useState({});
-  const [maxSpots, setMaxSpots] = useState(optimizationInput.maxSpots || 10);
-  const [timeLimit, setTimeLimit] = useState(optimizationInput.timeLimit || 120);
+  const safeOpt = optimizationInput || {};
+
+  const [maxSpots, setMaxSpots] = useState(safeOpt.maxSpots ?? 10);
+  const [timeLimit, setTimeLimit] = useState(safeOpt.timeLimit ?? 120);
   const [primePct, setPrimePct] = useState(80);
   const [nonPrimePct, setNonPrimePct] = useState(20);
   const [result, setResult] = useState(null);
@@ -59,7 +63,7 @@ function ChannelRatingAllocator({
     return isNaN(n) ? 0 : n;
   }, []);
 
-  const totalBudget = toNumber(optimizationInput.budget);
+  const totalBudget = toNumber(safeOpt.budget);
   const formatLKR = n =>
     `Rs. ${Number(n || 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`;
 
@@ -78,12 +82,13 @@ function ChannelRatingAllocator({
     return errs;
   }, [channels, channelSplits, primePct, nonPrimePct]);
 
-  const [budgetProportions, setBudgetProportions] = useState(
-    optimizationInput.budgetProportions ||
-      Array(optimizationInput.numCommercials).fill(
-        (100 / optimizationInput.numCommercials).toFixed(2)
-      )
-  );
+    const numCom = safeOpt.numCommercials ?? 1;
+
+    const [budgetProportions, setBudgetProportions] = useState(
+      safeOpt.budgetProportions ||
+        Array(numCom).fill((100 / numCom).toFixed(2))
+    );
+
 
   // channelMoney now supports onCost + comBenefit
     const channelMoney = useMemo(() => {
@@ -102,6 +107,24 @@ function ChannelRatingAllocator({
       });
       return map;
     }, [channels, budgetShares, totalBudget, hasProperty, propertyAmounts, propertyPercents]);
+
+    useEffect(() => {
+      if (!initialState) return;
+
+      setBudgetShares(initialState.budgetShares || {});
+      setMaxSpots(initialState.maxSpots || 10);
+      setTimeLimit(initialState.timeLimit || 120);
+      setPrimePct(initialState.primePct || 80);
+      setNonPrimePct(initialState.nonPrimePct || 20);
+
+      setChannelSplits(initialState.channelSplits || {});
+      setHasProperty(initialState.hasProperty || {});
+      setPropertyAmounts(initialState.propertyAmounts || {});
+      setPropertyPrograms(initialState.propertyPrograms || {});
+      setPropertyPercents(initialState.propertyPercents || {});
+      setBudgetProportions(initialState.budgetProportions || []);
+    }, [initialState]);
+
 
 
   // Pass up channelMoney
@@ -252,7 +275,7 @@ function ChannelRatingAllocator({
         return;
       }
     }
-    if (optimizationInput.numCommercials > 1) {
+    if ((safeOpt.numCommercials ?? 1) > 1) {
       const totalCommPct = budgetProportions.reduce((a, b) => a + toNumber(b), 0);
       if (Math.abs(totalCommPct - 100) > 0.01) {
         alert('Total commercial budget % must equal 100%');
@@ -290,11 +313,80 @@ function ChannelRatingAllocator({
       channel_nonprime_pct_map[ch] = toNumber(channelSplits[ch]?.nonprime ?? nonPrimePct);
     });
 
-    const adjustedShares = {};
-    if (totalAvailable <= 0) {
-      alert('All budget is consumed by property amounts. Nothing left to optimize.');
+    const adjustedShares = {};   // ⭐ ADD THIS BACK
+
+if (totalAvailable <= 0) {
+      // ⭐ Save state before leaving
+      if (typeof onSaveState === "function") {
+        onSaveState({
+          budgetShares,
+          maxSpots,
+          timeLimit,
+          primePct,
+          nonPrimePct,
+          channelSplits,
+          hasProperty,
+          propertyAmounts,
+          propertyPrograms,
+          propertyPercents,
+          budgetProportions
+        });
+      }
+
+      // 🎯 FIX: Prepare and send property-only results (since optimization plan is empty)
+      const mockMainCost = 0;
+      const mockMainRating = 0;
+
+      const totalBudgetIncl = mockMainCost + toNumber(totalProperty);
+      const totalNGRPIncl = mockMainRating + toNumber(propertyNGRPTotal);
+      const cprpIncl = totalNGRPIncl > 0 ? totalBudgetIncl / totalNGRPIncl : 0;
+
+      const inclusiveTotals = {
+        totalBudgetIncl,
+        totalNGRPIncl,
+        cprpIncl,
+      };
+
+      const mockResult = {
+        total_cost: mockMainCost,
+        total_rating: mockMainRating,
+        df_result: [],
+        channel_summary: [],
+        commercials_summary: [],
+        // Mocking success status for a property-only plan
+        is_optimal: true,
+        hit_time_limit: false,
+      };
+
+      const adaptedForFinal = {
+        tables: {
+          by_program: [],
+          by_channel: [],
+        },
+        commercials_summary: [],
+        totals: {
+          // Set these to the inclusive totals to ensure the final plan component gets the full budget/rating
+          total_budget_incl_property: totalBudgetIncl,
+          total_cost_incl_property: totalBudgetIncl,
+          total_rating: totalNGRPIncl,
+        },
+        inclusiveTotals,
+      };
+
+      // Call onResultReady to pass the data (property programs, inclusive totals) before proceeding
+      onResultReady?.({
+        raw: mockResult,
+        final: adaptedForFinal,
+        inclusiveTotals,
+        propertyPrograms,
+      });
+      // 🎯 END FIX
+
+      alert('All budget is consumed by property amounts. Proceeding to next step.');
+      onProceedToBonus?.();
       return;
     }
+
     channels.forEach(ch => {
       const available = toNumber(channelMoney[ch]?.available);
       adjustedShares[ch] = (available / totalAvailable) * 100.0;
@@ -302,11 +394,11 @@ function ChannelRatingAllocator({
 
     const payload = {
       budget: Number(totalAvailable.toFixed(2)),
-      budget_bound: optimizationInput.budgetBound,
+      budget_bound: safeOpt.budgetBound,
       budget_shares: adjustedShares,
       df_full: dfFull,
-      num_commercials: optimizationInput.numCommercials,
-      min_spots: optimizationInput.minSpots,
+      num_commercials: safeOpt.numCommercials,
+      min_spots: safeOpt.minSpots,
       max_spots: maxSpots,
       time_limit: timeLimit,
       prime_pct: primePct,
@@ -315,6 +407,22 @@ function ChannelRatingAllocator({
       channel_nonprime_pct_map,
       budget_proportions: budgetProportions.map(p => parseFloat(p))
     };
+
+    if (typeof onSaveState === "function") {
+      onSaveState({
+        budgetShares,
+        maxSpots,
+        timeLimit,
+        primePct,
+        nonPrimePct,
+        channelSplits,
+        hasProperty,
+        propertyAmounts,
+        propertyPrograms,
+        propertyPercents,
+        budgetProportions
+      });
+    }
 
     setIsProcessing(true);
     setStopRequested(false);
@@ -353,6 +461,11 @@ function ChannelRatingAllocator({
         }
 
         setResult(data);
+
+        setTimeout(() => {
+          const el = document.getElementById("optimization-summary");
+          if (el) el.scrollIntoView({ behavior: "smooth" });
+        }, 300);
 
         const inclusiveTotals = {
           totalBudgetIncl: toNumber(data.total_cost) + toNumber(totalProperty),
@@ -596,7 +709,7 @@ function ChannelRatingAllocator({
 
       <ChannelBudgetSetup
         channels={channels}
-        optimizationInput={optimizationInput}
+         optimizationInput={safeOpt}
         // state
         budgetShares={budgetShares}
         setBudgetShares={setBudgetShares}

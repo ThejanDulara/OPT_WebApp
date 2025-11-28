@@ -41,6 +41,7 @@ export default function BonusResults({
   // Prefer parent-supplied result; otherwise use locally-fetched
   const result = externalResult || localResult;
 
+
   // ---------------- styles ----------------
   const defaultStyles = {
     page: { padding: 40, maxWidth: 1280, margin: '0 auto' },
@@ -364,15 +365,15 @@ export default function BonusResults({
           <>
             <div style={s.summaryGrid}>
               <div style={s.summaryCard}>
-                <div style={s.summaryTitle}>Total Bonus Budget</div>
+                <div style={s.summaryTitle}>Optimized Bonus Budget</div>
                 <div style={s.summaryValue}>{formatLKR(globalCost)}</div>
               </div>
               <div style={s.summaryCard}>
-                <div style={s.summaryTitle}>Total Bonus GRP</div>
+                <div style={s.summaryTitle}>GRP</div>
                 <div style={s.summaryValue}>{safeFixed(globalGRP, 2)}</div>
               </div>
               <div style={s.summaryCard}>
-                <div style={s.summaryTitle}>Total Bonus NGRP</div>
+                <div style={s.summaryTitle}>NGRP</div>
                 <div style={s.summaryValue}>{safeFixed(globalRating, 2)}</div>
               </div>
               <div style={s.summaryCard}>
@@ -409,15 +410,15 @@ export default function BonusResults({
                   {/* Channel KPIs */}
                   <div style={s.channelKPIs}>
                     <div style={s.summaryCard}>
-                      <div style={s.summaryTitle}>Bonus Budget</div>
+                      <div style={s.summaryTitle}>Optimized Bonus Budget</div>
                       <div style={s.summaryValue}>{formatLKR(chCost)}</div>
                     </div>
                       <div style={s.summaryCard}>
-                        <div style={s.summaryTitle}>Bonus GRP</div>
+                        <div style={s.summaryTitle}>GRP</div>
                         <div style={s.summaryValue}>{safeFixed(chGRP)}</div>
                       </div>
                     <div style={s.summaryCard}>
-                      <div style={s.summaryTitle}>Bonus NGRP</div>
+                      <div style={s.summaryTitle}>NGRP</div>
                       <div style={s.summaryValue}>{safeFixed(chRating)}</div>
                     </div>
                     <div style={s.summaryCard}>

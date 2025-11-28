@@ -2,44 +2,80 @@
 import React, { useMemo, useState } from 'react';
 
 export default function BonusChannelBudgetSetup({
-  // Required inputs
-  channels = [],                             // ['Derana', ...]
-  channelMoney = {},                         // from previous step: { [ch]: { chAmount:number } }  (use chAmount as the "Channel Budget" base)
-  optimizationInput = {},                    // from OptimizationSetup (numCommercials, durations, budgetProportions, maxSpots, timeLimit)
-  // Nav
-  onBack,
-  onProceed                                   // (payload) => void  -> navigate to Bonus Program Selection
-}) {
+                  // Required inputs
+                  channels = [],
+                  channelMoney = {},
+                  optimizationInput = {},
+                  initialState = null,
+                  onSaveState = () => {},
+                  onBack,
+                  onProceed
+                }) {
+
   // --- helpers ---
   const num = (v) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
   const fmtLKR = (n) => `Rs. ${Number(n || 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`;
 
-  // --- seed from OptimizationSetup defaults ---
-  const [numCommercials, setNumCommercials] = useState(optimizationInput.numCommercials || 1);
-  const [durations, setDurations] = useState(
-    (optimizationInput.durations && optimizationInput.durations.slice(0, optimizationInput.numCommercials)) ||
-    Array(optimizationInput.numCommercials || 1).fill(30)
-  );
-  const [budgetProportions, setBudgetProportions] = useState(
-    (optimizationInput.budgetProportions && optimizationInput.budgetProportions.slice(0, optimizationInput.numCommercials)) ||
-    Array(optimizationInput.numCommercials || 1).fill(+(100 / (optimizationInput.numCommercials || 1)).toFixed(2))
-  );
+      // Number of commercials
+    const [numCommercials, setNumCommercials] = useState(
+      initialState?.numCommercials ??
+      optimizationInput?.numCommercials ??
+      1
+    );
 
-  // Global bonus-opt settings
-  const [maxSpots, setMaxSpots]     = useState(optimizationInput.maxSpots ?? 10);
-  const [timeLimit, setTimeLimit]   = useState(optimizationInput.timeLimit ?? 120);
+    // Durations
+    const [durations, setDurations] = useState(
+      initialState?.durations ??
+      (
+        optimizationInput?.durations?.slice(0, optimizationInput?.numCommercials) ??
+        Array(optimizationInput?.numCommercials || 1).fill(30)
+      )
+    );
 
-  // Per-channel inputs
-  const seededBonusPct = {};
-  const seededBounds   = {};
-  (channels || []).forEach(ch => {
-    seededBonusPct[ch] = 0;                                         // default 0% until user enters
-    // default bound: reuse global bound if present, otherwise 0
-    seededBounds[ch] = num(optimizationInput.budgetBound ?? 0);
-  });
+    // Budget proportions
+    const [budgetProportions, setBudgetProportions] = useState(
+      initialState?.budgetProportions ??
+      (
+        optimizationInput?.budgetProportions?.slice(0, optimizationInput?.numCommercials) ??
+        Array(optimizationInput?.numCommercials || 1).fill(
+          +(100 / (optimizationInput?.numCommercials || 1)).toFixed(2)
+        )
+      )
+    );
 
-  const [bonusPctByChannel, setBonusPctByChannel] = useState(seededBonusPct);
-  const [channelBounds, setChannelBounds]         = useState(seededBounds);
+    // Max spots
+    const [maxSpots, setMaxSpots] = useState(
+      initialState?.maxSpots ??
+      optimizationInput?.maxSpots ??
+      10
+    );
+
+    // Time limit
+    const [timeLimit, setTimeLimit] = useState(
+      initialState?.timeLimit ??
+      optimizationInput?.timeLimit ??
+      120
+    );
+
+    // Bonus % per channel
+    const [bonusPctByChannel, setBonusPctByChannel] = useState(
+      initialState?.bonusPctByChannel ??
+      channels.reduce((acc, ch) => {
+        acc[ch] = 0;
+        return acc;
+      }, {})
+    );
+
+    // Channel budget tolerance
+    const [channelBounds, setChannelBounds] = useState(
+      initialState?.channelBounds ??
+      channels.reduce((acc, ch) => {
+        acc[ch] = optimizationInput?.budgetBound ?? 0;
+        return acc;
+      }, {})
+    );
+
+
 
   const handleBonusPctChange = (ch, v) => {
     setBonusPctByChannel(prev => ({ ...prev, [ch]: num(v) }));
@@ -122,6 +158,17 @@ export default function BonusChannelBudgetSetup({
       alert('Commercial budget percentages must total 100%.');
       return;
     }
+
+      // ⭐ SAVE STATE
+      onSaveState({
+        numCommercials,
+        durations,
+        budgetProportions,
+        maxSpots,
+        timeLimit,
+        bonusPctByChannel,
+        channelBounds
+      });
 
     // assemble payload for next pages
     const payload = {

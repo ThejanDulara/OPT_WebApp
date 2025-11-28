@@ -12,42 +12,43 @@ export default function CommercialBenefitSetup({
   onResultReady,
   onProceedToBonus,
   onHome,
+  initialState,
+  onSaveState,
 }) {
-  const [primePct, setPrimePct] = useState(80);
-  const [nonPrimePct, setNonPrimePct] = useState(20);
-  const [maxSpots, setMaxSpots] = useState(optimizationInput?.maxSpots || 10);
-  const [timeLimit, setTimeLimit] = useState(optimizationInput?.timeLimit || 120);
-  const [budgetProportions, setBudgetProportions] = useState(
-    optimizationInput?.budgetProportions ||
-    Array(optimizationInput?.numCommercials || 1).fill(
-      (100 / (optimizationInput?.numCommercials || 1)).toFixed(2)
-    )
-  );
+    const safeInit = initialState || {};
+
+    const [primePct, setPrimePct] = useState(safeInit.primePct ?? 80);
+    const [nonPrimePct, setNonPrimePct] = useState(safeInit.nonPrimePct ?? 20);
+    const [maxSpots, setMaxSpots] = useState(safeInit.maxSpots ?? (optimizationInput?.maxSpots || 10));
+    const [timeLimit, setTimeLimit] = useState(safeInit.timeLimit ?? (optimizationInput?.timeLimit || 120));
+    const [budgetProportions, setBudgetProportions] = useState(
+      safeInit.budgetProportions ??
+      optimizationInput?.budgetProportions ??
+      Array(optimizationInput?.numCommercials || 1).fill((100 / (optimizationInput?.numCommercials || 1)).toFixed(2))
+    );
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [stopRequested, setStopRequested] = useState(false);
 
   const [result, setResult] = useState(null);
 
   // Per-channel splits
-  const [channelSplits, setChannelSplits] = useState(() => {
-    const seed = {};
-    (channels || []).forEach(ch => {
-      if (ch === 'HIRU TV') {
-        const avgPrime = 80 / 5;
-        seed[ch] = {
-          A1: avgPrime,
-          A2: avgPrime,
-          A3: avgPrime,
-          A4: avgPrime,
-          A5: avgPrime,
-          B: 20
-        };
-      } else {
-        seed[ch] = { prime: 80, nonprime: 20 };
-      }
+    const [channelSplits, setChannelSplits] = useState(() => {
+      if (safeInit.channelSplits) return safeInit.channelSplits;   // ⭐ RESTORE SAVED STATE
+
+      // default initialization
+      const seed = {};
+      (channels || []).forEach(ch => {
+        if (ch === 'HIRU TV') {
+          const avgPrime = 80 / 5;
+          seed[ch] = { A1: avgPrime, A2: avgPrime, A3: avgPrime, A4: avgPrime, A5: avgPrime, B: 20 };
+        } else {
+          seed[ch] = { prime: 80, nonprime: 20 };
+        }
+      });
+      return seed;
     });
-    return seed;
-  });
+
 
   const toNum = (v) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
   const formatLKR = (n) => `Rs. ${Number(n || 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`;
@@ -94,6 +95,11 @@ export default function CommercialBenefitSetup({
     }
     return () => { if (id) clearInterval(id); };
   }, [isProcessing, timeLimit]);
+
+    useEffect(() => {
+      // Hide old results when user enters this page again
+      setResult(null);
+    }, []);
 
   const applyGlobalToAllChannels = () => {
     const next = {};
@@ -229,6 +235,18 @@ export default function CommercialBenefitSetup({
       budget_proportions: budgetProportions.map(p => parseFloat(p))
     };
 
+    // ⭐⭐⭐ SAVE CURRENT STATE BEFORE OPTIMIZING ⭐⭐⭐
+    if (typeof onSaveState === "function") {
+      onSaveState({
+        primePct,
+        nonPrimePct,
+        maxSpots,
+        timeLimit,
+        budgetProportions,
+        channelSplits
+      });
+    }
+
     setIsProcessing(true);
     setStopRequested(false);
 
@@ -279,7 +297,14 @@ export default function CommercialBenefitSetup({
         }
       };
 
-      setResult(adapted); // 👈 show inline results
+        setResult(adapted);
+
+        // 🔥 Auto-scroll to results
+        setTimeout(() => {
+          const el = document.getElementById("commercial-benefit-summary");
+          if (el) el.scrollIntoView({ behavior: "smooth" });
+        }, 300);
+
       onResultReady?.({ raw: data, final: adapted, inclusiveTotals: adapted.inclusiveTotals });
       toast.success('Commercial Benefit optimization complete.');
     })
@@ -331,7 +356,6 @@ export default function CommercialBenefitSetup({
                       <span style={{ ...styles.label, minWidth: 90 }}>Prime Time:</span>
                       <input
                         type="number"
-                        step="0.01"
                         value={toNum(splits.prime ?? primePct)}
                         onChange={e => handleChannelSplitChange(ch, 'prime', e.target.value)}
                         style={{ ...styles.numberInput, width: 70, borderColor: hasErr ? '#e53e3e' : '#e2e8f0' }}
@@ -344,7 +368,6 @@ export default function CommercialBenefitSetup({
                       <span style={{ ...styles.label, minWidth: 90 }}>Non-Prime:</span>
                       <input
                         type="number"
-                        step="0.01"
                         value={toNum(splits.nonprime ?? nonPrimePct)}
                         onChange={e => handleChannelSplitChange(ch, 'nonprime', e.target.value)}
                         style={{ ...styles.numberInput, width: 70, borderColor: hasErr ? '#e53e3e' : '#e2e8f0' }}
@@ -373,7 +396,6 @@ export default function CommercialBenefitSetup({
                           <span style={{ ...styles.label, minWidth: 120 }}>{slotLabels[slot]}:</span>
                           <input
                             type="number"
-                            step="0.01"
                             value={pct}
                             onChange={e => handleChannelSplitChange(ch, slot, e.target.value)}
                             style={{ ...styles.numberInput, width: 70, borderColor: hasErr ? '#e53e3e' : '#e2e8f0' }}
@@ -410,12 +432,12 @@ export default function CommercialBenefitSetup({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <label style={{ minWidth: 250, fontWeight: 500, color: '#2d3748' }}>Prime Time % (global default):</label>
-              <input type="number" step="0.01" value={primePct} onChange={e => setPrimePct(parseFloat(e.target.value))} style={styles.numberInput} />
+              <input type="number" value={primePct} onChange={e => setPrimePct(parseFloat(e.target.value))} style={styles.numberInput} />
               <span style={styles.percentSymbol}>%</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <label style={{ minWidth: 250, fontWeight: 500, color: '#2d3748' }}>Non-Prime Time % (global default):</label>
-              <input type="number" step="0.01" value={nonPrimePct} onChange={e => setNonPrimePct(parseFloat(e.target.value))} style={styles.numberInput} />
+              <input type="number" value={nonPrimePct} onChange={e => setNonPrimePct(parseFloat(e.target.value))} style={styles.numberInput} />
               <span style={styles.percentSymbol}>%</span>
             </div>
             <button type="button" onClick={applyGlobalToAllChannels} style={{ marginTop: 8, padding: '6px 10px', border: '1px solid #cbd5e0', background: '#edf2f7', borderRadius: 6, cursor: 'pointer' }}>
@@ -448,7 +470,6 @@ export default function CommercialBenefitSetup({
                 <label style={{ ...styles.label, minWidth: 110 }}>Commercial {idx + 1}:</label>
                 <input
                   type="number"
-                  step="0.01"
                   value={val}
                   onChange={e => handleBudgetProportionChange(idx, e.target.value)}
                   style={styles.smallInput}
@@ -496,7 +517,8 @@ export default function CommercialBenefitSetup({
         <CommercialBenefitResults
           result={result}
           onProceedToBonus={onProceedToBonus}   // 👈 pass from props
-          onHome={onHome}                       // 👈 pass from props
+          onHome={onHome}
+          onBack={onBack}                 // 👈 pass from props
           formatLKR={formatLKR}
         />
       </div>

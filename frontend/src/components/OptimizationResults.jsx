@@ -12,6 +12,7 @@ export default function OptimizationResults({
   channels,
   propertyPrograms,
   onProceedToBonus,
+  onBackToInputs,
   onHome,
   onExport,
   channelBaseBudgets,
@@ -58,106 +59,159 @@ export default function OptimizationResults({
     onProceedToBonus?.();
   };
 
-  const handleExportToExcel = () => {
-    if (!result || !result.df_result || result.df_result.length === 0) {
-      alert('No data to export.');
-      return;
-    }
+const handleExportToExcel = () => {
+  if (!result || !result.df_result || result.df_result.length === 0) {
+    alert('No data to export.');
+    return;
+  }
 
-    const workbook = XLSX.utils.book_new();
-    const desiredOrder = displayOrder;
+  const workbook = XLSX.utils.book_new();
+  const desiredOrder = [...displayOrder, "GRP"]; // 🔥 force GRP column
 
-    // Channel, Name of the program, Com name, Day, Time, Budget, NCost, Duration, TVR, NTVR, Spots, NGRP
-    const toNum = (v) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
+  const toNum = (v) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
 
-    const propertyRows = [];
-    (channels || []).forEach((ch) => {
-      const rows = (propertyPrograms?.[ch] || []);
-      rows.forEach((r) => {
-        // accept either camelCase or Title Case keys
-        const name      = r.programName ?? r['Name of the program'] ?? r.programName ?? r['Name of the program'] ?? '';
-        const comName   = r.comName ?? r['Com name'] ?? r.ComName ?? r['Com Name'] ?? '';
-        const day       = r.day ?? r.Day ?? '';
-        const time      = r.time ?? r.Time ?? '';
+  /* ---------------------------------------------------------
+      1) PROPERTY PROGRAMS SHEET
+  --------------------------------------------------------- */
+  const propertyRows = [];
+  (channels || []).forEach((ch) => {
+    const rows = propertyPrograms?.[ch] || [];
+    rows.forEach((r) => {
+      const name = r.programName ?? r["Name of the program"] ?? "";
+      const comName = r.comName ?? r["Com name"] ?? "";
+      const day = r.day ?? r.Day ?? "";
+      const time = r.time ?? r.Time ?? "";
 
-        const budget    = toNum(r.budget ?? r.Budget);
-        const duration  = toNum(r.duration ?? r.Duration);
-        const tvr       = toNum(r.tvr ?? r.TVR);
-        const spots     = parseInt(r.spots ?? r.Spots ?? 0, 10) || 0;
+      const budget = toNum(r.budget ?? r.Budget);
+      const duration = toNum(r.duration ?? r.Duration);
+      const tvr = toNum(r.tvr ?? r.TVR);
+      const spots = parseInt(r.spots ?? r.Spots ?? 0, 10) || 0;
 
-        const ntvrRaw   = r.ntvr ?? r.NTVR;
-        const ntvr      = ntvrRaw != null ? toNum(ntvrRaw) : (tvr / 30) * duration;
+      const ntvr =
+        r.ntvr ?? r.NTVR != null
+          ? toNum(r.ntvr ?? r.NTVR)
+          : (tvr / 30) * duration;
 
-        const ncostRaw  = r.ncost ?? r.NCost;
-        const ncost     = ncostRaw != null ? toNum(ncostRaw) : (spots > 0 ? budget / spots : 0);
+      const ncost =
+        r.ncost ?? r.NCost != null
+          ? toNum(r.ncost ?? r.NCost)
+          : spots > 0
+          ? budget / spots
+          : 0;
 
-        const ngrpRaw   = r.ngrp ?? r.NGRP;
-        const ngrp      = ngrpRaw != null ? toNum(ngrpRaw) : (ntvr * spots);
+      const ngrp =
+        r.ngrp ?? r.NGRP != null
+          ? toNum(r.ngrp ?? r.NGRP)
+          : ntvr * spots;
 
-        propertyRows.push({
-          Channel: ch,
-          'Name of the program': name,
-          'Com name': comName,
-          Day: day,
-          Time: time,
-          Budget: budget,
-          NCost: ncost,
-          Duration: duration,
-          TVR: tvr,
-          NTVR: ntvr,
-          Spots: spots,
-          NGRP: ngrp,
-        });
+      const grp = tvr * spots;
+
+      propertyRows.push({
+        Channel: ch,
+        "Name of the program": name,
+        "Com name": comName,
+        Day: day,
+        Time: time,
+        Budget: budget,
+        NCost: ncost,
+        Duration: duration,
+        TVR: tvr,
+        NTVR: ntvr,
+        Spots: spots,
+        GRP: grp,
+        NGRP: ngrp,
       });
     });
+  });
 
-    const wsProperty = XLSX.utils.json_to_sheet(propertyRows);
-    XLSX.utils.book_append_sheet(workbook, wsProperty, 'Property Programs');
+  const wsProperty = XLSX.utils.json_to_sheet(propertyRows);
+  XLSX.utils.book_append_sheet(workbook, wsProperty, "Property Programs");
 
-    // One sheet per commercial
-    (result.commercials_summary || []).forEach((c, idx) => {
-      const headerMap = { 'Total_Cost': 'Total Budget', 'Total_Rating': 'NGRP' };
-      const cleanedData = (c.details || []).map(row => {
-        const newRow = {};
-        desiredOrder.forEach(key => (newRow[headerMap[key] || key] = row[key]));
-        return newRow;
+  /* ---------------------------------------------------------
+      2) COMMERCIAL SHEETS — WITH GRP COLUMN
+  --------------------------------------------------------- */
+  (result.commercials_summary || []).forEach((c, idx) => {
+    const sheetRows = (c.details || []).map((row) => {
+      const newRow = {};
+
+      desiredOrder.forEach((key) => {
+        if (key === "GRP") {
+          newRow["GRP"] = (Number(row.Spots) * Number(row.TVR)).toFixed(2);
+        } else {
+          const headerMap = { Total_Cost: "Total Budget", Total_Rating: "NGRP" };
+          newRow[headerMap[key] || key] = row[key];
+        }
       });
-      const ws = XLSX.utils.json_to_sheet(cleanedData);
-      XLSX.utils.book_append_sheet(workbook, ws, `Commercial ${idx + 1}`);
+
+      return newRow;
     });
 
-    // Summary sheet
-    const summaryOrder_ex = [
-      'Channel','Total_Cost','% Cost','Total_Rating','% Rating',
-      'Prime Cost','Prime Cost %','Non-Prime Cost','Non-Prime Cost %','Prime Rating','Non-Prime Rating',
-    ];
-    const summaryHeaderMap = {
-      'Total_Cost': 'Total Budget',
-      '% Cost': 'Budget %',
-      'Total_Rating': 'NGRP',
-      '% Rating': 'NGRP %',
-      'Prime Cost': 'PT Budget',
-      'Non-Prime Cost': 'NPT Budget',
-      'Prime Rating': 'PT NGRP',
-      'Non-Prime Rating': 'NPT NGRP',
-      'Prime Cost %': 'PT Budget %',
-      'Non-Prime Cost %': 'NPT Budget %',
-    };
+    const ws = XLSX.utils.json_to_sheet(sheetRows);
+    XLSX.utils.book_append_sheet(workbook, ws, `Commercial ${idx + 1}`);
+  });
 
-    if (result.channel_summary && result.channel_summary.length > 0) {
-      const cleanedSummary = result.channel_summary.map(row => {
-        const newRow = {};
-        summaryOrder_ex.forEach(key => (newRow[summaryHeaderMap[key] || key] = row[key]));
-        return newRow;
-      });
-      const wsSummary = XLSX.utils.json_to_sheet(cleanedSummary);
-      XLSX.utils.book_append_sheet(workbook, wsSummary, 'Summary');
-    }
+  /* ---------------------------------------------------------
+      3) SUMMARY SHEET — INCLUDING GRP AND GRP %
+  --------------------------------------------------------- */
+  const summaryOrderEx = [
+    "Channel",
+    "Total_Cost",
+    "% Cost",
+    "GRP",         // 🔥 added
+    "GRP %",       // 🔥 added
+    "Total_Rating",
+    "% Rating",
+    "Prime Cost",
+    "Prime Cost %",
+    "Non-Prime Cost",
+    "Non-Prime Cost %",
+    "Prime Rating",
+    "Non-Prime Rating",
+  ];
 
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const fileData = new Blob([excelBuffer], { type: 'application/octet-stream' });
-    saveAs(fileData, 'optimized_schedule.xlsx');
+  const summaryHeaderMap = {
+    Total_Cost: "Total Budget",
+    "% Cost": "Budget %",
+    Total_Rating: "NGRP",
+    "% Rating": "NGRP %",
+    "Prime Cost": "PT Budget",
+    "Non-Prime Cost": "NPT Budget",
+    "Prime Rating": "PT NGRP",
+    "Non-Prime Rating": "NPT NGRP",
+    "Prime Cost %": "PT Budget %",
+    "Non-Prime Cost %": "NPT Budget %",
   };
+
+  const wsSummaryRows = [];
+
+  if (result.channel_summary && result.channel_summary.length > 0) {
+    result.channel_summary.forEach((row) => {
+      const newRow = {};
+
+      const channelGRP = grpByChannel[row.Channel] || 0;
+      const totalGRP = Object.values(grpByChannel).reduce((a, b) => a + b, 0);
+      const channelGRPpct = totalGRP > 0 ? (channelGRP / totalGRP) * 100 : 0;
+
+      summaryOrderEx.forEach((key) => {
+        if (key === "GRP") newRow["GRP"] = channelGRP.toFixed(2);
+        else if (key === "GRP %") newRow["GRP %"] = channelGRPpct.toFixed(2);
+        else newRow[summaryHeaderMap[key] || key] = row[key];
+      });
+
+      wsSummaryRows.push(newRow);
+    });
+  }
+
+  const wsSummary = XLSX.utils.json_to_sheet(wsSummaryRows);
+  XLSX.utils.book_append_sheet(workbook, wsSummary, "Summary");
+
+  /* ---------------------------------------------------------
+      4) FILE SAVE
+  --------------------------------------------------------- */
+  const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  const fileData = new Blob([excelBuffer], { type: "application/octet-stream" });
+  saveAs(fileData, "optimized_schedule.xlsx");
+};
 
     // ---- COMPUTE EXCLUSIVE GRP (without property) ----
     const totalGRP_excl = (result?.commercials_summary || [])
@@ -192,53 +246,24 @@ export default function OptimizationResults({
   return (
     <div id="optimization-summary" style={styles.container}>
       <div style={styles.resultContainer}>
-        <h3 style={styles.sectionTitle}>Final Optimization Result</h3>
+        <h3 style={styles.sectionTitle}>Spot Buying Optimization Result</h3>
 
         <div style={styles.summaryGrid}>
           <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>Optimized Budget (excl. Property)</h4>
+            <h4 style={styles.summaryTitle}>Optimized Budget</h4>
             <p style={styles.summaryValue}>{formatLKR(result.total_cost)}</p>
           </div>
           <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>NGRP (excl. Property)</h4>
-            <p style={styles.summaryValue}>{Number(result.total_rating).toFixed(2)}</p>
-          </div>
-          <div style={styles.summaryCard}>
-              <h4 style={styles.summaryTitle}>GRP (excl. Property)</h4>
+              <h4 style={styles.summaryTitle}>GRP</h4>
               <p style={styles.summaryValue}>{totalGRP_excl.toFixed(2)}</p>
           </div>
           <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>CPRP (excl. Property)</h4>
+            <h4 style={styles.summaryTitle}>NGRP</h4>
+            <p style={styles.summaryValue}>{Number(result.total_rating).toFixed(2)}</p>
+          </div>
+          <div style={styles.summaryCard}>
+            <h4 style={styles.summaryTitle}>CPRP</h4>
             <p style={styles.summaryValue}>{Number(result.cprp).toFixed(2)}</p>
-          </div>
-        </div>
-        {/* Existing summary cards (excl. property) remain unchanged */}
-
-        {/* New: inclusive totals (includes property) */}
-        <div style={styles.summaryGrid}>
-          <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>Total Budget (incl. Property)</h4>
-            <p style={styles.summaryValue}>
-              {formatLKR(inclusiveTotals?.totalBudgetIncl || result.total_cost)}
-            </p>
-          </div>
-
-          <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>NGRP (incl. Property)</h4>
-            <p style={styles.summaryValue}>
-              {Number(inclusiveTotals?.totalNGRPIncl || result.total_rating).toFixed(2)}
-            </p>
-          </div>
-          <div style={styles.summaryCard}>
-              <h4 style={styles.summaryTitle}>GRP (incl. Property)</h4>
-              <p style={styles.summaryValue}>{totalGRP_incl.toFixed(2)}</p>
-            </div>
-
-          <div style={styles.summaryCard}>
-            <h4 style={styles.summaryTitle}>CPRP (incl. Property)</h4>
-            <p style={styles.summaryValue}>
-              {Number(inclusiveTotals?.cprpIncl || result.cprp).toFixed(2)}
-            </p>
           </div>
         </div>
 
@@ -339,13 +364,17 @@ export default function OptimizationResults({
           </tbody>
         </table>
 
-        <button onClick={handleExportToExcel} style={styles.exportButton}>
-          Export Final Plan to Excel
+        <button
+          onClick={onBackToInputs}
+          style={styles.backHomeButton}
+        >
+          Go Back
         </button>
 
-        <button onClick={onHome} style={styles.backHomeButton}>
-          Go Back to Home
+        <button onClick={handleExportToExcel} style={styles.exportButton}>
+          Export Plan to Excel
         </button>
+
         <button
           type="button"
           onClick={handleProceedToBonus}

@@ -18,12 +18,17 @@ export default function FinalPlan({
     `LKR ${Number(v ?? 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`,
   formatLKR_1 = (v) =>
     `${Number(v ?? 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`,
+  selectedTG = "", // ADD THIS
+  optimizationInput,
   onHome,
 }) {
   // ---- Normalize inputs (support both prop name styles) ----
   const mainResults = _mainResults || basePlanResult || {};
   const bonusResults = _bonusResults || bonusResult || {};
   const benefitResults = _benefitResults || {};
+  const commercialDurations = optimizationInput?.durations || {};
+
+
 
       useEffect(() => {
       console.log("🚀 FinalPlan props check");
@@ -68,6 +73,25 @@ export default function FinalPlan({
     const monthName = (mm) => {
       return new Date(2000, parseInt(mm)-1).toLocaleString("en-US", { month: "short" });
     };
+
+    // In FinalPlan.jsx - add this near the top with other helpers
+    const TG_MAPPING = {
+      "tvr_all": "All TG",
+      "tvr_abc_15_90": "SEC ABC | Age 15-90",
+      "tvr_abc_30_60": "SEC ABC | Age 30-60",
+      "tvr_abc_15_30": "SEC ABC | Age 15-30",
+      "tvr_abc_20_plus": "SEC ABC | Age 20+",
+      "tvr_ab_15_plus": "SEC AB | Age 15+",
+      "tvr_cd_15_plus": "SEC CD | Age 15+",
+      "tvr_ab_female_15_45": "SEC AB | Female Age 15-45",
+      "tvr_abc_15_60": "SEC ABC | Age 15-60",
+      "tvr_bcde_15_plus": "SEC BCDE | Age 15+",
+      "tvr_abcde_15_plus": "SEC ABCDE | Age 15+",
+      "tvr_abc_female_15_60": "SEC ABC | Female Age 15-60",
+      "tvr_abc_male_15_60": "SEC ABC | Male Age 15-60"
+    };
+
+    const getTGLabel = (tgKey) => TG_MAPPING[tgKey] || tgKey || 'Not specified';
 
   // ---------- Tables ----------
   // Main tables from optimization results
@@ -210,6 +234,14 @@ export default function FinalPlan({
             NTVR: ntvr,
             Spots: spots,
             NGRP: ngrp,
+            Language: r.language ?? r.Language ?? "",
+            PTNPT: r.pt_npt ?? r.ptnpt ?? r['PT / NPT'] ?? "",
+              // ⭐ NEW FIELDS YOU ADDED IN PROPERTY EDITOR ⭐
+              RateCardCost: toNum(r.rateCardCost ?? r.RateCardCost ?? 0),
+              RateCardTotal: toNum(r.rateCardTotal ?? r.RateCardTotal ?? 0),
+              TotalBudget: toNum(r.totalBudget ?? r.TotalBudget ?? budget), // same as On Cost
+              TotalSaving: toNum(r.totalSaving ?? r.TotalSaving ?? 0),
+              CPRP: toNum(r.cprp ?? r.CPRP ?? (ngrp > 0 ? budget / ngrp : 0)),
           });
         });
       });
@@ -382,6 +414,7 @@ export default function FinalPlan({
     return m;
   }, [bonusByChannel]);
 
+
   const channelSummaryInclBonus = useMemo(() => {
     const rows = (mainByChannel || []).map((r) => {
       const ch = toStr(r.Channel);
@@ -446,14 +479,33 @@ export default function FinalPlan({
       }, 0);
     }, [mainByProgram]);
 
-    // Property GRP
-    const propertyGRPTotal = useMemo(() => {
-      return (flatPropertyPrograms || []).reduce((a, r) => {
-        const tvr = num(r.TVR ?? 0);
-        const spots = num(r.Spots ?? 0);
-        return a + tvr * spots;
-      }, 0);
-    }, [flatPropertyPrograms]);
+
+// Property GRP = Manual Property GRP + Benefit GRP
+const propertyGRPTotal = useMemo(() => {
+  const manualGRP = (flatPropertyPrograms || []).reduce((a, r) => {
+    const tvr = num(r.TVR ?? 0);
+    const spots = num(r.Spots ?? 0);
+    return a + tvr * spots;
+  }, 0);
+
+  const benefitGRP = Object.values(benefitCommercialData || {}).reduce(
+    (sum, com) => {
+      const programs = com.programs || [];
+      return (
+        sum +
+        programs.reduce((x, p) => {
+          const tvr = num(p.TVR ?? p.NTVR ?? 0);
+          const spots = num(p.Spots ?? 0);
+          return x + tvr * spots;
+        }, 0)
+      );
+    },
+    0
+  );
+
+  return manualGRP + benefitGRP;
+}, [flatPropertyPrograms, benefitCommercialData]);
+
 
     // Bonus GRP
     const bonusGRP = useMemo(() => {
@@ -544,9 +596,19 @@ export default function FinalPlan({
           .filter(r => toStr(r.Channel) === ch)
           .reduce((a, r) => a + num(r.TVR ?? 0) * num(r.Spots ?? 0), 0);
 
-        const grpProperty = (flatPropertyPrograms || [])
+        // Manual Property GRP
+        const grpProperty_manual = (flatPropertyPrograms || [])
           .filter(r => toStr(r.Channel) === ch)
           .reduce((a, r) => a + num(r.TVR ?? 0) * num(r.Spots ?? 0), 0);
+
+        // Benefit GRP for this channel
+        const grpProperty_benefit = Object.values(benefitCommercialData || {})
+          .flatMap(com => com.programs || [])
+          .filter(p => toStr(p.Channel) === ch)
+          .reduce((a, p) => a + num(p.TVR ?? p.NTVR ?? 0) * num(p.Spots ?? 0), 0);
+
+        // Combined Property GRP (manual + benefit)
+        const grpProperty = grpProperty_manual + grpProperty_benefit;
 
         const grpBonus = (bonusByProgram || [])
           .filter(r => toStr(r.Channel) === ch)
@@ -564,7 +626,10 @@ export default function FinalPlan({
           NGRP_Property: ngrpProp,
           NGRP_Bonus: ngrpBonus,
           NGRP_Total: ngrpTotal,
-          GRP_Total: grpTotal,        // ✅ NEW FIELD
+          GRP_Spot: grpSpot,
+          GRP_Property: grpProperty,
+          GRP_Bonus: grpBonus,
+          GRP_Total: grpTotal,
           CPRP_LKR: cprp,
         };
       });
@@ -679,7 +744,29 @@ export default function FinalPlan({
     ]);
 
     // ---------- Export ----------
-    const handleExport = async () => {
+    const handleExport = async (useFormulas = false) => {
+
+    const removeGridlines = (ws) => {
+      const MAX_ROWS = 300;   // safe full-page fill
+      const MAX_COLS = 50;    // up to column AX
+
+      for (let r = 1; r <= MAX_ROWS; r++) {
+        const row = ws.getRow(r);
+        for (let c = 1; c <= MAX_COLS; c++) {
+          const cell = row.getCell(c);
+
+          // only set white background if cell doesn't already have fill
+          if (!cell.fill) {
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFFFFF' }
+            };
+          }
+        }
+      }
+    };
+
       const workbook = new ExcelJS.Workbook();
 
       // ---------- Build KPI sheet ----------
@@ -695,23 +782,74 @@ export default function FinalPlan({
         : 0;
 
       const kpiRows = [
-        { Metric: 'Total Budget (incl. Property)', Value: budgetInclProperty },
+        { Metric: 'Total Budget', Value: budgetInclProperty },
         { Metric: 'Spot Buying GRP', Value: mainSpotGRP },
         { Metric: 'Property GRP', Value: propertyGRPTotal },
         { Metric: 'Bonus GRP', Value: bonusGRP },
-        { Metric: 'Total GRP (incl. Property + Bonus)', Value: totalGRP_InclPropertyBonus },
-        { Metric: 'NGRP (Spot Buying)', Value: mainSpotNGRP },
-        { Metric: 'NGRP (Property)', Value: propertyNGRP_InclBenefit },
+        { Metric: 'Total GRP', Value: totalGRP_InclPropertyBonus },
+        { Metric: 'Spot Buying NGRP', Value: mainSpotNGRP },
+        { Metric: 'Property NGRP ', Value: propertyNGRP_InclBenefit },
         { Metric: 'Bonus NGRP', Value: bonusNGRP },
-        { Metric: 'Total NGRP (incl. Property + Bonus)', Value: totalNGRP_InclPropertyBonus },
-        { Metric: 'CPRP (incl. Property + Bonus)', Value: cprp_InclPropertyBonus },
+        { Metric: 'Total NGRP', Value: totalNGRP_InclPropertyBonus },
+        { Metric: 'CPRP', Value: cprp_InclPropertyBonus },
       ];
 
-      const kpiSheet = workbook.addWorksheet('Final KPIs');
-      kpiSheet.addRow(['Metric', 'Value']);
-      kpiRows.forEach(row => {
-        kpiSheet.addRow([row.Metric, row.Value]);
-      });
+        const kpiSheet = workbook.addWorksheet('Final KPIs');
+
+
+        // --- Add header ---
+        const header = kpiSheet.addRow(['KPI', 'Value']);
+
+        // --- Header styling (Light Excel Green + bold) ---
+        header.eachCell((cell) => {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'C6EFCE' }   // light Excel green
+          };
+          cell.font = { bold: true };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' },
+          };
+        });
+
+        // --- Add KPI rows ---
+        kpiRows.forEach((row) => {
+          const r = kpiSheet.addRow([row.Metric, row.Value]);
+
+          r.height = 20;
+
+          r.eachCell((cell) => {
+            cell.alignment = {
+              wrapText: true,
+              vertical: 'middle'
+            };
+            cell.border = {
+              top: { style: 'thin' },
+              left: { style: 'thin' },
+              bottom: { style: 'thin' },
+              right: { style: 'thin' },
+            };
+          });
+        });
+
+
+
+        removeGridlines(kpiSheet);
+        // --- Auto-fit Metric column width ---
+        let maxMetricLen = 0;
+        kpiRows.forEach((r) => {
+          if (r.Metric.length > maxMetricLen) maxMetricLen = r.Metric.length;
+        });
+
+        kpiSheet.getColumn(1).width = Math.min(Math.max(maxMetricLen * 1.2, 20), 50);
+
+        // Value column width
+        kpiSheet.getColumn(2).width = 20;
 
       // ---------- Channel list ----------
       const channelSet = new Set([
@@ -722,15 +860,48 @@ export default function FinalPlan({
       const channelList = Array.from(channelSet).sort((a, b) => a.localeCompare(b));
 
       // ---------- Headers ----------
-      const propertyHeaders = [
-        'Name of the program','Com name','Day','Time',
-        'Budget (LKR)','NCost (LKR)','Duration','TVR','NTVR','Spots','GRP','NGRP'
-      ];
-      const progHeaders = [
-        'Program','Day','Time','PT [A] / NPT [B]',
-        'Cost (LKR)','TVR','NCost (LKR)','NTVR',
-        'Total Budget (LKR)','GRP','NGRP','Spots'
-      ];
+    const propertyHeaders = [
+      'Program',
+      'Commercial name',
+      'Duration',
+      'Language',
+      'Day',
+      'Time',
+      'A - PT/B - NPT',
+      'Rate Card Value',
+      'Negotiated Value',
+      'Rate Card Total',
+      'Total Budget',
+      'Total Saving',
+      'TVR',
+      'NTVR',
+      'GRP',
+      'NGRP',
+      'CPRP',
+      'Spots'
+    ];
+
+    const progHeaders = [
+      'Program',
+      'Com name',
+      'Duration',
+      'Language',
+      'Day',
+      'Time',
+      'PT [A] / NPT [B]',
+      'Nrate',
+      'NCost (LKR)',
+      'Rate Card Total (LKR)',
+      'Total Budget (LKR)',
+      'Total Saving (LKR)',
+      'TVR',
+      'NTVR',
+      'GRP',
+      'NGRP',
+      'CPRP',
+      'Spots'
+    ];
+
 
       // Merge helper for export (always merge benefit into main)
       const mergeProgramsForExport = (mainRows, benefitRows) => {
@@ -794,14 +965,52 @@ export default function FinalPlan({
         const sheetTitle = `Channel - ${ch}`.substring(0, 31); // Excel sheet name limit
         const worksheet = workbook.addWorksheet(sheetTitle);
 
-        // SECTION 1: Header Info
-        worksheet.addRow(["", `Client Name: ${clientName}`]);
-        worksheet.addRow(["", `Brand Name: ${brandName}`]);
-        worksheet.addRow(["", `Ref No: ${refNo}`]);
-        worksheet.addRow([]);
+            // ====================== TOP DETAIL SECTION (Start from Column B) ======================
+            const topRows = [
+              ["", "Client :", clientName],
+              ["", "Activity :", activity],
+              ["", "Brand :", brandName],
+              ["", "Campaign :", campaign],
+              ["", "Target Group :", getTGLabel(selectedTG)],
+              ["", "TV Budget :", tvBudget ? Number(tvBudget) : ""],
+              ["", "Duration :", durationName],
+              ["", "Activation Period :", `${fromDate}  to  ${toDate}`],
+              ["", "Ref No :", refNo],
+            ];
+
+            topRows.forEach((r) => worksheet.addRow(r));
+            worksheet.addRow([]); // spacer row
+
+            // ---------------------- Styling ----------------------
+            for (let i = 1; i <= worksheet.rowCount; i++) {
+              const row = worksheet.getRow(i);
+              const colB = row.getCell(2); // Label
+              const colC = row.getCell(3); // Value
+
+              // Stop at spacer row
+              if (!colB.value) break;
+
+              // LABELS (Column B) — bold + right aligned
+              colB.font = { bold: false };
+              colB.alignment = {
+                horizontal: 'right',
+                vertical: 'middle'
+              };
+
+              // VALUES (Column C) — bold + right aligned
+              colC.font = { bold: true };
+              colC.alignment = {
+                vertical: 'middle'
+              };
+            }
+
+            // Column width optimization
+            worksheet.getColumn(1).width = 2;   // empty spacer
+            worksheet.getColumn(2).width =50;//abel column
+            worksheet.getColumn(3).width = 50;  // value column
 
         // ================== DATE RANGE ROW ===================
-        // Build date list
+        // Build date listno
         const dateList = [];
         let d = new Date(fromDate);
         const endDate = new Date(toDate);
@@ -810,7 +1019,7 @@ export default function FinalPlan({
           d.setDate(d.getDate() + 1);
         }
 
-        const OFFSET = 12;
+        const OFFSET = propertyHeaders.length;
         const empty = Array(OFFSET).fill("");
 
         // --- 3 header rows ---
@@ -843,6 +1052,7 @@ export default function FinalPlan({
         const r1 = worksheet.addRow(rowMonth);
         const r2 = worksheet.addRow(rowDay);
         const r3 = worksheet.addRow(rowDate);
+
 
         // === COLOR ONLY DATE HEADER CELLS (ASH COLOR) ===
         const ashColor = 'D9D9D9';
@@ -947,15 +1157,7 @@ export default function FinalPlan({
         // Capture the 3rd row index (for later weekend shading)
         const DATE_HEADER_END_ROW = r3.number;
 
-        // Property Benefits Section
-        const propHeaderRow = worksheet.addRow([`Property Benefits`]);
-
-        propHeaderRow.getCell(1).fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FABF8F' }  //
-        };
-        // Property Header Row (ASH COLORED)
+                // Property Header Row (ASH COLORED)
         const headerRow = worksheet.addRow(propertyHeaders);
 
         headerRow.eachCell((cell) => {
@@ -967,31 +1169,108 @@ export default function FinalPlan({
           cell.font = { bold: true };
         });
 
+// Property Benefits Section
+        const propHeaderRow = worksheet.addRow([`Property Benefits`]);
+
+        propHeaderRow.getCell(1).fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FABF8F' }
+        };
+
+
         const propRows = (flatPropertyPrograms || []).filter(r => toStr(r.Channel) === ch);
+
         if (propRows.length > 0) {
           propRows.forEach(r => {
-            worksheet.addRow([
-              toStr(r['Name of the program']),
-              toStr(r['Com name']),
-              toStr(r.Day),
-              toStr(r.Time),
-              Number(num(r.Budget)),
-              Number(num(r.NCost)),
-              Number(num(r.Duration)),
-              Number(num(r.TVR)),
-              Number(num(r.NTVR)),
-              Number(num(r.Spots)),
-              Number(num(r.TVR) * num(r.Spots)),   // GRP
-              Number(num(r.NGRP)),                 // NGRP
-            ]);
+            // Calculate basic values needed for both Value and Formula modes
+            const rateCardCost = num(r.RateCardCost);
+            const budget = num(r.Budget);
+            const spots = num(r.Spots);
+            const tvr = num(r.TVR);
+            const ntvr = num(r.NTVR);
+
+            // 1. Prepare the first 9 columns (Static Data)
+            // Columns A to I
+            const rowData = [
+              toStr(r['Name of the program']), // A
+              toStr(r['Com name']),            // B
+              Number(num(r.Duration)),         // C
+              toStr(r.Language ?? ""),         // D
+              toStr(r.Day),                    // E
+              toStr(r.Time),                   // F
+              toStr(r.PTNPT ?? ""),            // G
+              Number(rateCardCost),            // H (Rate Card Cost)
+              0,                               // I (Negotiated Value)
+            ];
+
+            if (useFormulas) {
+              // --- FORMULA MODE ---
+              // Determine the Row Index this new row will occupy
+              const idx = worksheet.rowCount + 1;
+
+              rowData.push(
+                // Col J: Rate Card Total = RateCardCost(H) * Spots(R)
+                { formula: `H${idx}*R${idx}` },
+
+                // Col K: Total Budget (Static Input for Property)
+                Number(budget),
+
+                // Col L: Total Saving = RateCardTotal(J) - TotalBudget(K)
+                { formula: `J${idx}-K${idx}` },
+
+                // Col M: TVR (Static Value)
+                Number(tvr),
+
+                // Col N: NTVR (Static Value)
+                Number(ntvr),
+
+                // Col O: GRP = TVR(M) * Spots(R)
+                { formula: `M${idx}*R${idx}` },
+
+                // Col P: NGRP = NTVR(N) * Spots(R)
+                { formula: `N${idx}*R${idx}` },
+
+                // Col Q: CPRP = TotalBudget(K) / NGRP(P)
+                // Wrapped in IFERROR to handle division by zero
+                { formula: `IFERROR(K${idx}/P${idx}, 0)` },
+
+                // Col R: Spots (Static Value)
+                Number(spots)
+              );
+            } else {
+              // --- VALUE MODE (Existing Logic) ---
+              const rateCardTotal = rateCardCost * spots;
+              const totalSaving = rateCardTotal - budget;
+              const grp = tvr * spots;
+              const ngrp = num(r.NGRP); // or ntvr * spots
+              const cprp = num(r.CPRP);
+
+              rowData.push(
+                Number(rateCardTotal), // J
+                Number(budget),        // K
+                Number(totalSaving),   // L
+                Number(tvr),           // M
+                Number(ntvr),          // N
+                Number(grp),           // O
+                Number(ngrp),          // P
+                Number(cprp),          // Q
+                Number(spots)          // R
+              );
+            }
+
+            worksheet.addRow(rowData);
           });
         } else {
           worksheet.addRow(['(No property rows)']);
         }
+
+
         const commercialHeaderRows = [];
         // SECTION: Commercial Programs (Main + Benefit merged)
         let headerAdded = false;
         (allCommercialKeys || []).forEach((commercialKey, idx) => {
+         const commDuration = num(commercialDurations[commercialKey] || 0);
           const mainPrograms = (mainCommercialData?.[commercialKey]?.programs || [])
             .filter(r => toStr(r.Channel) === ch);
           const benefitPrograms = (benefitCommercialData?.[commercialKey]?.programs || [])
@@ -1001,49 +1280,102 @@ export default function FinalPlan({
 
           worksheet.addRow([]);
 
-            if (!headerAdded) {
-              const progHeaderRow = worksheet.addRow(progHeaders);
-
-              // ASH color for each header cell
-              progHeaderRow.eachCell((cell) => {
-                cell.fill = {
-                  type: 'pattern',
-                  pattern: 'solid',
-                  fgColor: { argb: 'D9D9D9' } // ASH
-                };
-                cell.font = { bold: true };
-              });
-
-              headerAdded = true;
-            }
-
           const customName = commercialNames[commercialKey] || `Commercial ${idx + 1}`;
             const commercialHeaderRow = worksheet.addRow([`${customName}`]);
             const commercialHeaderRowIndex = commercialHeaderRow.number;
             commercialHeaderRows.push(commercialHeaderRowIndex);
 
 
-          if (mergedPrograms.length > 0) {
-            mergedPrograms.forEach(r => {
-              worksheet.addRow([
-                toStr(r.Program),
-                toStr(r.Day ?? r.Date ?? ''),
-                toStr(r.Time ?? ''),
-                toStr(r.Slot ?? 'A'),
-                Number(num(r.Cost ?? r.NCost)),
-                Number(num(r.TVR ?? r.NTVR)),
-                Number(num(r.NCost ?? 0)),
-                Number(num(r.NTVR ?? 0)),
-                Number(num(r.Total_Cost ?? 0)),
-                Number(num(r.TVR ?? r.NTVR) * num(r.Spots)), // GRP
-                Number(num(r.Total_Rating ?? r.Total_NTVR ?? 0)), // NGRP
-                Number(num(r.Spots ?? 0)),
-              ]);
-            });
-          } else {
-            worksheet.addRow(['(No program rows for this commercial)']);
-          }
-        });
+    // In the commercial section where you add program rows, replace this part:
+    if (mergedPrograms.length > 0) {
+      mergedPrograms.forEach(r => {
+        // --- base values ---
+        const program   = toStr(r.Program);
+        const day       = toStr(r.Day ?? r.Date ?? '');
+        const time      = toStr(r.Time ?? '');
+        const slot      = toStr(r.Slot ?? 'A');
+
+        const cost      = num(r.Cost ?? r.NCost ?? r.Total_Cost ?? 0);      // Cost (LKR)
+        const ncost     = num(r.NCost ?? r.Cost ?? 0);                       // NCost (LKR)
+        const tvr       = num(r.TVR ?? r.NTVR ?? 0);                         // TVR
+        const ntvr      = num(r.NTVR ?? r.TVR ?? 0);                         // NTVR
+        const spots     = num(r.Spots ?? 0);                                 // Spots
+
+        const totalBudget   = num(r.Total_Cost ?? 0);                        // Total Budget (LKR)
+        const ngrp          = num(r.Total_Rating ?? r.Total_NTVR ?? 0);      // NGRP
+        const cprp          = ngrp > 0 ? totalBudget / ngrp : 0;             // CPRP
+
+        // Duration: from optimization results (per-row) or 0 if missing
+        const duration      = commDuration;            // seconds
+
+        // Nrate = Cost (LKR) / 30 * Duration
+        const nrate = (cost / 30) * commDuration;
+
+        // Rate Card Total = Nrate * Spots
+        const rateCardTotal = nrate * spots;
+
+        // Total Saving = Rate Card Total - Total Budget
+        const totalSaving   = rateCardTotal - totalBudget;
+
+        // Commercial name + language from dialog
+        const comName       = commercialNames[commercialKey] || `Commercial ${idx + 1}`;
+        const lang          = commercialLanguages[commercialKey] || "";
+
+        const rowData = [
+          // Program
+          program,
+          // Com name
+          comName,
+          // Duration
+          Number(duration),
+          // Language
+          lang,
+          // Day
+          day,
+          // Time
+          time,
+          // PT / NPT
+          slot,
+          // Nrate
+          Number(nrate),
+          // NCost (LKR)
+          Number(ncost),
+        ];
+
+        if (useFormulas) {
+          // For formulas export, add formulas instead of calculated values
+          rowData.push(
+            { formula: `H${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // Rate Card Total (LKR) - Column J
+            { formula: `I${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // Total Budget (LKR) - This is the correction!
+            { formula: `J${worksheet.rowCount + 1}-K${worksheet.rowCount + 1}` }, // Total Saving (LKR)
+            Number(tvr), // TVR - Keep as value
+            Number(ntvr), // NTVR - Keep as value
+            { formula: `M${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // GRP
+            { formula: `N${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // NGRP
+            { formula: `K${worksheet.rowCount + 1}/P${worksheet.rowCount + 1}` }, // CPRP
+            Number(spots) // Spots - Keep as value
+          );
+        } else {
+          // For normal export, use calculated values
+          rowData.push(
+            Number(rateCardTotal), // Rate Card Total (LKR)
+            Number(totalBudget),   // Total Budget (LKR)
+            Number(totalSaving),   // Total Saving (LKR)
+            Number(tvr),           // TVR
+            Number(ntvr),          // NTVR
+            Number(tvr * spots),   // GRP
+            Number(ngrp),          // NGRP
+            Number(cprp),          // CPRP
+            Number(spots)          // Spots
+          );
+        }
+
+        worksheet.addRow(rowData);
+      });
+    }
+    });
+
+
 
         // FINAL SECTION: Bonus Programs
         const bonusRows = (bonusByProgram || []).filter(r => toStr(r.Channel) === ch);
@@ -1056,66 +1388,326 @@ export default function FinalPlan({
           fgColor: { argb: 'FABF8F' }  //
         };
 
+        // In the bonus section, replace the row creation with:
         if (bonusRows.length > 0) {
           bonusRows.forEach(r => {
-            worksheet.addRow([
-              toStr(r.Program),
-              toStr(r.Day ?? r.Date ?? ''),
-              toStr(r.Time ?? ''),
-              'B',
-              Number(num(r.Cost ?? r.NCost)),
-              Number(num(r.TVR ?? r.NTVR)),
-              Number(num(r.NCost ?? 0)),
-              Number(num(r.NTVR ?? 0)),
-              Number(num(r.Total_Cost ?? 0)),
-              Number(num(r.TVR ?? r.NTVR) * num(r.Spots)),
-              Number(num(r.Total_Rating ?? r.Total_NTVR ?? 0)),
-              Number(num(r.Spots ?? 0)),
-            ]);
+            // --- Identify commercial key from the row ---
+            const bonusCommercialKey = normalizeCommercial(
+              r.Commercial ?? r.comName ?? r['Com name'] ?? r['Com Name'] ?? r.ComName ?? 'COM_1',
+              { zeroBasedNumeric: false }
+            );
+
+            // --- Commercial details from dialog ---
+            const comName = commercialNames[bonusCommercialKey] || bonusCommercialKey;
+            const lang    = commercialLanguages[bonusCommercialKey] || "";
+
+            // --- base values ---
+            const program   = toStr(r.Program);
+            const day       = toStr(r.Day ?? r.Date ?? '');
+            const time      = toStr(r.Time ?? '');
+            const slot      = 'B';
+
+            const cost      = num(r.Cost ?? r.NCost ?? r.Total_Cost ?? 0);
+            const ncost       = 0;
+            const tvr       = num(r.TVR ?? r.NTVR ?? 0);
+            const ntvr      = num(r.NTVR ?? r.TVR ?? 0);
+            const spots     = num(r.Spots ?? 0);
+
+            const totalBudget = 0;
+            const ngrp          = num(r.Total_Rating ?? r.Total_NTVR ?? 0);
+            const cprp          = ngrp > 0 ? totalBudget / ngrp : 0;
+
+            const duration      = num(r.Duration ?? r.duration ?? 0);
+
+            // New fields
+            const nrate         = (cost / 30) * duration;
+            const rateCardTotal = nrate * spots;
+            const totalSaving   = rateCardTotal - totalBudget;
+
+            const rowData = [
+              program,
+              comName,
+              Number(duration),
+              lang,
+              day,
+              time,
+              slot,
+              Number(nrate),
+              Number(ncost),
+            ];
+
+            // Add the formula columns based on exportWithFormulas flag
+            if (useFormulas) {
+              rowData.push(
+                { formula: `H${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // Rate Card Total (LKR)
+                Number(totalBudget), // Total Budget (LKR)
+                { formula: `J${worksheet.rowCount + 1}-K${worksheet.rowCount + 1}` }, // Total Saving (LKR)
+                Number(tvr), // TVR
+                Number(ntvr), // NTVR
+                { formula: `M${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // GRP
+                { formula: `N${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // NGRP
+                { formula: `K${worksheet.rowCount + 1}/P${worksheet.rowCount + 1}` }, // CPRP
+                Number(spots) // Spots
+              );
+            } else {
+              rowData.push(
+                Number(rateCardTotal), // Rate Card Total (LKR)
+                Number(totalBudget),   // Total Budget (LKR)
+                Number(totalSaving),   // Total Saving (LKR)
+                Number(tvr),           // TVR
+                Number(ntvr),          // NTVR
+                Number(tvr * spots),   // GRP
+                Number(ngrp),          // NGRP
+                Number(cprp),          // CPRP
+                Number(spots)          // Spots
+              );
+            }
+
+            worksheet.addRow(rowData);
           });
+        }
+
+        // ============ ADD THIS RIGHT HERE ============
+  // ============ ADD THIS RIGHT HERE (UPDATED) ============
+        // ---------- CALCULATE TOTALS FOR TOTAL ROW ----------
+        const totalRowData = {
+          rateCardValue: 0,
+          rateCardTotal: 0,
+          totalBudget: 0,
+          totalSaving: 0,
+          grp: 0,
+          ngrp: 0,
+          spots: 0
+        };
+
+        // ... (Keep your existing loop logic to calculate totalRowData values for fallback) ...
+        // Property section
+        propRows.forEach(r => {
+          const rateCardValue = num(r.RateCardCost);
+          const spots = num(r.Spots);
+          const rateCardTotal = rateCardValue * spots;
+          const totalBudget = num(r.Budget);
+
+          totalRowData.rateCardValue += rateCardValue;
+          totalRowData.rateCardTotal += rateCardTotal;
+          totalRowData.totalBudget += totalBudget;
+          totalRowData.totalSaving += (rateCardTotal - totalBudget);
+          totalRowData.grp += num(r.TVR) * spots;
+          totalRowData.ngrp += num(r.NGRP);
+          totalRowData.spots += spots;
+        });
+
+        // Commercial sections (Main + Benefit)
+        allCommercialKeys.forEach((commercialKey) => {
+          const mainPrograms = (mainCommercialData?.[commercialKey]?.programs || []).filter(r => toStr(r.Channel) === ch);
+          const benefitPrograms = (benefitCommercialData?.[commercialKey]?.programs || []).filter(r => toStr(r.Channel) === ch);
+          const mergedPrograms = mergeProgramsForExport(mainPrograms, benefitPrograms);
+
+          mergedPrograms.forEach(r => {
+             const cost = num(r.Cost ?? r.NCost ?? r.Total_Cost ?? 0);
+             const duration = commercialDurations[commercialKey] || 0;
+             const spots = num(r.Spots ?? 0);
+             const nrate = (cost / 30) * duration;
+             const rateCardTotal = nrate * spots;
+             const totalBudget = num(r.Total_Cost ?? 0);
+             const ngrp = num(r.Total_Rating ?? r.Total_NTVR ?? 0);
+             const tvr = num(r.TVR ?? r.NTVR ?? 0);
+
+             totalRowData.rateCardValue += nrate;
+             totalRowData.rateCardTotal += rateCardTotal;
+             totalRowData.totalBudget += totalBudget;
+             totalRowData.totalSaving += (rateCardTotal - totalBudget);
+             totalRowData.grp += tvr * spots;
+             totalRowData.ngrp += ngrp;
+             totalRowData.spots += spots;
+          });
+        });
+
+        // Bonus section
+        bonusRows.forEach(r => {
+          const cost = num(r.Cost ?? r.NCost ?? r.Total_Cost ?? 0);
+          const duration = num(r.Duration ?? r.duration ?? 0);
+          const spots = num(r.Spots ?? 0);
+          const nrate = (cost / 30) * duration;
+          const rateCardTotal = nrate * spots;
+          const totalBudget = 0;
+          const ngrp = num(r.Total_Rating ?? r.Total_NTVR ?? 0);
+          const tvr = num(r.TVR ?? r.NTVR ?? 0);
+
+          totalRowData.rateCardValue += nrate;
+          totalRowData.rateCardTotal += rateCardTotal;
+          totalRowData.totalBudget += totalBudget;
+          totalRowData.totalSaving += (rateCardTotal - totalBudget);
+          totalRowData.grp += tvr * spots;
+          totalRowData.ngrp += ngrp;
+          totalRowData.spots += spots;
+        });
+
+        // Calculate CPRP (JS Calculation Fallback)
+        const cprp = totalRowData.ngrp > 0 ? totalRowData.totalBudget / totalRowData.ngrp : 0;
+
+
+        // --- NEW FORMULA LOGIC STARTS HERE ---
+
+        // 1. Determine the data range
+        // The header is at `propHeaderRow.number`. Data starts immediately after.
+        const startRow = propHeaderRow.number + 1;
+
+        // The current last row in the sheet is the end of the data
+        const endRow = worksheet.rowCount;
+
+        // The Total row will be the NEXT row
+        const totalRowIndex = endRow + 1;
+
+        let totalRowValues = [];
+
+        if (useFormulas){
+          totalRowValues = [
+            "Total", // Col 1
+            "",      // Col 2
+            "",      // Col 3
+            "",      // Col 4
+            "",      // Col 5
+            "",      // Col 6
+            "",      // Col 7
+            "",      // Col 8 (Rate Card Value - usually empty in total)
+            "",      // Col 9 (Negotiated Value)
+
+            // Col 10 (J): Rate Card Total -> SUM(Jstart:Jend)
+            { formula: `SUM(J${startRow}:J${endRow})` },
+
+            // Col 11 (K): Total Budget -> SUM(Kstart:Kend)
+            { formula: `SUM(K${startRow}:K${endRow})` },
+
+            // Col 12 (L): Total Saving -> SUM(Lstart:Lend)
+            { formula: `SUM(L${startRow}:L${endRow})` },
+
+            "",      // Col 13 (TVR)
+            "",      // Col 14 (NTVR)
+
+            // Col 15 (O): GRP -> SUM(Ostart:Oend)
+            { formula: `SUM(O${startRow}:O${endRow})` },
+
+            // Col 16 (P): NGRP -> SUM(Pstart:Pend)
+            { formula: `SUM(P${startRow}:P${endRow})` },
+
+            // Col 17 (Q): CPRP -> Total Budget / Total NGRP -> K_total / P_total
+            { formula: `IFERROR(K${totalRowIndex}/P${totalRowIndex}, 0)` },
+
+            // Col 18 (R): Spots -> SUM(Rstart:Rend)
+            { formula: `SUM(R${startRow}:R${endRow})` }
+          ];
         } else {
-          worksheet.addRow(['(No bonus program rows)']);
-        }
-// find area where actual program rows begin
-const firstProgramRow = worksheet._rows.find(r => {
-  if (!r) return false;
-  const v = r.getCell(1).value;
-  return typeof v === 'string' && !v.includes("Property") && !v.includes("Bonus") && v.trim() !== "" && !isNaN(v.match(/\d/));
-})?.number || 10;
-
-        // === APPLY WEEKEND COLUMN SHADING ===
-        dateList.forEach((dt, idx) => {
-          const col = 13 + idx; // ExcelJS columns are 1-based, starting after 12 offset columns + 1
-          const day = new Date(dt).getDay();
-          if (day !== 0 && day !== 6) return; // not weekend
-
-for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
-          const row = worksheet.getRow(r);
-
-        // === SKIP HEADER ROWS (Property, Commercial, Bonus) ===
-
-        // FINAL FIX: skip commercial header rows
-        if (commercialHeaderRows.includes(r)) {
-            continue;
+          // Normal Export (Values)
+          totalRowValues = [
+            "Total",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            Number(totalRowData.rateCardTotal),        // Col 10
+            Number(totalRowData.totalBudget),          // Col 11
+            Number(totalRowData.totalSaving),          // Col 12
+            "",
+            "",
+            Number(totalRowData.grp),                  // Col 15
+            Number(totalRowData.ngrp),                 // Col 16
+            Number(cprp),                              // Col 17
+            Number(totalRowData.spots)                 // Col 18
+          ];
         }
 
+        // Add Total Row
+        const totalRow = worksheet.addRow(totalRowValues);
 
-          // Apply weekend shading
-          const cell = row.getCell(col);
+        // ... (Keep the rest of the styling logic below unchanged) ...
+        // Color the total row with the same orange color as commercial headers (first 18 columns only)
+        for (let c = 1; c <= 18; c++) {
+          const cell = totalRow.getCell(c);
           cell.fill = {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: 'D8E4BC' } // Light green
+            fgColor: { argb: 'FABF8F' } // Same orange color as commercial headers
           };
+          cell.font = { bold: true };
         }
+        // ============ END OF ADDED CODE ============
 
-        });
+            // === APPLY BONUS ROW STYLING ===
+            let bonusStartRow = -1;
+            let totalRowNumber = -1;
+            worksheet.eachRow((row, rowNumber) => {
+              if (row.getCell(1).value === 'Bonus Programs') {
+                bonusStartRow = rowNumber + 1; // data starts 2 rows below
+              }
+              if (row.getCell(1).value === 'Total') {
+                totalRowNumber = rowNumber;
+              }
+            });
 
-        // === APPLY BONUS ROW STYLING ===
-        let bonusStartRow = -1;
-        worksheet.eachRow((row, rowNumber) => {
-          if (row.getCell(1).value === 'Bonus Programs') {
-            bonusStartRow = rowNumber + 1; // data starts 2 rows below
+            if (bonusStartRow > 0 && bonusRows.length > 0) {
+              const bonusEndRow = bonusStartRow + bonusRows.length - 1;
+              for (let r = bonusStartRow; r <= bonusEndRow; r++) {
+                const row = worksheet.getRow(r);
+                row.eachCell((cell) => {
+                  cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFDEEFFA' } // Light blue
+                  };
+                });
+              }
+
+              // Apply orange color to the total row (override the light blue)
+              if (totalRowNumber > 0) {
+                for (let c = 1; c <= 18; c++) {
+                  const cell = worksheet.getRow(totalRowNumber).getCell(c);
+                  cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FABF8F' } // Orange color
+                  };
+                  cell.font = { bold: true };
+                }
+              }
+            }
+
+            // find area where actual program rows begin
+            const firstProgramRow = worksheet._rows.find(r => {
+              if (!r) return false;
+              const v = r.getCell(1).value;
+              return typeof v === 'string' && !v.includes("Property") && !v.includes("Bonus") && v.trim() !== "" && !isNaN(v.match(/\d/));
+            })?.number || 10;
+
+        // === APPLY WEEKEND COLUMN SHADING ===
+        dateList.forEach((dt, idx) => {
+          const col = 19 + idx; // ExcelJS columns are 1-based, starting after 12 offset columns + 1
+          const day = new Date(dt).getDay();
+          if (day !== 0 && day !== 6) return; // not weekend
+
+          // Stop at the row before the total row (bonus section ends before total row)
+          const lastRowForDates = totalRow.number - 1;
+
+          for (let r = firstProgramRow; r <= lastRowForDates; r++) {
+            const row = worksheet.getRow(r);
+
+            // === SKIP HEADER ROWS (Property, Commercial, Bonus) ===
+            // FINAL FIX: skip commercial header rows
+            if (commercialHeaderRows.includes(r)) {
+              continue;
+            }
+
+            // Apply weekend shading
+            const cell = row.getCell(col);
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'D8E4BC' } // Light green
+            };
           }
         });
 
@@ -1133,16 +1725,17 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
           }
         }
 
+
         // --- CUSTOM COLUMN WIDTHS ---
         worksheet.getColumn(1).width = 25;
         worksheet.getColumn(2).width = 15;
-        worksheet.getColumn(3).width = 15;
+        worksheet.getColumn(3).width = 10;
 
-        worksheet.getColumn(4).width = 5;
         worksheet.getColumn(5).width = 10;
+        worksheet.getColumn(6).width = 10;
 
         // Date columns (start at column M = 13)
-        const firstDateCol = 13;
+        const firstDateCol = 19;
         dateList.forEach((_, idx) => {
           worksheet.getColumn(firstDateCol + idx).width = 3;
         });
@@ -1151,13 +1744,14 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
 
         // Identify where borders should start
         const propertyHeaderRowIndex = headerRow.number;     // first header after Property Benefits
-        const firstBorderRow = propHeaderRow.number;    // start horizontal/vertical borders from here
+        const firstBorderRow = headerRow.number;    // start horizontal/vertical borders from here
         const firstBorderCol = startCol;                     // first date column (OFFSET + 1)
         const lastRow = worksheet.rowCount;
         const lastCol = worksheet.actualColumnCount;
 
         // Starting row for date section (first row with dates)
         const firstDateRow = r3.number + 1;   // date header rows end at r3
+
 
         // === VERTICAL BORDER at START (first date column) ===
         for (let r = firstDateRow; r <= worksheet.rowCount; r++) {
@@ -1169,12 +1763,42 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
         }
 
         // === VERTICAL BORDER at END (last date column) ===
-        for (let r = firstDateRow; r <= worksheet.rowCount; r++) {
-          const cell = worksheet.getRow(r).getCell(lastCol);
-          cell.border = {
-            ...cell.border,
-            right: { style: 'thin' }
-          };
+    //    for (let r = firstDateRow; r <= worksheet.rowCount; r++) {
+      //    const cell = worksheet.getRow(r).getCell(lastCol);
+     //     cell.border = {
+       //     ...cell.border,
+     //       right: { style: 'thin' }
+      //    };
+      //  }
+
+        // ⭐ Vertical borders for first 20 columns (header → end of bonus section, excluding total row)
+        const bonusEndRow = bonusStartRow + bonusRows.length -1 ;
+
+        for (let r = firstBorderRow; r <= bonusEndRow; r++) {
+          const row = worksheet.getRow(r);
+          for (let c = 1; c <= 18; c++) {
+            const cell = row.getCell(c);
+            cell.border = {
+              ...cell.border,
+              left:  { style: 'thin' },
+              right: { style: 'thin' }
+            };
+          }
+        }
+
+        // Apply borders to total row separately (only first 18 columns)
+        if (totalRowNumber > 0) {
+          const totalRowObj = worksheet.getRow(totalRowNumber);
+          for (let c = 1; c <= 18; c++) {
+            const cell = totalRowObj.getCell(c);
+            cell.border = {
+              ...cell.border,
+              left:  { style: 'thin' },
+              right: { style: 'thin' },
+              top: { style: 'thin' },
+              bottom: { style: 'thin' }
+            };
+          }
         }
 
         // === COLOR FULL PROPERTY BENEFITS TOPIC ROW ===
@@ -1205,50 +1829,68 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
           cell.font = { bold: true };
         }
 
-        // --- 1) HORIZONTAL THIN BORDERS ---
-        for (let r = firstBorderRow; r <= lastRow; r++) {
-          const row = worksheet.getRow(r);
-          for (let c = 1; c <= lastCol; c++) {
-            const cell = row.getCell(c);
-            cell.border = {
-              ...cell.border,
-              top: { style: 'thin' },
-              bottom: { style: 'thin' }
-            };
-          }
-        }
+    // --- 1) HORIZONTAL THIN BORDERS ---
+    for (let r = firstBorderRow; r <= lastRow; r++) {
+      const row = worksheet.getRow(r);
 
-        // --- 2) VERTICAL DOTTED BORDERS (INSIDE DATE AREA ONLY) ---
-        for (let r = firstBorderRow; r <= lastRow; r++) {
-          const row = worksheet.getRow(r);
-
-          for (let c = firstBorderCol + 1; c <= lastCol - 1; c++) {   // <<<<<< FIX HERE
-            const cell = row.getCell(c);
-            cell.border = {
-              ...cell.border,
-              left: { style: 'dotted' },
-              right: { style: 'dotted' }
-            };
-          }
+      // For total row, only apply borders to first 18 columns
+      if (r === totalRowNumber) {
+        for (let c = 1; c <= 18; c++) {
+          const cell = row.getCell(c);
+          cell.border = {
+            ...cell.border,
+            top: { style: 'thin' },
+            bottom: { style: 'thin' }
+          };
         }
+      } else {
+        // For all other rows, apply borders to all columns
+        for (let c = 1; c <= lastCol; c++) {
+          const cell = row.getCell(c);
+          cell.border = {
+            ...cell.border,
+            top: { style: 'thin' },
+            bottom: { style: 'thin' }
+          };
+        }
+      }
+    }
+
+    // --- 2) VERTICAL DOTTED BORDERS (INSIDE DATE AREA ONLY) ---
+    // Stop at the row before the total row (bonus section ends before total row)
+    const lastRowForDateBorders = totalRow.number - 1;
+
+    for (let r = firstBorderRow; r <= lastRowForDateBorders; r++) {
+      const row = worksheet.getRow(r);
+
+      for (let c = firstBorderCol + 1; c <= lastCol - 1; c++) {
+        const cell = row.getCell(c);
+        cell.border = {
+          ...cell.border,
+          left: { style: 'dotted' },
+          right: { style: 'dotted' }
+        };
+      }
+    }
 
     // --- 3) SOLID LEFT BORDER (OVERRIDE dotted) ---
-        for (let r = firstDateRow; r <= lastRow; r++) {
-          const cell = worksheet.getRow(r).getCell(firstBorderCol);
-          cell.border = {
-            ...cell.border,
-            left: { style: 'thin' }  // override dotted
-          };
-        }
+    for (let r = firstDateRow; r <= lastRowForDateBorders; r++) {
+      const cell = worksheet.getRow(r).getCell(firstBorderCol);
+      cell.border = {
+        ...cell.border,
+        left: { style: 'thin' }  // override dotted
+      };
+    }
 
-        // --- 4) SOLID RIGHT BORDER (OVERRIDE dotted) ---
-        for (let r = firstDateRow; r <= lastRow; r++) {
-          const cell = worksheet.getRow(r).getCell(lastCol);
-          cell.border = {
-            ...cell.border,
-            right: { style: 'thin' } // override dotted
-          };
-        }
+    // --- 4) SOLID RIGHT BORDER (OVERRIDE dotted) ---
+    for (let r = firstDateRow; r <= lastRowForDateBorders; r++) {
+      const cell = worksheet.getRow(r).getCell(lastCol);
+      cell.border = {
+        ...cell.border,
+        right: { style: 'thin' } // override dotted
+      };
+    }
+
     // === APPLY SOLID BORDER TO DATE HEADER ROWS (r1, r2, r3) ===
         [r1, r2, r3].forEach((row) => {
           // Solid LEFT BORDER
@@ -1297,62 +1939,107 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
           };
         }
         });
+    removeGridlines(worksheet);
       });
 
-      // ---------- Last sheet: Channel Summary (All-In) ----------
-      if (combinedChannelRows?.length) {
-        const summarySheet = workbook.addWorksheet('Channel Summary (All-In)');
+    if (combinedChannelRows?.length) {
+      const summarySheet = workbook.addWorksheet('Channel Summary (All-In)');
+      summarySheet.properties.showGridLines = false;
 
-        const summaryHeaders = [
-          'Channel', 'Cost (LKR)', 'Property value (LKR)', 'Total Cost (LKR)',
-          'GRP (Spot Buying)', 'Property GRP', 'Bonus GRP', 'Total GRP',
-          'NGRP (Spot Buying)', 'NGRP (Property)', 'Bonus NGRP', 'Total NGRP', 'CPRP (LKR)'
-        ];
+      const summaryHeaders = [
+        'Channel', 'Cost', 'Property value', 'Total Cost',
+        'Spot Buying GRP', 'Property GRP', 'Bonus GRP', 'Total GRP',
+        'Spot Buying NGRP', 'Property NGRP', 'Bonus NGRP', 'Total NGRP', 'CPRP'
+      ];
 
-        summarySheet.addRow(summaryHeaders);
+      // --- Header Row ---
+      const headerRow = summarySheet.addRow(summaryHeaders);
 
-        combinedChannelRows.forEach((r) => {
-          summarySheet.addRow([
-            r.Channel,
-            Number(r.Cost_LKR),
-            Number(r.Property_LKR),
-            Number(r.TotalCost_LKR),
-            Number((mainByProgram || [])
-              .filter(p => toStr(p.Channel) === r.Channel)
-              .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
-            ),
-            Number((flatPropertyPrograms || [])
-              .filter(p => toStr(p.Channel) === r.Channel)
-              .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
-            ),
-            Number((bonusByProgram || [])
-              .filter(p => toStr(p.Channel) === r.Channel)
-              .reduce((a, p) => a + num(p.TVR ?? 0) * num(p.Spots ?? 0), 0)
-            ),
-            Number(r.GRP_Total),
-            Number(r.NGRP_Spot),
-            Number(r.NGRP_Property),
-            Number(r.NGRP_Bonus),
-            Number(r.NGRP_Total),
-            Number(r.CPRP_LKR),
-          ]);
+      headerRow.eachCell((cell) => {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'C6EFCE' }  // same Excel light green as KPI sheet
+        };
+        cell.font = { bold: true };
+        cell.alignment = { horizontal: 'center', vertical: 'middle',wrapText: true  };
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
+        };
+      });
+
+      // --- Add Data Rows ---
+      combinedChannelRows.forEach((r) => {
+        const row = summarySheet.addRow([
+          r.Channel,
+          Number(r.Cost_LKR),
+          Number(r.Property_LKR),
+          Number(r.TotalCost_LKR),
+            // ✔ Correct Spot GRP (already in r)
+            Number(r.GRP_Spot),
+
+            // ✔ Correct Property GRP (manual + benefit)
+            Number(r.GRP_Property),
+
+            // ✔ Correct Bonus GRP
+            Number(r.GRP_Bonus),
+          Number(r.GRP_Total),
+          Number(r.NGRP_Spot),
+          Number(r.NGRP_Property),
+          Number(r.NGRP_Bonus),
+          Number(r.NGRP_Total),
+          Number(r.CPRP_LKR),
+        ]);
+
+        row.eachCell((cell) => {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' },
+          };
         });
 
-        // Auto-fit summary columns
-        summarySheet.columns.forEach(column => {
-          column.width = 15;
-        });
-      }
+        // make first column (Channel) left-aligned
+        row.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+      });
+
+      // --- FIXED COLUMN WIDTHS (all = 10) ---
+      summarySheet.columns.forEach((col) => {
+        col.width = 13;
+      });
+      removeGridlines(summarySheet);
+    }
 
 
       // ---------- Save ----------
-      try {
-        const buffer = await workbook.xlsx.writeBuffer();
-        saveAs(new Blob([buffer]), 'Final_Plan_By_Channel.xlsx');
-      } catch (error) {
-        console.error('Error exporting Excel file:', error);
-        alert('Error exporting Excel file. Please try again.');
-      }
+    // In the save section, modify the filename:
+// ---------- Save (Updated Filename Logic) ----------
+
+    // 1. Prepare file parts
+    const clientPart = clientName ? `_${clientName}` : "";
+    // Create a period string like "_2023-10-01_to_2023-10-07"
+    const periodPart = `_${fromDate}_to_${toDate}`;
+
+    // 2. Determine base name based on the formula flag
+    const baseName = useFormulas
+      ? 'Final_Plan_By_Channel_With_Formulas'
+      : 'Final_Plan_By_Channel';
+
+    // 3. Combine them: Name + Client + Period + Extension
+    const filename = `${baseName}${clientPart}${periodPart}.xlsx`;
+
+    try {
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(new Blob([buffer]), filename);
+    } catch (error) {
+      console.error('Error exporting Excel file:', error);
+      alert('Error exporting Excel file. Please try again.');
+    }
     };
 
 
@@ -1393,6 +2080,12 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
           borderRadius: "6px"
         };
 
+    const highlightCard = {
+      backgroundColor: '#38a169',   // deep green
+      //border: '2px solid #1b5e20',  // darker green border
+      color: 'white',               // white text
+    };
+
     const normalizeRow = (r) => ({
       Channel: toStr(r.Channel),
       Program: toStr(r.Program),
@@ -1426,6 +2119,12 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
   const [brandName, setBrandName] = useState("");
   const [refNo, setRefNo] = useState("");
   const [commercialNames, setCommercialNames] = useState({});
+  const [activity] = useState("TV Schedule");  // fixed
+  const [campaign, setCampaign] = useState("");
+  const [tvBudget, setTvBudget] = useState("");
+  const [durationName, setDurationName] = useState("");
+  const [commercialLanguages, setCommercialLanguages] = useState({});
+
 
     const today = new Date();
     const nextWeek = new Date();
@@ -1449,12 +2148,16 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
        <h2 style={s.pageTitle || {fontSize: 22,fontWeight: 700, margin: '8px 0 16px', letterSpacing: 0.3,}}>Final Optimized Plan (Property + Spot Buying + Bonus)</h2>
     {/* KPI Cards */}
     <div style={s.summaryGrid}>
-      <div style={s.summaryCard}>
-        <div style={s.summaryTitle}>Total Budget (incl. Property)</div>
-        <div style={s.summaryValue}>{formatLKR(budgetInclProperty)}</div>
+      <div style={{ ...s.summaryCard, ...highlightCard }}>
+         <div style={{ ...s.summaryTitle, color: 'white',fontWeight: '750' }}>Total Optimized Budget</div>
+        <div style={{ ...s.summaryValue, color: 'white',fontWeight: '750' }}>{formatLKR(budgetInclProperty)}</div>
       </div>
+    <div style={s.summaryCard}>
+      <div style={s.summaryTitle}>Total GRP</div>
+      <div style={s.summaryValue}>{safeFx(totalGRP_InclPropertyBonus)}</div>
+    </div>
       <div style={s.summaryCard}>
-      <div style={s.summaryTitle}>GRP (Spot Buying)</div>
+      <div style={s.summaryTitle}>Spot Buying GRP</div>
       <div style={s.summaryValue}>{safeFx(mainSpotGRP)}</div>
     </div>
     <div style={s.summaryCard}>
@@ -1465,15 +2168,19 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
       <div style={s.summaryTitle}>Bonus GRP</div>
       <div style={s.summaryValue}>{safeFx(bonusGRP)}</div>
     </div>
-    <div style={s.summaryCard}>
-      <div style={s.summaryTitle}>Total GRP (incl. Property + Bonus)</div>
-      <div style={s.summaryValue}>{safeFx(totalGRP_InclPropertyBonus)}</div>
-    </div>
     </div>
 
     <div style={s.summaryGrid}>
+      <div style={{ ...s.summaryCard, ...highlightCard }}>
+        <div style={{ ...s.summaryTitle, color: 'white' ,fontWeight: '750'}}>CPRP</div>
+        <div style={{ ...s.summaryValue, color: 'white',fontWeight: '750' }}>{formatLKR(cprp_InclPropertyBonus)}</div>
+      </div>
+      <div style={s.summaryCard}>
+        <div style={s.summaryTitle}>Total NGRP</div>
+        <div style={s.summaryValue}>{safeFx(totalNGRP_InclPropertyBonus)}</div>
+      </div>
         <div style={s.summaryCard}>
-        <div style={s.summaryTitle}>NGRP (Spot Buying)</div>
+        <div style={s.summaryTitle}>Spot Buying NGRP</div>
         <div style={s.summaryValue}>{safeFx(mainSpotNGRP)}</div>
       </div>
       <div style={s.summaryCard}>
@@ -1484,14 +2191,6 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
         <div style={s.summaryTitle}>Bonus NGRP</div>
         <div style={s.summaryValue}>{safeFx(bonusNGRP)}</div>
       </div>
-      <div style={s.summaryCard}>
-        <div style={s.summaryTitle}>Total NGRP (incl. Property + Bonus)</div>
-        <div style={s.summaryValue}>{safeFx(totalNGRP_InclPropertyBonus)}</div>
-      </div>
-      <div style={s.summaryCard}>
-        <div style={s.summaryTitle}>CPRP (incl. Property + Bonus)</div>
-        <div style={s.summaryValue}>{formatLKR(cprp_InclPropertyBonus)}</div>
-      </div>
     </div>
 
     {/* Property Program Details */}
@@ -1501,43 +2200,73 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
         <div style={s.summaryCard}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ ...s.table, minWidth: 1100 }}>
-              <thead>
-                <tr>
-                  <th style={s.th}>Channel</th>
-                  <th style={s.th}>Name of the program</th>
-                  <th style={s.th}>Com name</th>
-                  <th style={s.th}>Day</th>
-                  <th style={s.th}>Time</th>
-                  <th style={s.th}>Budget</th>
-                  <th style={s.th}>NCost</th>
-                  <th style={s.th}>Duration</th>
-                  <th style={s.th}>TVR</th>
-                  <th style={s.th}>NTVR</th>
-                  <th style={s.th}>Spots</th>
-                  <th style={s.th}>GRP</th>
-                  <th style={s.th}>NGRP</th>
-
-                </tr>
-              </thead>
-              <tbody>
-                {flatPropertyPrograms.map((r, i) => (
-                  <tr key={`pp-${i}`}>
-                    <td style={{ ...s.td, textAlign: 'left' }}>{r.Channel}</td>
-                    <td style={{ ...s.td, textAlign: 'left' }}>{r['Name of the program']}</td>
-                    <td style={{ ...s.td, textAlign: 'left' }}>{r['Com name']}</td>
-                    <td style={s.td}>{r.Day}</td>
-                    <td style={s.td}>{r.Time}</td>
-                    <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(r.Budget)}</td>
-                    <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(r.NCost)}</td>
-                    <td style={{ ...s.td, textAlign: 'right' }}>{Number(r.Duration).toFixed(2)}</td>
-                    <td style={{ ...s.td, textAlign: 'right' }}>{Number(r.TVR).toFixed(2)}</td>
-                    <td style={{ ...s.td, textAlign: 'right' }}>{Number(r.NTVR).toFixed(2)}</td>
-                    <td style={{ ...s.td, textAlign: 'right' }}>{parseInt(r.Spots, 10)}</td>
-                    <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.TVR) * num(r.Spots))}</td>
-                    <td style={{ ...s.td, textAlign: 'right' }}>{Number(r.NGRP).toFixed(2)}</td>
+                <thead>
+                  <tr>
+                    <th style={s.th}>Channel</th>
+                    <th style={s.th}>Program</th>
+                    <th style={s.th}>Commercial name</th>
+                    <th style={s.th}>Duration</th>
+                    <th style={s.th}>Language</th>
+                    <th style={s.th}>Day</th>
+                    <th style={s.th}>Time</th>
+                    <th style={s.th}>PT / NPT</th>
+                    <th style={s.th}>Rate Card Cost</th>
+                    <th style={s.th}>On Cost</th>
+                    <th style={s.th}>Rate Card Total</th>
+                    <th style={s.th}>Total Budget</th>
+                    <th style={s.th}>Total Saving</th>
+                    <th style={s.th}>NCost</th>
+                    <th style={s.th}>TVR</th>
+                    <th style={s.th}>NTVR</th>
+                    <th style={s.th}>GRP</th>
+                    <th style={s.th}>NGRP</th>
+                    <th style={s.th}>CPRP</th>
+                    <th style={s.th}>Spots</th>
                   </tr>
-                ))}
-              </tbody>
+                </thead>
+                <tbody>
+                    {flatPropertyPrograms.map((r, i) => {
+
+                      // FIX ONLY THESE TWO (missing from editor)
+                      const rateCardTotal = num(r.RateCardCost) * num(r.Spots);
+                      const totalSaving = rateCardTotal - num(r.Budget);
+
+                      return (
+                        <tr key={`pp-${i}`}>
+                          <td style={{ ...s.td, textAlign: 'left' }}>{r.Channel}</td>
+                          <td style={{ ...s.td, textAlign: 'left' }}>{r['Name of the program']}</td>
+                          <td style={{ ...s.td, textAlign: 'left' }}>{r['Com name']}</td>
+
+                          <td style={{ ...s.td, textAlign: 'right' }}>{Number(r.Duration).toFixed(2)}</td>
+                          <td style={s.td}>{r.Language ?? ""}</td>
+                          <td style={s.td}>{r.Day}</td>
+                          <td style={s.td}>{r.Time}</td>
+                          <td style={s.td}>{r.PTNPT ?? ""}</td>
+
+                          <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(r.RateCardCost)}</td>
+                          <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(r.Budget)}</td>
+
+                          {/* ✔ FIXED: Rate Card Total */}
+                          <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(rateCardTotal)}</td>
+
+                          {/* ✔ FIXED: Total Budget (same as On Cost) */}
+                          <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(r.Budget)}</td>
+
+                          {/* ✔ FIXED: Total Saving */}
+                          <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(totalSaving)}</td>
+
+                          {/* Existing correct fields */}
+                          <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(r.NCost)}</td>
+                          <td style={{ ...s.td, textAlign: 'right' }}>{Number(r.TVR).toFixed(2)}</td>
+                          <td style={{ ...s.td, textAlign: 'right' }}>{Number(r.NTVR).toFixed(2)}</td>
+                          <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(num(r.TVR) * num(r.Spots))}</td>
+                          <td style={{ ...s.td, textAlign: 'right' }}>{Number(r.NGRP).toFixed(2)}</td>
+                          <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(r.CPRP)}</td>
+                          <td style={{ ...s.td, textAlign: 'right' }}>{parseInt(r.Spots, 10)}</td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
             </table>
           </div>
         </div>
@@ -1809,21 +2538,24 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
       )}
 
         {/* Channel Summary (Single Table) */}
-        <h3 style={s.sectionTitle}>Channel Summary (Spot Buying + Property + Bonus)</h3>
+        <h3 style={s.sectionTitle}>Channel Summary</h3>
         <div style={s.summaryCard}>
           <table style={s.table}>
             <thead>
               <tr>
                 <th style={s.th}>Channel</th>
-                <th style={s.th}>Cost (LKR)</th>
-                <th style={s.th}>Property value (LKR)</th>
-                <th style={s.th}>Total Cost (LKR)</th>
-                <th style={s.th}>NGRP (Spot Buying)</th>
-                <th style={s.th}>NGRP (Property)</th>
+                <th style={s.th}>Cost</th>
+                <th style={s.th}>Property value</th>
+                <th style={s.th}>Total Cost</th>
+                <th style={s.th}>Spot Buying GRP</th>   {/* NEW */}
+                <th style={s.th}>Property GRP</th>        {/* NEW */}
+                <th style={s.th}>Bonus GRP</th>           {/* NEW */}
+                <th style={s.th}>Total GRP</th>           {/* Already exists */}
+                <th style={s.th}>Spot Buying NGRP</th>
+                <th style={s.th}>Property NGRP</th>
                 <th style={s.th}>Bonus NGRP</th>
                 <th style={s.th}>Total NGRP</th>
-                <th style={s.th}>Total GRP</th>
-                <th style={s.th}>CPRP (LKR)</th>
+                <th style={s.th}>CPRP</th>
               </tr>
             </thead>
             <tbody>
@@ -1833,11 +2565,22 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
                   <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(r.Cost_LKR)}</td>
                   <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(r.Property_LKR)}</td>
                   <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(r.TotalCost_LKR)}</td>
+                                    {/* NEW GRP COLUMNS */}
+                  <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(
+                    (mainByProgram || []).filter(p => p.Channel === r.Channel).reduce((a,p)=>a+num(p.TVR)*num(p.Spots),0)
+                  )}</td>
+
+                <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(r.GRP_Property)}</td>
+
+                  <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(
+                    (bonusByProgram || []).filter(p => p.Channel === r.Channel).reduce((a,p)=>a+num(p.TVR)*num(p.Spots),0)
+                  )}</td>
+                  {/* Already in your data */}
+                  <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(r.GRP_Total)}</td>
                   <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(r.NGRP_Spot)}</td>
                   <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(r.NGRP_Property)}</td>
                   <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(r.NGRP_Bonus)}</td>
                   <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(r.NGRP_Total)}</td>
-                  <td style={{ ...s.td, textAlign: 'right' }}>{safeFx(r.GRP_Total)}</td>
                   <td style={{ ...s.td, textAlign: 'right' }}>{formatLKR_1(r.CPRP_LKR)}</td>
                 </tr>
               ))}
@@ -1853,6 +2596,13 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
 
       {/* Actions */}
       <div style={{marginTop: '24px'}}>
+      <button
+          type="button"
+          onClick={() => window.history.back()}
+          style={s.backHomeButton}
+        >
+          Go Back
+        </button>
         <button type="button" onClick={() => setShowExportDialog(true)} style={s.exportButton}>
           Export Final Plan to Excel
         </button>
@@ -1860,98 +2610,215 @@ for (let r = firstProgramRow; r <= worksheet.rowCount; r++) {
           Go Back to Home
         </button>
       </div>
-      {showExportDialog && (
-          <div style={{
-            position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-            background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center",
-            justifyContent: "center", zIndex: 9999
-          }}>
-            <div style={{
-              background: "white", padding: "24px", borderRadius: "12px",
-              width: "520px", boxShadow: "0 4px 20px rgba(0,0,0,0.2)"
-            }}>
-              <h3 style={{marginBottom: "12px"}}>Export Details</h3>
+     {showExportDialog && (
+      <div style={{
+        position: "fixed",
+        top: 0, left: 0, width: "100%", height: "100%",
+        background: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999
+      }}>
+        <div style={{
+          background: "white",
+          padding: "24px",
+          borderRadius: "12px",
+          width: "650px",
+          maxWidth: "90vw",     // responsive
+          maxHeight: "70vh",
+          overflowY: "auto",    // vertical scroll only
+          overflowX: "hidden",  // remove horizontal scroll
+          boxShadow: "0 4px 20px rgba(0,0,0,0.2)"
+        }}>
+          <h3 style={{marginBottom: "12px"}}>Export Details</h3>
+            {/* DATE RANGE (From & To in one row) */}
+            <label style={{ fontWeight: 600, marginBottom: "6px", display: "block" }}>
+              Activation Period
+            </label>
 
-              <label>Date Range</label>
+            <div style={{ display: "flex", gap: "30px", marginBottom: "16px" }}>
 
-                <div style={{ display: "flex", gap: "10px", marginBottom: "12px" }}>
-                  <div style={{ flex: 1 , marginRight: "20px"  }}>
-                    <label>From</label>
-                    <input
-                      type="date"
-                      style={s.inputBox}
-                      value={fromDate}
-                      onChange={(e) => setFromDate(e.target.value)}
-                    />
-                  </div>
+              {/* From Date */}
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: "13px" }}>From</label>
+                <input
+                  type="date"
+                  style={s.inputBox}
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                />
+              </div>
 
-                  <div style={{ flex: 1 }}>
-                    <label>To</label>
-                    <input
-                      type="date"
-                      style={s.inputBox}
-                      value={toDate}
-                      onChange={(e) => setToDate(e.target.value)}
-                    />
-                  </div>
-                </div>
+              {/* To Date */}
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: "13px" }}>To</label>
+                <input
+                  type="date"
+                  style={s.inputBox}
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                />
+              </div>
 
-              <label>Client Name</label>
-              <input style={s.inputBox}
+            </div>
+
+              <label>Client</label>
+              <input
+                style={s.inputBox}
                 value={clientName}
-                onChange={e => setClientName(e.target.value)}
+                onChange={(e) => setClientName(e.target.value)}
               />
 
-              <label>Brand Name</label>
-              <input style={s.inputBox}
+              <label>Activity</label>
+              <div style={{
+                ...s.inputBox,
+                backgroundColor: '#f5f5f5',
+                color: '#666',
+                cursor: 'not-allowed'
+              }}>
+                TV Schedule
+              </div>
+
+              <label>Brand</label>
+              <input
+                style={s.inputBox}
                 value={brandName}
-                onChange={e => setBrandName(e.target.value)}
+                onChange={(e) => setBrandName(e.target.value)}
               />
+
+              <label>Campaign</label>
+              <input
+                style={s.inputBox}
+                value={campaign}
+                onChange={(e) => setCampaign(e.target.value)}
+              />
+
+              <label>TV Budget</label>
+              <input
+                type="number"
+                style={s.inputBox}
+                value={tvBudget}
+                onChange={(e) => setTvBudget(e.target.value)}
+              />
+
+              <label>Duration</label>
+              <input
+                style={s.inputBox}
+                value={durationName}
+                onChange={(e) => setDurationName(e.target.value)}
+              />
+
+              {/* Target Group (existing logic – DO NOT CHANGE) */}
+              <label>Selected Target Group</label>
+              <div style={{
+                ...s.inputBox,
+                backgroundColor: '#f5f5f5',
+                color: '#666',
+                cursor: 'not-allowed'
+              }}>
+                {getTGLabel(selectedTG)}
+              </div>
 
               <label>Ref No</label>
-              <input style={s.inputBox}
+              <input
+                style={s.inputBox}
                 value={refNo}
-                onChange={e => setRefNo(e.target.value)}
+                onChange={(e) => setRefNo(e.target.value)}
               />
 
               <hr style={{margin: "16px 0"}} />
 
-              <h4>Commercial Names</h4>
-            {allCommercialKeys.map((key, index) => {
-              const defaultName = `Commercial ${index + 1}`;
-              return (
-                <div key={key} style={{ marginBottom: "12px" }}>
-                  <label>{defaultName}</label>
-                  <input
-                    style={s.inputBox}
-                    placeholder={`Enter name for ${defaultName}`}
-                    required
-                    value={commercialNames[key] || ""}
-                    onChange={(e) => {
-                      setCommercialNames(prev => ({
-                        ...prev,
-                        [key]: e.target.value
-                      }));
-                    }}
-                  />
-                </div>
-              );
-            })}
+                <h4>Commercial Names</h4>
+                {allCommercialKeys.map((key, index) => {
+                  const defaultName = `Commercial ${index + 1}`;
+                  return (
+                    <div key={key} style={{ marginBottom: "12px" }}>
 
-              <div style={{marginTop:"20px", textAlign:"right"}}>
-                <button style={s.backHomeButton} onClick={() => setShowExportDialog(false)}>
-                  Cancel
-                </button>
-                <button
-                  style={s.primaryButton}
-                  onClick={() => {
-                    setShowExportDialog(false);
-                    handleExport();
-                  }}>
-                  Export
-                </button>
-              </div>
+                      {/* wrapper row */}
+                      <div style={{ display: "flex", gap: "30px" }}>
+
+                        {/* Commercial name input (wide) */}
+                        <div style={{ flex: 2 }}>
+                          <label>{defaultName}</label>
+                          <input
+                            style={s.inputBox}
+                            placeholder={`Enter name for ${defaultName}`}
+                            required
+                            value={commercialNames[key] || ""}
+                            onChange={(e) => {
+                              setCommercialNames(prev => ({
+                                ...prev,
+                                [key]: e.target.value
+                              }));
+                            }}
+                          />
+                        </div>
+
+                        {/* Language dropdown (smaller) */}
+                        <div style={{ flex: 1 }}>
+                          <label>Language</label>
+                        <select
+                          style={{
+                            ...s.inputBox,
+                            height: "35px",
+                            padding: "8px",          // match input box padding
+                            border: "1px solid #ccc",
+                            borderRadius: "6px",
+                            fontSize: "14px",
+                            backgroundColor: "white", // avoid grey look
+                            appearance: "none",       // cleaner dropdown
+                            WebkitAppearance: "none",
+                            MozAppearance: "none"
+                          }}
+                          value={commercialLanguages[key] || ""}
+                          onChange={(e) => {
+                            setCommercialLanguages(prev => ({
+                              ...prev,
+                              [key]: e.target.value
+                            }));
+                          }}
+                        >
+                          <option value="">Select</option>
+                          <option value="Sinhala">Sinhala</option>
+                          <option value="English">English</option>
+                          <option value="Tamil">Tamil</option>
+                        </select>
+                        </div>
+
+                      </div>
+
+                    </div>
+                  );
+                })}
+
+
+             <div style={{marginTop:"20px", textAlign:"right"}}>
+              <button style={s.backHomeButton} onClick={() => setShowExportDialog(false)}>
+                Cancel
+              </button>
+              <button
+                style={s.primaryButton}
+                onClick={() => {
+                  setShowExportDialog(false);
+                  // setExportWithFormulas(false);  <-- REMOVE THIS
+                  handleExport(false); // <-- PASS FALSE DIRECTLY
+                }}
+              >
+                Export
+              </button>
+              <button
+                style={{...s.primaryButton, backgroundColor: '#2d3748', marginLeft: '10px'}}
+                onClick={() => {
+                  setShowExportDialog(false);
+                  // setExportWithFormulas(true); <-- REMOVE THIS
+                  handleExport(true); // <-- PASS TRUE DIRECTLY
+                }}
+              >
+                Export with Formulas
+              </button>
             </div>
+         </div>
           </div>
         )}
     </div>
