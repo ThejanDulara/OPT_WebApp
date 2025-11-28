@@ -315,7 +315,8 @@ function ChannelRatingAllocator({
 
     const adjustedShares = {};   // ⭐ ADD THIS BACK
 
-if (totalAvailable <= 0) {
+    const EPS = 1e-6;
+    if (Math.abs(totalAvailable) < EPS) {
       // ⭐ Save state before leaving
       if (typeof onSaveState === "function") {
         onSaveState({
