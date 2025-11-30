@@ -852,12 +852,28 @@ const propertyGRPTotal = useMemo(() => {
         kpiSheet.getColumn(2).width = 20;
 
       // ---------- Channel list ----------
-      const channelSet = new Set([
-        ...(mainByChannel || []).map(r => toStr(r.Channel)),
-        ...(flatPropertyPrograms || []).map(r => toStr(r.Channel)),
-        ...(bonusByProgram || []).map(r => toStr(r.Channel)),
-      ].filter(Boolean));
-      const channelList = Array.from(channelSet).sort((a, b) => a.localeCompare(b));
+        // ---------- Channel list (FIXED!) ----------
+        const channelSet = new Set();
+
+        // Main
+        (mainByChannel || []).forEach(r => channelSet.add(toStr(r.Channel)));
+
+        // Property
+        (flatPropertyPrograms || []).forEach(r => channelSet.add(toStr(r.Channel)));
+
+        // Bonus
+        (bonusByProgram || []).forEach(r => channelSet.add(toStr(r.Channel)));
+
+        // Benefit programs (this was missing!)
+        Object.values(benefitCommercialData || {}).forEach(commercial => {
+          (commercial.programs || []).forEach(r => {
+            channelSet.add(toStr(r.Channel));
+          });
+        });
+
+        const channelList = Array.from(channelSet)
+          .filter(ch => ch && ch.trim() !== '')
+          .sort((a, b) => a.localeCompare(b));
 
       // ---------- Headers ----------
     const propertyHeaders = [
@@ -962,8 +978,9 @@ const propertyGRPTotal = useMemo(() => {
 
       // ---------- Build per-channel sheets ----------
       channelList.forEach((ch) => {
-        const sheetTitle = `Channel - ${ch}`.substring(0, 31); // Excel sheet name limit
-        const worksheet = workbook.addWorksheet(sheetTitle);
+            console.log(`[DEBUG] Processing channel: ${ch}`); // ADD THIS
+            const sheetTitle = `${ch}`.substring(0, 31); // Excel sheet name limit
+            const worksheet = workbook.addWorksheet(sheetTitle);
 
             // ====================== TOP DETAIL SECTION (Start from Column B) ======================
             const topRows = [
@@ -1169,7 +1186,7 @@ const propertyGRPTotal = useMemo(() => {
           cell.font = { bold: true };
         });
 
-// Property Benefits Section
+        // Property Benefits Section
         const propHeaderRow = worksheet.addRow([`Property Benefits`]);
 
         propHeaderRow.getCell(1).fill = {
@@ -1269,14 +1286,19 @@ const propertyGRPTotal = useMemo(() => {
         const commercialHeaderRows = [];
         // SECTION: Commercial Programs (Main + Benefit merged)
         let headerAdded = false;
+        let hasCommercialData = false; // ADD THIS
         (allCommercialKeys || []).forEach((commercialKey, idx) => {
          const commDuration = num(commercialDurations[commercialKey] || 0);
+
           const mainPrograms = (mainCommercialData?.[commercialKey]?.programs || [])
             .filter(r => toStr(r.Channel) === ch);
           const benefitPrograms = (benefitCommercialData?.[commercialKey]?.programs || [])
             .filter(r => toStr(r.Channel) === ch);
 
           const mergedPrograms = mergeProgramsForExport(mainPrograms, benefitPrograms);
+
+          if (mergedPrograms.length > 0) {
+                hasCommercialData = true;
 
           worksheet.addRow([]);
 
@@ -1372,14 +1394,25 @@ const propertyGRPTotal = useMemo(() => {
 
         worksheet.addRow(rowData);
       });
-    }
+    }}
     });
 
-
+    // === ADD THIS AFTER THE COMMERCIAL LOOP ===
+    if (!hasCommercialData) {
+      worksheet.addRow([]);
+      const noCommHeader = worksheet.addRow([`Commercial Programs`]);
+      noCommHeader.getCell(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FABF8F' }
+      };
+      worksheet.addRow(['No commercial programs for this channel']);
+    }
 
         // FINAL SECTION: Bonus Programs
         const bonusRows = (bonusByProgram || []).filter(r => toStr(r.Channel) === ch);
         worksheet.addRow([]);
+
         const bonusHeaderRow = worksheet.addRow([`Bonus Programs`]);
 
         bonusHeaderRow.getCell(1).fill = {
@@ -1462,14 +1495,14 @@ const propertyGRPTotal = useMemo(() => {
                 Number(spots)          // Spots
               );
             }
-
             worksheet.addRow(rowData);
           });
+        } else {
+          worksheet.addRow(['No bonus programs for this channel']);
         }
 
-        // ============ ADD THIS RIGHT HERE ============
-  // ============ ADD THIS RIGHT HERE (UPDATED) ============
         // ---------- CALCULATE TOTALS FOR TOTAL ROW ----------
+        const hasAnyData = propRows.length > 0 || hasCommercialData || bonusRows.length > 0;
         const totalRowData = {
           rateCardValue: 0,
           rateCardTotal: 0,
