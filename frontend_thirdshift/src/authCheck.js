@@ -30,19 +30,22 @@ export async function checkAuth() {
 
     console.log("✅ Authenticated user:", user);
 
-    // 🟢 Return full user object
     return {
       authorized: true,
-      userId: user.id || user.userId || "",
-      firstName: user.firstName || user.firstname || "",
-      lastName: user.lastName || user.lastname || "",
+
+      // your backend returns: id
+      userId: user.id,
+
+      // backend returns: first_name, last_name
+      firstName: user.first_name,
+      lastName: user.last_name,
+
       email: user.email || "",
-      role: user.role || "user",
-      isAdmin:
-        user.role === "admin" ||
-        user.role === "superadmin" ||
-        user.isAdmin === true,
+
+      // backend returns: is_admin = 1 or 0
+      isAdmin: user.is_admin === 1 || user.is_admin === "1",
     };
+
   } catch (err) {
     console.error("❌ Auth check failed:", err);
     const current = encodeURIComponent(window.location.href);
