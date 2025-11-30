@@ -191,19 +191,21 @@ const primaryButton = {
 
 const secondaryButton = {
   padding: '14px 32px',
-  backgroundColor: colors.white,
-  color: colors.textDark,
-  border: `1px solid ${colors.primary}`,
+  background: colors.white,
   borderRadius: '30px',
   fontSize: '16px',
-  fontWeight: '500',
+  fontWeight: '600',
   cursor: 'pointer',
-  transition: 'all 0.25s ease',
-  display: 'block',
   width: '100%',
-  maxWidth: '240px',
-  marginLeft: 'auto',
-  marginRight: 'auto',
+  maxWidth: '260px',
+  margin: '0 auto 18px',
+  color: colors.accentDark,
+  border: '2px solid transparent',
+  backgroundImage: `linear-gradient(${colors.white}, ${colors.white}),
+                    linear-gradient(135deg, ${colors.primary}, ${colors.accent})`,
+  backgroundOrigin: 'border-box',
+  backgroundClip: 'padding-box, border-box',
+  transition: '0.3s',
 };
 
 // Add hover effects using CSS-in-JS
