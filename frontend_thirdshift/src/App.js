@@ -114,29 +114,21 @@ function App() {
 
       const session = json.session_data || {};
 
-      // 🔁 Restore everything we care about
-      setChannels(session.channels || []);
-      setSelectedTG(session.selectedTG || "tvr_all");
-      setSelectedProgramIds(session.selectedProgramIds || session.selected_program_ids || []);
-      setNegotiatedRates(session.negotiatedRates || {});
-      setChannelDiscounts(session.channelDiscounts || {});
-      setOptimizationInput(session.optimizationInput || null);
-      setDfFull(session.dfFull || []);
-      setBasePlanResult(session.basePlanResult || null);
-      setBasePlanForFinal(session.basePlanForFinal || null);
-      setBasePlanInclusiveTotals(session.basePlanInclusiveTotals || null);
-      setPropertyProgramsForFinal(session.propertyProgramsForFinal || {});
-      setChannelMoney(session.channelMoney || {});
-      setBenefitResult(session.benefitResult || null);
-      setBonusResult(session.bonusResult || null);
-      setAllocatorState(session.allocatorState || null);
-      setBenefitState(session.benefitState || null);
-      setBonusSharesInput(session.bonusSharesInput || null);
-      setBonusSetupState(session.bonusSetupState || null);
-      setSelectedClient(session.selectedClient || "Other");
+        setChannels(session.channels || []);
+        setSelectedTG(session.selectedTG || "tvr_all");
+        setSelectedProgramIds(session.selectedProgramIds || []);
+        setNegotiatedRates(session.negotiatedRates || {});
+        setChannelDiscounts(session.channelDiscounts || {});
+        setOptimizationInput(session.optimizationInput || null);
+        setAllocatorState(session.allocatorState || null);
+        setBenefitState(session.benefitState || null);
+        setBonusSharesInput(session.bonusSharesInput || null);
+        setBonusSetupState(session.bonusSetupState || null);
+        setSelectedClient(session.selectedClient || "Other");
 
-      // Go directly to Final Plan; user can go back if they want
-      navigate('/final-plan');
+        // Navigate user to Step 1
+        navigate('/select-channels');
+
     } catch (err) {
       console.error('Error loading saved plan', err);
       alert('Error loading saved plan.');
@@ -519,28 +511,19 @@ function App() {
                     : optimizationInput.durations
                 }
               : null;
-             const sessionSnapshot = {
+            const sessionSnapshot = {
               channels,
               selectedTG,
               selectedProgramIds,
               negotiatedRates,
               channelDiscounts,
-              optimizationInput: mappedOptimizationInput,
-              dfFull,
-              basePlanResult,
-              basePlanForFinal,
-              basePlanInclusiveTotals,
-              propertyProgramsForFinal,
-              channelMoney,
-              benefitResult,
-              bonusResult,
-              allocatorState,
-              benefitState,
-              bonusSharesInput,
-              bonusSetupState,
-              selectedClient,
+              optimizationInput,   // durations, budget, limits
+              allocatorState,      // rating allocator inputs
+              benefitState,         // benefit setup inputs
+              bonusSharesInput,     // bonus share inputs
+              bonusSetupState,      // bonus setup inputs
+              selectedClient,       // Cargills or other
             };
-
 
             return (
               <FinalPlan
