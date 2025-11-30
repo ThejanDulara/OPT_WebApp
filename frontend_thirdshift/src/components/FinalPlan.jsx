@@ -4,7 +4,13 @@ import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import ExcelJS from 'exceljs';
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || "";
+const hostname = window.location.hostname;
+const isLocal =
+  hostname.includes("localhost") || hostname.includes("127.");
+
+const API_BASE = isLocal
+  ? "http://localhost:5000"
+  : "https://optwebapp-production.up.railway.app";
 
 export default function FinalPlan({
   // Accept BOTH naming styles so App.js doesn't have to change

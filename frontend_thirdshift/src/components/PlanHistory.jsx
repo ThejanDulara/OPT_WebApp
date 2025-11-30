@@ -1,7 +1,13 @@
 // src/components/PlanHistory.jsx
 import React, { useEffect, useState, useMemo } from 'react';
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || "";
+const hostname = window.location.hostname;
+const isLocal =
+  hostname.includes("localhost") || hostname.includes("127.");
+
+const API_BASE = isLocal
+  ? "http://localhost:5000"                        // Flask OPT API locally
+  : "https://optwebapp-production.up.railway.app"; // Production OPT API
 
 function PlanHistory({ onBack, onLoadPlan }) {
   const [plans, setPlans] = useState([]);
