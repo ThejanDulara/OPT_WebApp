@@ -54,7 +54,7 @@ function PlanHistory({ onBack, onLoadPlan }) {
 
   const visiblePlans = useMemo(() => {
     if (!isAdmin || !showOnlyMine) return plans;
-    return plans.filter((p) => p.user_id === userId);
+    return plans.filter((p) => String(p.user_id) === String(userId));
   }, [plans, isAdmin, showOnlyMine, userId]);
 
   return (
