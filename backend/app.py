@@ -9,6 +9,7 @@ import os
 import json
 import time
 from flask import send_file
+from datetime import datetime
 import numpy as np
 from collections import defaultdict
 
@@ -1180,6 +1181,214 @@ def optimize_bonus():
             ]
         }
     })
+
+@app.route('/save-plan', methods=['POST'])
+def save_plan():
+    """
+    Save a completed optimization session (final plan) for later reuse.
+    Expected JSON:
+    {
+      "user_id": "...",
+      "user_first_name": "...",
+      "user_last_name": "...",
+      "metadata": {
+        "client_name": "...",
+        "brand_name": "...",
+        "activation_from": "YYYY-MM-DD",
+        "activation_to": "YYYY-MM-DD",
+        "campaign": "...",
+        "tv_budget": 123456,
+        ...
+      },
+      "session_data": { ... }  # full snapshot from frontend
+    }
+    """
+    payload = request.get_json() or {}
+
+    user_id = payload.get("user_id")
+    user_first_name = payload.get("user_first_name")
+    user_last_name = payload.get("user_last_name")
+    metadata = payload.get("metadata") or {}
+    session_data = payload.get("session_data") or {}
+
+    if not user_id:
+        return jsonify({"success": False, "error": "Missing user_id"}), 400
+
+    client_name = metadata.get("client_name")
+    brand_name = metadata.get("brand_name")
+    activation_from = metadata.get("activation_from")  # 'YYYY-MM-DD'
+    activation_to = metadata.get("activation_to")      # 'YYYY-MM-DD'
+    campaign = metadata.get("campaign")
+    tv_budget = metadata.get("tv_budget")
+
+    # total_budget can be the "totalBudgetInclProperty" you pass from frontend
+    total_budget = metadata.get("total_budget")
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            INSERT INTO saved_plans (
+              user_id,
+              user_first_name,
+              user_last_name,
+              client_name,
+              brand_name,
+              activation_from,
+              activation_to,
+              campaign,
+              total_budget,
+              data
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                user_id,
+                user_first_name,
+                user_last_name,
+                client_name,
+                brand_name,
+                activation_from,
+                activation_to,
+                campaign,
+                tv_budget if tv_budget not in (None, "") else total_budget,
+                json.dumps({
+                    "metadata": metadata,
+                    "session_data": session_data,
+                })
+            )
+        )
+        plan_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        return jsonify({"success": True, "plan_id": plan_id}), 200
+    except Exception as e:
+        print("Error in /save-plan:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/plans', methods=['GET'])
+def list_plans():
+    """
+    List saved plans.
+    Query params:
+      user_id: current user id
+      is_admin: '1' if admin, otherwise normal user
+    """
+    user_id = request.args.get("user_id")
+    is_admin = request.args.get("is_admin") == "1"
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    if is_admin:
+        # Admin → see ALL plans
+        cursor.execute(
+            """
+            SELECT
+              id,
+              user_id,
+              user_first_name,
+              user_last_name,
+              client_name,
+              brand_name,
+              activation_from,
+              activation_to,
+              campaign,
+              total_budget,
+              created_at
+            FROM saved_plans
+            ORDER BY created_at DESC
+            """
+        )
+    else:
+        # Normal user → only own plans
+        cursor.execute(
+            """
+            SELECT
+              id,
+              user_id,
+              user_first_name,
+              user_last_name,
+              client_name,
+              brand_name,
+              activation_from,
+              activation_to,
+              campaign,
+              total_budget,
+              created_at
+            FROM saved_plans
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+            """,
+            (user_id,)
+        )
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return jsonify({"success": True, "plans": rows}), 200
+
+
+@app.route('/plans/<int:plan_id>', methods=['GET'])
+def get_plan(plan_id):
+    """
+    Load a single saved plan (for reuse).
+    Returns metadata + session_data.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute(
+        """
+        SELECT
+          id,
+          user_id,
+          user_first_name,
+          user_last_name,
+          client_name,
+          brand_name,
+          activation_from,
+          activation_to,
+          campaign,
+          total_budget,
+          created_at,
+          data
+        FROM saved_plans
+        WHERE id = %s
+        """,
+        (plan_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({"success": False, "error": "Plan not found"}), 404
+
+    try:
+        data_blob = row.get("data")
+        parsed = json.loads(data_blob) if isinstance(data_blob, str) else (data_blob or {})
+    except Exception:
+        parsed = {}
+
+    return jsonify({
+        "success": True,
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "user_first_name": row.get("user_first_name"),
+        "user_last_name": row.get("user_last_name"),
+        "client_name": row.get("client_name"),
+        "brand_name": row.get("brand_name"),
+        "activation_from": row.get("activation_from"),
+        "activation_to": row.get("activation_to"),
+        "campaign": row.get("campaign"),
+        "total_budget": float(row.get("total_budget") or 0),
+        "created_at": row.get("created_at"),
+        "metadata": parsed.get("metadata") or {},
+        "session_data": parsed.get("session_data") or {}
+    }), 200
 
 #4
 if __name__ == '__main__':
