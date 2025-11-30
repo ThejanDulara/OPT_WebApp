@@ -4,24 +4,28 @@ import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import ExcelJS from 'exceljs';
 
+const API_BASE = process.env.REACT_APP_API_BASE_URL || "";
+
 export default function FinalPlan({
   // Accept BOTH naming styles so App.js doesn't have to change
   mainResults: _mainResults,
   bonusResults: _bonusResults,
   benefitResults: _benefitResults,
-  basePlanResult,     // from your current App.js
-  bonusResult,        // from your current App.js
-  totalBudgetInclProperty, // optional explicit budget (unchanged by bonus)
+  basePlanResult,
+  bonusResult,
+  totalBudgetInclProperty,
   propertyPrograms = {},
   styles = {},
   formatLKR = (v) =>
     `LKR ${Number(v ?? 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`,
   formatLKR_1 = (v) =>
     `${Number(v ?? 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`,
-  selectedTG = "", // ADD THIS
+  selectedTG = "",
   optimizationInput,
+  sessionSnapshot = {},   // 🌟 NEW
   onHome,
 }) {
+
   // ---- Normalize inputs (support both prop name styles) ----
   const mainResults = _mainResults || basePlanResult || {};
   const bonusResults = _bonusResults || bonusResult || {};
@@ -2158,6 +2162,49 @@ const propertyGRPTotal = useMemo(() => {
   const [durationName, setDurationName] = useState("");
   const [commercialLanguages, setCommercialLanguages] = useState({});
 
+  const savePlan = async () => {
+    try {
+      const auth = (typeof window !== 'undefined' && window.__AUTH__) || {};
+      const payload = {
+        user_id: auth.userId || auth.user_id || "",
+        user_first_name: auth.firstName || "",
+        user_last_name: auth.lastName || "",
+        metadata: {
+          client_name: clientName || "",
+          brand_name: brandName || "",
+          campaign: campaign || "",
+          activity,
+          tv_budget: tvBudget || "",
+          duration_label: durationName || "",
+          activation_from: fromDate,
+          activation_to: toDate,
+          commercial_names: commercialNames,
+          commercial_languages: commercialLanguages,
+          selected_tg: selectedTG,
+          total_budget: totalBudgetInclProperty,
+        },
+        session_data: sessionSnapshot || {},
+      };
+
+      const res = await fetch(`${API_BASE}/save-plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        console.error("Save plan failed", json);
+        alert(json.error || "Failed to save plan. Plan was not saved.");
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error("Error saving plan:", err);
+      alert("Error saving plan. Please try again.");
+      return false;
+    }
+  };
+
 
     const today = new Date();
     const nextWeek = new Date();
@@ -2827,29 +2874,39 @@ const propertyGRPTotal = useMemo(() => {
 
 
              <div style={{marginTop:"20px", textAlign:"right"}}>
-              <button style={s.backHomeButton} onClick={() => setShowExportDialog(false)}>
-                Cancel
-              </button>
-              <button
-                style={s.primaryButton}
-                onClick={() => {
-                  setShowExportDialog(false);
-                  // setExportWithFormulas(false);  <-- REMOVE THIS
-                  handleExport(false); // <-- PASS FALSE DIRECTLY
-                }}
-              >
-                Export
-              </button>
-              <button
-                style={{...s.primaryButton, backgroundColor: '#2d3748', marginLeft: '10px'}}
-                onClick={() => {
-                  setShowExportDialog(false);
-                  // setExportWithFormulas(true); <-- REMOVE THIS
-                  handleExport(true); // <-- PASS TRUE DIRECTLY
-                }}
-              >
-                Export with Formulas
-              </button>
+                <button
+                  style={s.backHomeButton}
+                  onClick={() => setShowExportDialog(false)}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  style={s.primaryButton}
+                  onClick={async () => {
+                    const ok = await savePlan();
+                    if (ok) {
+                      setShowExportDialog(false);
+                      await handleExport(false); // normal export
+                    }
+                  }}
+                >
+                  Save & Export
+                </button>
+
+                <button
+                  style={{ ...s.primaryButton, backgroundColor: '#2d3748', marginLeft: '10px' }}
+                  onClick={async () => {
+                    const ok = await savePlan();
+                    if (ok) {
+                      setShowExportDialog(false);
+                      await handleExport(true); // export with formulas
+                    }
+                  }}
+                >
+                  Save & Export with Formulas
+                </button>
+
             </div>
          </div>
           </div>

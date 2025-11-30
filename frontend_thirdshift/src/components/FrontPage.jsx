@@ -1,6 +1,6 @@
 import React from 'react';
 
-function FrontPage({ onStart, onManagePrograms }) {
+function FrontPage({ onStart, onManagePrograms, onOpenHistory }) {
   return (
     <section style={pageWrapper}>
       {/* Left gradient panel with image */}
@@ -47,13 +47,17 @@ function FrontPage({ onStart, onManagePrograms }) {
           <h1 style={companyName}>Third Shift Media (PVT) LTD</h1>
           <p style={tagline}>Where Intelligence Shapes Smarter Media Planning.</p>
 
-          <button onClick={onStart} style={primaryButton}>
-            Start Optimization
-          </button>
+            <button onClick={onStart} style={primaryButton}>
+              Start Optimization
+            </button>
 
-          <button onClick={onManagePrograms} style={secondaryButton}>
-            Manage Program Data
-          </button>
+            <button onClick={onManagePrograms} style={secondaryButton}>
+              Manage Program Data
+            </button>
+
+            <button onClick={onOpenHistory} style={secondaryButton}>
+              View Saved Plans
+            </button>
         </div>
       </div>
     </section>

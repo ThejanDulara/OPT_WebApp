@@ -28,6 +28,8 @@ import ScrollToTop from "./components/ScrollToTop";
 import CalculatorWidget from "./components/CalculatorWidget";
 import {  useLocation } from "react-router-dom";
 
+import PlanHistory from './components/PlanHistory';
+
 
 function App() {
   const navigate = useNavigate();
@@ -84,6 +86,56 @@ function App() {
   const [bonusSetupState, setBonusSetupState] = useState(null);
   const [selectedClient, setSelectedClient] = useState("Other");
 
+  const API_BASE = process.env.REACT_APP_API_BASE_URL || "";
+
+  const handleOpenHistory = () => {
+    navigate('/history');
+  };
+
+  const handleLoadSavedPlan = async (planId) => {
+    try {
+      const res = await fetch(`${API_BASE}/plans/${planId}`);
+      if (!res.ok) {
+        console.error('Failed to load plan', await res.text());
+        alert('Failed to load saved plan.');
+        return;
+      }
+      const json = await res.json();
+      if (!json.success) {
+        alert(json.error || 'Failed to load saved plan.');
+        return;
+      }
+
+      const session = json.session_data || {};
+
+      // 🔁 Restore everything we care about
+      setChannels(session.channels || []);
+      setSelectedTG(session.selectedTG || "tvr_all");
+      setSelectedProgramIds(session.selectedProgramIds || session.selected_program_ids || []);
+      setNegotiatedRates(session.negotiatedRates || {});
+      setChannelDiscounts(session.channelDiscounts || {});
+      setOptimizationInput(session.optimizationInput || null);
+      setDfFull(session.dfFull || []);
+      setBasePlanResult(session.basePlanResult || null);
+      setBasePlanForFinal(session.basePlanForFinal || null);
+      setBasePlanInclusiveTotals(session.basePlanInclusiveTotals || null);
+      setPropertyProgramsForFinal(session.propertyProgramsForFinal || {});
+      setChannelMoney(session.channelMoney || {});
+      setBenefitResult(session.benefitResult || null);
+      setBonusResult(session.bonusResult || null);
+      setAllocatorState(session.allocatorState || null);
+      setBenefitState(session.benefitState || null);
+      setBonusSharesInput(session.bonusSharesInput || null);
+      setBonusSetupState(session.bonusSetupState || null);
+      setSelectedClient(session.selectedClient || "Other");
+
+      // Go directly to Final Plan; user can go back if they want
+      navigate('/final-plan');
+    } catch (err) {
+      console.error('Error loading saved plan', err);
+      alert('Error loading saved plan.');
+    }
+  };
 
   // ---- Navigation helper replacements ----
 
@@ -158,9 +210,20 @@ function App() {
               <FrontPage
                 onStart={() => navigate('/select-channels')}
                 onManagePrograms={() => navigate('/program-updater')}
+                onOpenHistory={handleOpenHistory}
               />
             }
           />
+          {/** HISTORY PAGE */}
+            <Route
+              path="/history"
+              element={
+                <PlanHistory
+                  onBack={() => navigate('/')}
+                  onLoadPlan={handleLoadSavedPlan}
+                />
+              }
+            />
           <Route
           path="/select-channels"
           element={
@@ -450,6 +513,28 @@ function App() {
                     : optimizationInput.durations
                 }
               : null;
+             const sessionSnapshot = {
+              channels,
+              selectedTG,
+              selectedProgramIds,
+              negotiatedRates,
+              channelDiscounts,
+              optimizationInput: mappedOptimizationInput,
+              dfFull,
+              basePlanResult,
+              basePlanForFinal,
+              basePlanInclusiveTotals,
+              propertyProgramsForFinal,
+              channelMoney,
+              benefitResult,
+              bonusResult,
+              allocatorState,
+              benefitState,
+              bonusSharesInput,
+              bonusSetupState,
+              selectedClient,
+            };
+
 
             return (
               <FinalPlan
@@ -487,6 +572,7 @@ function App() {
                 propertyPrograms={propertyProgramsForFinal}
                 selectedTG={selectedTG}
                 optimizationInput={mappedOptimizationInput}   // ⭐ FIXED VALUE GOES HERE
+                sessionSnapshot={sessionSnapshot}
                 onBack={() => navigate('/bonus-results')}
                 onHome={() => navigate('/')}
               />

@@ -26,10 +26,28 @@ document.body.innerHTML = `
   </div>
 `;
 
-// 🚀 Run auth check before rendering
 async function startApp() {
-  const authorized = await checkAuth();
-  if (!authorized) return; // redirect handled inside checkAuth
+  const result = await checkAuth();
+  if (!result) return; // redirect handled inside checkAuth
+
+  let authPayload = {};
+
+  // Support both old (boolean) and new (object) styles:
+  if (typeof result === "object") {
+    const { authorized, userId, firstName, lastName, isAdmin } = result;
+    if (authorized === false) return;
+
+    authPayload = {
+      userId: userId || "",
+      firstName: firstName || "",
+      lastName: lastName || "",
+      isAdmin: !!isAdmin,
+    };
+  }
+
+  if (typeof window !== "undefined") {
+    window.__AUTH__ = authPayload; // 🌟 used by FinalPlan & History
+  }
 
   // 🧹 Clear pre-auth screen
   document.body.innerHTML = `<div id="root"></div>`;
