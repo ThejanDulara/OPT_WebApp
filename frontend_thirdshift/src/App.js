@@ -86,7 +86,13 @@ function App() {
   const [bonusSetupState, setBonusSetupState] = useState(null);
   const [selectedClient, setSelectedClient] = useState("Other");
 
-  const API_BASE = process.env.REACT_APP_API_BASE_URL || "";
+  const hostname = window.location.hostname;
+    const isLocal =
+      hostname.includes("localhost") || hostname.includes("127.");
+
+    const PLAN_API_BASE = isLocal
+      ? "http://localhost:5000"   // your local OPT backend
+      : "https://optwebapp-production.up.railway.app"; // correct production OPT backend
 
   const handleOpenHistory = () => {
     navigate('/history');
@@ -94,7 +100,7 @@ function App() {
 
   const handleLoadSavedPlan = async (planId) => {
     try {
-      const res = await fetch(`${API_BASE}/plans/${planId}`);
+      const res = await fetch(`${PLAN_API_BASE}/plans/${planId}`);
       if (!res.ok) {
         console.error('Failed to load plan', await res.text());
         alert('Failed to load saved plan.');
