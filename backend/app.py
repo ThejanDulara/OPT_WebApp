@@ -1390,6 +1390,18 @@ def get_plan(plan_id):
         "session_data": parsed.get("session_data") or {}
     }), 200
 
+@app.route('/delete-plan/<int:plan_id>', methods=['DELETE'])
+def delete_plan(plan_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM saved_plans WHERE id = %s", (plan_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 #4
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
