@@ -247,7 +247,7 @@ function ProgramUpdater({ onBack }) {
                 {/* Specific Note for HIRU TV */}
                 {selectedChannel === "HIRU TV" && (
                 <div style={{...styles.hiruNoteInline, marginTop: '8px'}}>
-                    <strong>HIRU TV Specifics:</strong> A1 (6.55 News) | A2 (9.55 News) | A3 (WD PT) | A4 (WE PT) | A5 (PT B)
+                    <strong>HIRU TV Specifics:</strong> A1 (6.55 News) | A2 (9.55 News) | A3 (WD PT + 11.55 News) | A4 (WE PT) | A5 (PT B)
                 </div>
                 )}
             </div>
