@@ -106,9 +106,10 @@ function PlanHistory({ onBack, onLoadPlan }) {
                 const period = (p.activation_from && p.activation_to)
                   ? `${p.activation_from} → ${p.activation_to}`
                   : "-";
-                const userName = (p.user_first_name || p.user_last_name)
-                  ? `${p.user_first_name || ""} ${p.user_last_name || ""}`.trim()
-                  : p.user_id;
+                const userName =
+                  p.user_first_name || p.user_last_name
+                    ? `${p.user_first_name || ""} ${p.user_last_name || ""}`.trim()
+                    : "-";
 
                 return (
                   <tr key={p.id}>
