@@ -1392,15 +1392,43 @@ def get_plan(plan_id):
 
 @app.route('/delete-plan/<int:plan_id>', methods=['DELETE'])
 def delete_plan(plan_id):
+    payload = request.get_json(silent=True) or {}
+    user_id = payload.get("user_id")
+    is_admin = payload.get("is_admin", False)
+
+    if not user_id:
+        return jsonify({"success": False, "error": "Missing user_id"}), 400
+
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
+        cursor = conn.cursor(dictionary=True)
+
+        # Get plan owner
+        cursor.execute("SELECT user_id FROM saved_plans WHERE id = %s", (plan_id,))
+        row = cursor.fetchone()
+
+        if not row:
+            conn.close()
+            return jsonify({"success": False, "error": "Plan not found"}), 404
+
+        owner_id = row["user_id"]
+
+        # Permission check
+        if not is_admin and str(owner_id) != str(user_id):
+            conn.close()
+            return jsonify({"success": False, "error": "Not authorized to delete this plan"}), 403
+
+        # Delete
         cursor.execute("DELETE FROM saved_plans WHERE id = %s", (plan_id,))
         conn.commit()
         conn.close()
+
         return jsonify({"success": True}), 200
+
     except Exception as e:
+        print("Error deleting plan:", e)
         return jsonify({"success": False, "error": str(e)}), 500
+
 
 #4
 if __name__ == '__main__':
