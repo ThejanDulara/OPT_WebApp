@@ -49,31 +49,19 @@ export default function BonusProgramSelector({
   const [searchTextByChannel, setSearchTextByChannel] = useState({});
   const [checkedByChannel, setCheckedByChannel] = useState({}); // {ch: Set(rowKey)}
 
-    // src/components/BonusProgramSelector.jsx - ADD THIS BLOCK
-      // Initialize or update checkedByChannel whenever the selectedBonusPrograms prop or channels list changes.
-      useEffect(() => {
-        // console.log("Initializing/Updating checkedByChannel from selectedBonusPrograms", selectedBonusPrograms);
-
-        // Only proceed if we have a list of channels
-        if (channels.length === 0) return;
-
-        const initialChecked = {};
-        channels.forEach((ch) => {
-          const savedRows = selectedBonusPrograms[ch] || [];
-
-          if (savedRows.length > 0) {
-            // Case 1: Saved selection exists in the prop. Use it.
-            // Map the saved row objects to their unique keys for the Set
-            initialChecked[ch] = new Set(savedRows.map(rowKey));
-          } else {
-            // Case 2: No saved selection for this channel. Default to *nothing selected*.
-            initialChecked[ch] = new Set();
-          }
-        });
-
-        setCheckedByChannel(initialChecked);
-      }, [selectedBonusPrograms, channels, rowKey]); // Re-run when the prop or channels list changes
-
+  // Seed from any previously saved selection
+    useEffect(() => {
+      const seeded = {};
+      channels.forEach((ch) => {
+        const allRows = slotBByChannel[ch] || [];
+        // ✅ If previous selections exist, use them; otherwise select everything
+        const arr = selectedBonusPrograms?.[ch]?.length
+          ? selectedBonusPrograms[ch]
+          : allRows;
+        seeded[ch] = new Set(arr.map(rowKey));
+      });
+      setCheckedByChannel(seeded);
+    }, [channels, slotBByChannel]);
 
   const filteredRowsByChannel = useMemo(() => {
     const out = {};
