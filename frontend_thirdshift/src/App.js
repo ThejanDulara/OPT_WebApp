@@ -124,6 +124,7 @@ function App() {
         setBenefitState(session.benefitState || null);
         setBonusSharesInput(session.bonusSharesInput || null);
         setBonusSetupState(session.bonusSetupState || null);
+        setSelectedBonusPrograms(session.selectedBonusPrograms || {});
         setSelectedClient(session.selectedClient || "Other");
 
         // Navigate user to Step 1
@@ -522,6 +523,7 @@ function App() {
               benefitState,         // benefit setup inputs
               bonusSharesInput,     // bonus share inputs
               bonusSetupState,      // bonus setup inputs
+              selectedBonusPrograms,
               selectedClient,       // Cargills or other
             };
 
