@@ -49,19 +49,24 @@ export default function BonusProgramSelector({
   const [searchTextByChannel, setSearchTextByChannel] = useState({});
   const [checkedByChannel, setCheckedByChannel] = useState({}); // {ch: Set(rowKey)}
 
-  // Seed from any previously saved selection
+    // Seed from any previously saved selection — run only on first mount
     useEffect(() => {
       const seeded = {};
       channels.forEach((ch) => {
         const allRows = slotBByChannel[ch] || [];
-        // ✅ If previous selections exist, use them; otherwise select everything
-        const arr = selectedBonusPrograms?.[ch]?.length
-          ? selectedBonusPrograms[ch]
-          : allRows;
-        seeded[ch] = new Set(arr.map(rowKey));
+
+        if (selectedBonusPrograms[ch]?.length) {
+          // Use previously saved selections
+          seeded[ch] = new Set(selectedBonusPrograms[ch].map(rowKey));
+        } else {
+          // First time: select all
+          seeded[ch] = new Set(allRows.map(rowKey));
+        }
       });
+
       setCheckedByChannel(seeded);
-    }, [channels, slotBByChannel]);
+    }, []); // ← runs ONCE, not every time slotBByChannel changes
+
 
   const filteredRowsByChannel = useMemo(() => {
     const out = {};
