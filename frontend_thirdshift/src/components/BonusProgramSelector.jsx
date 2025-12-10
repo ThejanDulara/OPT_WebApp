@@ -49,17 +49,6 @@ export default function BonusProgramSelector({
   const [searchTextByChannel, setSearchTextByChannel] = useState({});
   const [checkedByChannel, setCheckedByChannel] = useState({}); // {ch: Set(rowKey)}
 
-    // 🌟 FIX: Initialize checkedByChannel from the selectedBonusPrograms prop
-      useEffect(() => {
-        console.log("Initializing checkedByChannel from selectedBonusPrograms", selectedBonusPrograms);
-        const initialChecked = {};
-        Object.entries(selectedBonusPrograms || {}).forEach(([ch, rows]) => {
-          // rows are raw objects; convert to keys (using rowKey) for the Set
-          initialChecked[ch] = new Set((rows || []).map(rowKey));
-        });
-        setCheckedByChannel(initialChecked);
-      }, [selectedBonusPrograms]); // Re-run when the prop changes (i.e., on plan load)
-
     // src/components/BonusProgramSelector.jsx - ADD THIS BLOCK
       // Initialize or update checkedByChannel whenever the selectedBonusPrograms prop or channels list changes.
       useEffect(() => {
