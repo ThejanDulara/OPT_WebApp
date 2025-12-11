@@ -50,10 +50,11 @@ export default function BonusProgramSelector({
 
   // ⭐ CRITICAL: Restore saved selections when component loads
   useEffect(() => {
-    console.log('Restoring bonus selections:', {
+    console.log('🔍 Restoring bonus selections:', {
       hasSavedSelections: selectedBonusPrograms && Object.keys(selectedBonusPrograms).length > 0,
       channels,
-      slotBRowCount: Object.values(slotBByChannel).reduce((sum, arr) => sum + (arr?.length || 0), 0)
+      slotBRowCount: Object.values(slotBByChannel).reduce((sum, arr) => sum + (arr?.length || 0), 0),
+      allDbProgramsCount: allDbPrograms?.length || 0
     });
 
     const seeded = {};
@@ -65,43 +66,89 @@ export default function BonusProgramSelector({
       if (selectedBonusPrograms && selectedBonusPrograms[ch] && Array.isArray(selectedBonusPrograms[ch])) {
         const savedRows = selectedBonusPrograms[ch]; // Saved rows from old plan
 
-        savedRows.forEach(savedRow => {
-          // Try to find matching row in current data
-          const matchingRow = currentRows.find(currentRow => {
-            // Compare by program identity (not pricing/TVR data)
-            return (
-              toStr(currentRow.Channel) === toStr(savedRow.Channel) &&
-              toStr(currentRow.Program) === toStr(savedRow.Program) &&
-              toStr(currentRow.Day || currentRow.Date) === toStr(savedRow.Day || savedRow.Date) &&
-              toStr(currentRow.Time || currentRow.Start_Time || currentRow.StartTime) ===
-              toStr(savedRow.Time || savedRow.Start_Time || savedRow.StartTime) &&
-              toStr(currentRow.Slot || 'B') === toStr(savedRow.Slot || 'B')
-            );
-          });
+        console.log(`📊 Channel ${ch}:`, {
+          savedRowsCount: savedRows.length,
+          currentRowsCount: currentRows.length,
+          savedIds: savedRows.map(r => r.Id || r.id || r.ID).filter(Boolean),
+          currentIds: currentRows.map(r => r.Id || r.id || r.ID).filter(Boolean)
+        });
+
+        savedRows.forEach((savedRow, index) => {
+          const savedId = savedRow.Id || savedRow.id || savedRow.ID;
+
+          // TRY 1: Match by ID (most reliable)
+          let matchingRow = null;
+
+          if (savedId) {
+            matchingRow = currentRows.find(currentRow => {
+              const currentId = currentRow.Id || currentRow.id || currentRow.ID;
+              return String(currentId) === String(savedId);
+            });
+
+            if (matchingRow) {
+              console.log(`✅ Matched by ID: ${savedId} - ${savedRow.Program}`);
+            }
+          }
+
+          // TRY 2: If no ID match, try detailed matching
+          if (!matchingRow) {
+            matchingRow = currentRows.find(currentRow => {
+              // Normalize all strings for comparison
+              const normalize = (str) => toStr(str).trim().toUpperCase().replace(/\s+/g, ' ');
+
+              return (
+                normalize(currentRow.Channel) === normalize(savedRow.Channel) &&
+                normalize(currentRow.Program) === normalize(savedRow.Program) &&
+                normalize(currentRow.Day || currentRow.Date) === normalize(savedRow.Day || savedRow.Date) &&
+                normalize(currentRow.Time || currentRow.Start_Time || currentRow.StartTime) ===
+                normalize(savedRow.Time || savedRow.Start_Time || savedRow.StartTime) &&
+                normSlot(currentRow.Slot) === normSlot(savedRow.Slot)
+              );
+            });
+
+            if (matchingRow) {
+              console.log(`✅ Matched by details: ${savedRow.Program}`);
+            }
+          }
+
+          // TRY 3: Last resort - match by program name only (loosest match)
+          if (!matchingRow) {
+            matchingRow = currentRows.find(currentRow => {
+              const normalize = (str) => toStr(str).trim().toUpperCase().replace(/\s+/g, ' ');
+              return normalize(currentRow.Program) === normalize(savedRow.Program);
+            });
+
+            if (matchingRow) {
+              console.log(`⚠️ Loosely matched by program name only: ${savedRow.Program}`);
+            }
+          }
 
           if (matchingRow) {
             // Found match - select it
             seeded[ch].add(rowKey(matchingRow));
-            console.log('Matched saved program:', {
-              channel: ch,
-              program: savedRow.Program,
-              matchFound: true
-            });
           } else {
-            console.log('No match found for saved program:', {
+            console.log(`❌ No match found for saved program ${index}:`, {
               channel: ch,
+              id: savedId,
               program: savedRow.Program,
               day: savedRow.Day,
-              time: savedRow.Time
+              time: savedRow.Time,
+              slot: savedRow.Slot
             });
           }
         });
       }
     });
 
-    console.log('Seeded checkbox states:', seeded);
+    console.log('📋 Seeded checkbox states:', {
+      seeded: Object.fromEntries(
+        Object.entries(seeded).map(([ch, set]) => [ch, Array.from(set)])
+      ),
+      totalSelected: Object.values(seeded).reduce((sum, set) => sum + set.size, 0)
+    });
+
     setCheckedByChannel(seeded);
-  }, [channels, slotBByChannel, selectedBonusPrograms, rowKey, toStr]);
+  }, [channels, slotBByChannel, selectedBonusPrograms, rowKey, toStr, normSlot]);
 
   const filteredRowsByChannel = useMemo(() => {
     const out = {};
@@ -166,6 +213,12 @@ export default function BonusProgramSelector({
       const allRows = slotBByChannel[ch] || [];
       payload[ch] = allRows.filter((r) => keys.has(rowKey(r)));
     });
+
+    console.log('💾 Saving selected bonus programs:', {
+      payloadCount: Object.values(payload).reduce((sum, arr) => sum + arr.length, 0),
+      payloadChannels: Object.keys(payload)
+    });
+
     setSelectedBonusPrograms(payload);
     onNext && onNext();
   }, [totalSelected, channels, checkedByChannel, slotBByChannel, rowKey, setSelectedBonusPrograms, onNext]);
@@ -225,6 +278,11 @@ export default function BonusProgramSelector({
           <div style={styles.title}>Bonus Program Selection (Non-Prime)</div>
           <div style={styles.hint}>
             Select Slot B programs for bonus optimization. Saved selections are automatically restored.
+            {selectedBonusPrograms && Object.keys(selectedBonusPrograms).length > 0 && (
+              <span style={{ color: '#3182ce', fontWeight: 'bold' }}>
+                {' '}(Restoring {Object.values(selectedBonusPrograms).reduce((sum, arr) => sum + (arr?.length || 0), 0)} saved programs)
+              </span>
+            )}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -241,6 +299,7 @@ export default function BonusProgramSelector({
         {channels.map((ch) => {
           const rows = filteredRowsByChannel[ch] || [];
           const checked = checkedByChannel[ch] || new Set();
+          const savedCount = selectedBonusPrograms?.[ch]?.length || 0;
 
           return (
             <div key={ch} style={styles.card}>
@@ -253,6 +312,17 @@ export default function BonusProgramSelector({
                     onError={(e) => (e.currentTarget.style.display = 'none')}
                   />
                   <span>{ch}</span>
+                  {savedCount > 0 && (
+                    <span style={{
+                      fontSize: 12,
+                      color: '#3182ce',
+                      background: '#ebf8ff',
+                      padding: '2px 8px',
+                      borderRadius: 12
+                    }}>
+                      {savedCount} saved
+                    </span>
+                  )}
                 </div>
                 <div style={styles.badge}>
                   {checked.size} of {rows.length} selected
@@ -295,16 +365,46 @@ export default function BonusProgramSelector({
                       const time = r.Time ?? r.Start_Time ?? r.StartTime ?? '';
                       const rate = r.Rate ?? r.DB_Rate ?? r.Cost ?? '';
                       const tvr = r.TVR ?? r.Rating ?? r.NTVR ?? '';
+                      const programId = r.Id || r.id || r.ID;
+
+                      // Check if this program was in saved selections
+                      const wasSaved = selectedBonusPrograms?.[ch]?.some(saved =>
+                        String(saved.Id || saved.id || saved.ID) === String(programId)
+                      );
+
                       return (
-                        <tr key={`${k}-${idx}`}>
+                        <tr
+                          key={`${k}-${idx}`}
+                          style={wasSaved ? { backgroundColor: '#f0fff4' } : {}}
+                        >
                           <td style={styles.td}>
                             <input
                               type="checkbox"
                               checked={isOn}
                               onChange={() => toggleRow(ch, r)}
                             />
+                            {wasSaved && (
+                              <span style={{
+                                fontSize: 10,
+                                color: '#38a169',
+                                marginLeft: 4
+                              }} title="Previously saved">
+                                ✓
+                              </span>
+                            )}
                           </td>
-                          <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>{toStr(r.Program)}</td>
+                          <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
+                            {toStr(r.Program)}
+                            {programId && (
+                              <span style={{
+                                fontSize: 10,
+                                color: '#718096',
+                                marginLeft: 4
+                              }}>
+                                (ID: {programId})
+                              </span>
+                            )}
+                          </td>
                           <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>{toStr(r.Day ?? r.Date ?? '')}</td>
                           <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>{toStr(time)}</td>
                           <td style={styles.numTd}>{fmt(rate)}</td>
