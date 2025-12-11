@@ -49,19 +49,27 @@ export default function BonusProgramSelector({
   const [searchTextByChannel, setSearchTextByChannel] = useState({});
   const [checkedByChannel, setCheckedByChannel] = useState({}); // {ch: Set(rowKey)}
 
-  // Seed from any previously saved selection
     useEffect(() => {
       const seeded = {};
       channels.forEach((ch) => {
         const allRows = slotBByChannel[ch] || [];
-        // ✅ If previous selections exist, use them; otherwise select everything
-        const arr = selectedBonusPrograms?.[ch]?.length
-          ? selectedBonusPrograms[ch]
-          : allRows;
-        seeded[ch] = new Set(arr.map(rowKey));
+
+        // Check if selectedBonusPrograms exists and has this channel
+        const hasSavedSelection = selectedBonusPrograms &&
+                                 selectedBonusPrograms[ch] &&
+                                 Array.isArray(selectedBonusPrograms[ch]) &&
+                                 selectedBonusPrograms[ch].length > 0;
+
+        if (hasSavedSelection) {
+          // Use saved selections
+          seeded[ch] = new Set(selectedBonusPrograms[ch].map(rowKey));
+        } else {
+          // Don't select anything by default - start with empty set
+          seeded[ch] = new Set();
+        }
       });
       setCheckedByChannel(seeded);
-    }, [channels, slotBByChannel]);
+    }, [channels, slotBByChannel, selectedBonusPrograms]); // Add selectedBonusPrograms to dependencies
 
   const filteredRowsByChannel = useMemo(() => {
     const out = {};
