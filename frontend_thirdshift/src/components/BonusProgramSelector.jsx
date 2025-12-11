@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 export default function BonusProgramSelector({
   channels = [],
   allDbPrograms = [],
-  selectedBonusPrograms = {},               // { [channel]: Array<row> }
+  selectedBonusPrograms = {},               // { [channel]: Array<row> } from saved plan
   setSelectedBonusPrograms = () => {},
   onNext,
   onBack,
@@ -15,15 +15,14 @@ export default function BonusProgramSelector({
   const fmt = useCallback((n) =>
     (Number(n) || 0).toLocaleString('en-LK', { maximumFractionDigits: 0 }), []);
 
-  // A robust row key (since DB schema keys vary) - useCallback to memoize
+  // A robust row key using only stable identifying fields (not pricing/TVR data)
   const rowKey = useCallback((r) => [
-    r.Channel,
-    r.Program,
-    r.Day ?? r.Date ?? '',
-    r.Time ?? r.Start_Time ?? r.StartTime ?? '',
-    r.Slot ?? '',
-    r.Rate ?? '',
-  ].map(toStr).join('||'), [toStr]);
+    toStr(r.Channel || ''),
+    toStr(r.Program || ''),
+    toStr(r.Day || r.Date || ''),
+    toStr(r.Time || r.Start_Time || r.StartTime || ''),
+    toStr(r.Slot || 'B'),
+  ].join('||'), [toStr]);
 
   // Only Slot B (non-prime) rows, group by channel
   const slotBByChannel = useMemo(() => {
@@ -43,31 +42,66 @@ export default function BonusProgramSelector({
       out[ch].push(r);
     });
     return out;
-  }, [allDbPrograms, channels, normSlot]); // Added normSlot dependency
+  }, [allDbPrograms, channels, normSlot]);
 
   // Local UI state: search text per channel, and checkbox state per channel
   const [searchTextByChannel, setSearchTextByChannel] = useState({});
   const [checkedByChannel, setCheckedByChannel] = useState({}); // {ch: Set(rowKey)}
 
+  // ⭐ CRITICAL: Restore saved selections when component loads
   useEffect(() => {
+    console.log('Restoring bonus selections:', {
+      hasSavedSelections: selectedBonusPrograms && Object.keys(selectedBonusPrograms).length > 0,
+      channels,
+      slotBRowCount: Object.values(slotBByChannel).reduce((sum, arr) => sum + (arr?.length || 0), 0)
+    });
+
     const seeded = {};
     channels.forEach((ch) => {
-      // Check if selectedBonusPrograms exists and has this channel
-      const hasSavedSelection = selectedBonusPrograms &&
-                               selectedBonusPrograms[ch] &&
-                               Array.isArray(selectedBonusPrograms[ch]) &&
-                               selectedBonusPrograms[ch].length > 0;
+      const currentRows = slotBByChannel[ch] || []; // Current rows from fresh dfFull
+      seeded[ch] = new Set();
 
-      if (hasSavedSelection) {
-        // Use saved selections
-        seeded[ch] = new Set(selectedBonusPrograms[ch].map(rowKey));
-      } else {
-        // Don't select anything by default - start with empty set
-        seeded[ch] = new Set();
+      // If we have saved selections for this channel
+      if (selectedBonusPrograms && selectedBonusPrograms[ch] && Array.isArray(selectedBonusPrograms[ch])) {
+        const savedRows = selectedBonusPrograms[ch]; // Saved rows from old plan
+
+        savedRows.forEach(savedRow => {
+          // Try to find matching row in current data
+          const matchingRow = currentRows.find(currentRow => {
+            // Compare by program identity (not pricing/TVR data)
+            return (
+              toStr(currentRow.Channel) === toStr(savedRow.Channel) &&
+              toStr(currentRow.Program) === toStr(savedRow.Program) &&
+              toStr(currentRow.Day || currentRow.Date) === toStr(savedRow.Day || savedRow.Date) &&
+              toStr(currentRow.Time || currentRow.Start_Time || currentRow.StartTime) ===
+              toStr(savedRow.Time || savedRow.Start_Time || savedRow.StartTime) &&
+              toStr(currentRow.Slot || 'B') === toStr(savedRow.Slot || 'B')
+            );
+          });
+
+          if (matchingRow) {
+            // Found match - select it
+            seeded[ch].add(rowKey(matchingRow));
+            console.log('Matched saved program:', {
+              channel: ch,
+              program: savedRow.Program,
+              matchFound: true
+            });
+          } else {
+            console.log('No match found for saved program:', {
+              channel: ch,
+              program: savedRow.Program,
+              day: savedRow.Day,
+              time: savedRow.Time
+            });
+          }
+        });
       }
     });
+
+    console.log('Seeded checkbox states:', seeded);
     setCheckedByChannel(seeded);
-  }, [channels, selectedBonusPrograms, rowKey]); // Added rowKey dependency
+  }, [channels, slotBByChannel, selectedBonusPrograms, rowKey, toStr]);
 
   const filteredRowsByChannel = useMemo(() => {
     const out = {};
@@ -189,6 +223,9 @@ export default function BonusProgramSelector({
       <div style={styles.header}>
         <div>
           <div style={styles.title}>Bonus Program Selection (Non-Prime)</div>
+          <div style={styles.hint}>
+            Select Slot B programs for bonus optimization. Saved selections are automatically restored.
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="button" onClick={selectAllGlobal} style={styles.smlBtn}>
@@ -216,6 +253,9 @@ export default function BonusProgramSelector({
                     onError={(e) => (e.currentTarget.style.display = 'none')}
                   />
                   <span>{ch}</span>
+                </div>
+                <div style={styles.badge}>
+                  {checked.size} of {rows.length} selected
                 </div>
               </div>
 
@@ -297,7 +337,7 @@ export default function BonusProgramSelector({
           style={{ ...styles.nextBtn, opacity: totalSelected > 0 ? 1 : 0.7 }}
           disabled={totalSelected === 0}
         >
-          Proceed to Bonus Optimization-Ready Table
+          Proceed to Bonus Optimization-Ready Table ({totalSelected} programs selected)
         </button>
       </div>
     </div>
