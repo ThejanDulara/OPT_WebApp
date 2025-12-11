@@ -1,5 +1,5 @@
 // src/components/BonusProgramSelector.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 
 export default function BonusProgramSelector({
   channels = [],
@@ -10,66 +10,64 @@ export default function BonusProgramSelector({
   onBack,
 }) {
   // --- helpers ---
-  const toStr = (v) => (v === null || v === undefined ? '' : String(v));
-  const normSlot = (s) => toStr(s).trim().toUpperCase();
-  const fmt = (n) =>
-    (Number(n) || 0).toLocaleString('en-LK', { maximumFractionDigits: 0 });
+  const toStr = useCallback((v) => (v === null || v === undefined ? '' : String(v)), []);
+  const normSlot = useCallback((s) => toStr(s).trim().toUpperCase(), [toStr]);
+  const fmt = useCallback((n) =>
+    (Number(n) || 0).toLocaleString('en-LK', { maximumFractionDigits: 0 }), []);
 
-  // A robust row key (since DB schema keys vary)
-  const rowKey = (r) => [
+  // A robust row key (since DB schema keys vary) - useCallback to memoize
+  const rowKey = useCallback((r) => [
     r.Channel,
     r.Program,
     r.Day ?? r.Date ?? '',
     r.Time ?? r.Start_Time ?? r.StartTime ?? '',
     r.Slot ?? '',
     r.Rate ?? '',
-  ].map(toStr).join('||');
+  ].map(toStr).join('||'), [toStr]);
 
   // Only Slot B (non-prime) rows, group by channel
-    const slotBByChannel = useMemo(() => {
-      const out = {};
-      channels.forEach((ch) => (out[ch] = []));
-      const seen = new Set();
+  const slotBByChannel = useMemo(() => {
+    const out = {};
+    channels.forEach((ch) => (out[ch] = []));
+    const seen = new Set();
 
-      (allDbPrograms || []).forEach((r) => {
-        const ch = r.Channel;
-        if (!ch || !channels.includes(ch)) return;
-        if (normSlot(r.Slot) !== 'B') return;
+    (allDbPrograms || []).forEach((r) => {
+      const ch = r.Channel;
+      if (!ch || !channels.includes(ch)) return;
+      if (normSlot(r.Slot) !== 'B') return;
 
-        const key = [ch, r.Program, r.Day ?? r.Date ?? '', r.Time ?? r.Start_Time ?? r.StartTime ?? ''].join('||');
-        if (seen.has(key)) return; // skip duplicate
-        seen.add(key);
+      const key = [ch, r.Program, r.Day ?? r.Date ?? '', r.Time ?? r.Start_Time ?? r.StartTime ?? ''].join('||');
+      if (seen.has(key)) return; // skip duplicate
+      seen.add(key);
 
-        out[ch].push(r);
-      });
-      return out;
-    }, [allDbPrograms, channels]);
+      out[ch].push(r);
+    });
+    return out;
+  }, [allDbPrograms, channels, normSlot]); // Added normSlot dependency
 
   // Local UI state: search text per channel, and checkbox state per channel
   const [searchTextByChannel, setSearchTextByChannel] = useState({});
   const [checkedByChannel, setCheckedByChannel] = useState({}); // {ch: Set(rowKey)}
 
-    useEffect(() => {
-      const seeded = {};
-      channels.forEach((ch) => {
-        const allRows = slotBByChannel[ch] || [];
+  useEffect(() => {
+    const seeded = {};
+    channels.forEach((ch) => {
+      // Check if selectedBonusPrograms exists and has this channel
+      const hasSavedSelection = selectedBonusPrograms &&
+                               selectedBonusPrograms[ch] &&
+                               Array.isArray(selectedBonusPrograms[ch]) &&
+                               selectedBonusPrograms[ch].length > 0;
 
-        // Check if selectedBonusPrograms exists and has this channel
-        const hasSavedSelection = selectedBonusPrograms &&
-                                 selectedBonusPrograms[ch] &&
-                                 Array.isArray(selectedBonusPrograms[ch]) &&
-                                 selectedBonusPrograms[ch].length > 0;
-
-        if (hasSavedSelection) {
-          // Use saved selections
-          seeded[ch] = new Set(selectedBonusPrograms[ch].map(rowKey));
-        } else {
-          // Don't select anything by default - start with empty set
-          seeded[ch] = new Set();
-        }
-      });
-      setCheckedByChannel(seeded);
-    }, [channels, slotBByChannel, selectedBonusPrograms]); // Add selectedBonusPrograms to dependencies
+      if (hasSavedSelection) {
+        // Use saved selections
+        seeded[ch] = new Set(selectedBonusPrograms[ch].map(rowKey));
+      } else {
+        // Don't select anything by default - start with empty set
+        seeded[ch] = new Set();
+      }
+    });
+    setCheckedByChannel(seeded);
+  }, [channels, selectedBonusPrograms, rowKey]); // Added rowKey dependency
 
   const filteredRowsByChannel = useMemo(() => {
     const out = {};
@@ -88,9 +86,9 @@ export default function BonusProgramSelector({
       }
     });
     return out;
-  }, [channels, searchTextByChannel, slotBByChannel]);
+  }, [channels, searchTextByChannel, slotBByChannel, toStr]);
 
-  const toggleRow = (ch, r) => {
+  const toggleRow = useCallback((ch, r) => {
     const k = rowKey(r);
     setCheckedByChannel((prev) => {
       const next = { ...prev };
@@ -99,30 +97,30 @@ export default function BonusProgramSelector({
       else next[ch].add(k);
       return next;
     });
-  };
+  }, [rowKey]);
 
-  const selectAllVisible = (ch) => {
+  const selectAllVisible = useCallback((ch) => {
     setCheckedByChannel((prev) => {
       const next = { ...prev };
       next[ch] = new Set(next[ch] || []);
       (filteredRowsByChannel[ch] || []).forEach((r) => next[ch].add(rowKey(r)));
       return next;
     });
-  };
+  }, [filteredRowsByChannel, rowKey]);
 
-  const clearAll = (ch) => {
+  const clearAll = useCallback((ch) => {
     setCheckedByChannel((prev) => {
       const next = { ...prev };
       next[ch] = new Set();
       return next;
     });
-  };
+  }, []);
 
   const totalSelected = useMemo(() => {
     return channels.reduce((acc, ch) => acc + (checkedByChannel[ch]?.size || 0), 0);
   }, [channels, checkedByChannel]);
 
-  const handleProceed = () => {
+  const handleProceed = useCallback(() => {
     if (totalSelected === 0) {
       alert('Please select at least one non-prime (Slot B) program to continue.');
       return;
@@ -136,7 +134,7 @@ export default function BonusProgramSelector({
     });
     setSelectedBonusPrograms(payload);
     onNext && onNext();
-  };
+  }, [totalSelected, channels, checkedByChannel, slotBByChannel, rowKey, setSelectedBonusPrograms, onNext]);
 
   // ---- styles ----
   const styles = {
@@ -153,8 +151,8 @@ export default function BonusProgramSelector({
     searchInput: { flex: 1, padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 6 },
     smlBtn: { padding: '6px 10px', borderRadius: 6, background: '#edf2f7', border: '1px solid #cbd5e0', cursor: 'pointer' },
     tableWrap: { maxHeight: 360, overflow: 'auto', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 },
-    table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 ,tableLayout: 'auto' },
-    th: {position: 'sticky',top: 0,background: '#f7fafc',borderBottom: '1px solid #e2e8f0',padding: '8px 10px',textAlign: 'center'},
+    table: { width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'auto' },
+    th: { position: 'sticky', top: 0, background: '#f7fafc', borderBottom: '1px solid #e2e8f0', padding: '8px 10px', textAlign: 'center' },
     td: { borderBottom: '1px solid #edf2f7', padding: '8px 10px', verticalAlign: 'top' },
     actions: { display: 'flex', gap: 12, marginTop: 16 },
     backBtn: { padding: '12px 18px', background: '#edf2f7', border: '1px solid #cbd5e0', borderRadius: 6, cursor: 'pointer' },
@@ -165,27 +163,26 @@ export default function BonusProgramSelector({
 
   const logoPath = (ch) => `/logos/${ch}.png`;
 
-    const selectAllGlobal = () => {
-      setCheckedByChannel((prev) => {
-        const next = { ...prev };
-        channels.forEach((ch) => {
-          next[ch] = new Set(next[ch] || []);
-          (slotBByChannel[ch] || []).forEach((r) => next[ch].add(rowKey(r)));
-        });
-        return next;
+  const selectAllGlobal = useCallback(() => {
+    setCheckedByChannel((prev) => {
+      const next = { ...prev };
+      channels.forEach((ch) => {
+        next[ch] = new Set(next[ch] || []);
+        (slotBByChannel[ch] || []).forEach((r) => next[ch].add(rowKey(r)));
       });
-    };
+      return next;
+    });
+  }, [channels, slotBByChannel, rowKey]);
 
-    const clearAllGlobal = () => {
-      setCheckedByChannel((prev) => {
-        const next = {};
-        channels.forEach((ch) => {
-          next[ch] = new Set(); // clear all
-        });
-        return next;
+  const clearAllGlobal = useCallback(() => {
+    setCheckedByChannel((prev) => {
+      const next = {};
+      channels.forEach((ch) => {
+        next[ch] = new Set(); // clear all
       });
-    };
-
+      return next;
+    });
+  }, [channels]);
 
   return (
     <div style={styles.page}>
@@ -247,7 +244,7 @@ export default function BonusProgramSelector({
                       <th style={styles.th}>Program</th>
                       <th style={styles.th}>Day</th>
                       <th style={styles.th}>Time</th>
-                      <th style={{ ...styles.th, whiteSpace: 'nowrap'}}>RC Rate</th>
+                      <th style={{ ...styles.th, whiteSpace: 'nowrap' }}>RC Rate</th>
                       <th style={styles.th}>TVR</th>
                     </tr>
                   </thead>
@@ -267,9 +264,9 @@ export default function BonusProgramSelector({
                               onChange={() => toggleRow(ch, r)}
                             />
                           </td>
-                          <td style={{ ...styles.td, whiteSpace: 'nowrap'}}>{toStr(r.Program)}</td>
-                          <td style={{ ...styles.td, whiteSpace: 'nowrap'}}>{toStr(r.Day ?? r.Date ?? '')}</td>
-                          <td style={{ ...styles.td, whiteSpace: 'nowrap'}}>{toStr(time)}</td>
+                          <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>{toStr(r.Program)}</td>
+                          <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>{toStr(r.Day ?? r.Date ?? '')}</td>
+                          <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>{toStr(time)}</td>
                           <td style={styles.numTd}>{fmt(rate)}</td>
                           <td style={styles.numTd}>{toStr(tvr)}</td>
                         </tr>
