@@ -229,33 +229,59 @@ def generate_df():
 @app.route('/generate-bonus-df', methods=['POST'])
 def generate_bonus_df():
     """
-    Generate the bonus optimization-ready DataFrame
-    using the same normalization logic as /generate-df.
-    Avoids duplicates and ensures consistent scaling.
+    Generate bonus (Slot B) optimization-ready DataFrame.
+    Bonus programs:
+    - Use raw 'cost' from DB (NO discounts or negotiations applied)
+    - Use dynamic Target Group for TVR
+    - Only duration-based normalization (NTVR / NCost)
     """
     data = request.get_json()
 
-    # Selected program IDs for Slot B
     program_ids = data.get('program_ids', [])
+    tg = data.get("target_group", "tvr_all")  # Dynamic TG from frontend
     durations = data.get('durations', [])
-    num_commercials = len(durations)
-    negotiated_rates = data.get('negotiated_rates', {})
-    channel_discounts = data.get('channel_discounts', {})
 
     if not program_ids or not durations:
         return jsonify({"error": "Missing program_ids or durations"}), 400
 
-    # 🔁 Reuse existing generate_df logic (inline version)
+    # Validate and fallback TG
+    ALLOWED_TGS = [
+        "tvr_all", "tvr_abc_15_90", "tvr_abc_30_60", "tvr_abc_15_30",
+        "tvr_abc_20_plus", "tvr_ab_15_plus", "tvr_cd_15_plus",
+        "tvr_ab_female_15_45", "tvr_abc_15_60", "tvr_bcde_15_plus",
+        "tvr_abcde_15_plus", "tvr_abc_female_15_60", "tvr_abc_male_15_60",
+    ]
+    if tg not in ALLOWED_TGS:
+        tg = "tvr_all"
+
+    num_commercials = len(durations)
+
+    # Fetch only raw cost + dynamic TG column
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     fmt = ','.join(['%s'] * len(program_ids))
-    cursor.execute(f"SELECT id, channel, day, time, program, cost, tvr, slot FROM programs WHERE id IN ({fmt})", tuple(program_ids))
+    query = f"""
+        SELECT 
+            id,
+            channel,
+            day,
+            time,
+            program,
+            cost,
+            {tg} AS tvr,
+            slot
+        FROM programs 
+        WHERE id IN ({fmt})
+    """
+    cursor.execute(query, tuple(program_ids))
     rows = cursor.fetchall()
     conn.close()
+
     if not rows:
         return jsonify({"error": "No programs found for given IDs"}), 400
 
     df = pd.DataFrame(rows)
+
     df.rename(columns={
         'id': 'Id',
         'channel': 'Channel',
@@ -267,39 +293,42 @@ def generate_bonus_df():
         'slot': 'Slot'
     }, inplace=True)
 
+    # Ensure numeric types
     df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce').fillna(0.0)
-    df['TVR'] = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
+    df['TVR']  = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
 
-    def effective_cost(row):
-        pid = row['Id']
-        ch = row['Channel']
-        base = float(row['Cost'])
-        if pid in negotiated_rates:
-            return float(negotiated_rates[pid])
-        disc_pct = float(channel_discounts.get(ch, 30.0))
-        return round(base * (1.0 - disc_pct / 100.0), 2)
+    # For bonus: Rate = Raw Cost (no negotiation, no discount)
+    df['Negotiated_Rate'] = df['Cost']  # Exact copy — no changes
 
-    df['Negotiated_Rate'] = df.apply(effective_cost, axis=1)
-
+    # Expand by commercials with duration scaling
     df_list = []
     for c in range(num_commercials):
         temp = df.copy()
-        temp['Commercial'] = f"com_{c+1}"
+        temp['Commercial'] = f"com_{c + 1}"
         dur = float(durations[c])
         temp['Duration'] = dur
-        temp['NTVR'] = (temp['TVR'] / 30.0) * dur
-        temp['NCost'] = (temp['Negotiated_Rate'] / 30.0) * dur
+
+        # Scale TVR and Cost by duration (from 30-sec base)
+        temp['NTVR']  = (temp['TVR'] / 30.0) * dur
+        temp['NCost'] = (temp['Cost'] / 30.0) * dur   # Uses raw Cost → no discount
         temp['Slot'] = 'B'
+
         df_list.append(temp)
 
     df_full = pd.concat(df_list, ignore_index=True)
+
+    # Remove duplicates (safety)
     df_full = df_full.drop_duplicates(subset=['Channel', 'Program', 'Day', 'Time', 'Commercial'])
 
+    # Round numeric columns
     cols_to_round = ['Cost', 'TVR', 'Negotiated_Rate', 'NTVR', 'NCost']
     for col in cols_to_round:
         df_full[col] = pd.to_numeric(df_full[col], errors='coerce').fillna(0.0).round(2)
 
-    return jsonify({"success": True, "df_full": json.loads(df_full.to_json(orient='records'))})
+    return jsonify({
+        "success": True,
+        "df_full": json.loads(df_full.to_json(orient='records'))
+    })
 
 
 @app.route('/optimize', methods=['POST'])
