@@ -35,122 +35,74 @@ export default function BonusProgramSelector({
       if (!ch || !channels.includes(ch)) return;
       if (normSlot(r.Slot) !== 'B') return;
 
-      const key = [ch, r.Program, r.Day ?? r.Date ?? '', r.Time ?? r.Start_Time ?? r.StartTime ?? ''].join('||');
-      if (seen.has(key)) return; // skip duplicate
-      seen.add(key);
+      // Use the stable rowKey for deduplication, as in the old code, which is fine
+      // The key here is just for internal deduplication during dfFull creation
+      const dedupKey = [ch, r.Program, r.Day ?? r.Date ?? '', r.Time ?? r.Start_Time ?? r.StartTime ?? ''].join('||');
+      if (seen.has(dedupKey)) return;
+      seen.add(dedupKey);
 
       out[ch].push(r);
     });
     return out;
   }, [allDbPrograms, channels, normSlot]);
 
-  // Local UI state: search text per channel, and checkbox state per channel
-  const [searchTextByChannel, setSearchTextByChannel] = useState({});
-  const [checkedByChannel, setCheckedByChannel] = useState({}); // {ch: Set(rowKey)}
 
-  // ⭐ CRITICAL: Restore saved selections when component loads
-  useEffect(() => {
-    console.log('🔍 Restoring bonus selections:', {
-      hasSavedSelections: selectedBonusPrograms && Object.keys(selectedBonusPrograms).length > 0,
-      channels,
-      slotBRowCount: Object.values(slotBByChannel).reduce((sum, arr) => sum + (arr?.length || 0), 0),
-      allDbProgramsCount: allDbPrograms?.length || 0
-    });
-
+  // 🌟 FIX: RECONCILIATION LOGIC MOVED TO useMemo FOR INITIAL STATE 🌟
+  // This memoized value calculates which saved programs are still present in the new dfFull.
+  const initialSelectedKeys = useMemo(() => {
+    const availableProgramKeys = new Set();
     const seeded = {};
-    channels.forEach((ch) => {
-      const currentRows = slotBByChannel[ch] || []; // Current rows from fresh dfFull
+
+    // 1. Collect all stable keys from the NEW, available programs (slotBByChannel/new dfFull)
+    Object.entries(slotBByChannel).forEach(([ch, rows]) => {
       seeded[ch] = new Set();
-
-      // If we have saved selections for this channel
-      if (selectedBonusPrograms && selectedBonusPrograms[ch] && Array.isArray(selectedBonusPrograms[ch])) {
-        const savedRows = selectedBonusPrograms[ch]; // Saved rows from old plan
-
-        console.log(`📊 Channel ${ch}:`, {
-          savedRowsCount: savedRows.length,
-          currentRowsCount: currentRows.length,
-          savedIds: savedRows.map(r => r.Id || r.id || r.ID).filter(Boolean),
-          currentIds: currentRows.map(r => r.Id || r.id || r.ID).filter(Boolean)
-        });
-
-        savedRows.forEach((savedRow, index) => {
-          const savedId = savedRow.Id || savedRow.id || savedRow.ID;
-
-          // TRY 1: Match by ID (most reliable)
-          let matchingRow = null;
-
-          if (savedId) {
-            matchingRow = currentRows.find(currentRow => {
-              const currentId = currentRow.Id || currentRow.id || currentRow.ID;
-              return String(currentId) === String(savedId);
-            });
-
-            if (matchingRow) {
-              console.log(`✅ Matched by ID: ${savedId} - ${savedRow.Program}`);
-            }
-          }
-
-          // TRY 2: If no ID match, try detailed matching
-          if (!matchingRow) {
-            matchingRow = currentRows.find(currentRow => {
-              // Normalize all strings for comparison
-              const normalize = (str) => toStr(str).trim().toUpperCase().replace(/\s+/g, ' ');
-
-              return (
-                normalize(currentRow.Channel) === normalize(savedRow.Channel) &&
-                normalize(currentRow.Program) === normalize(savedRow.Program) &&
-                normalize(currentRow.Day || currentRow.Date) === normalize(savedRow.Day || savedRow.Date) &&
-                normalize(currentRow.Time || currentRow.Start_Time || currentRow.StartTime) ===
-                normalize(savedRow.Time || savedRow.Start_Time || savedRow.StartTime) &&
-                normSlot(currentRow.Slot) === normSlot(savedRow.Slot)
-              );
-            });
-
-            if (matchingRow) {
-              console.log(`✅ Matched by details: ${savedRow.Program}`);
-            }
-          }
-
-          // TRY 3: Last resort - match by program name only (loosest match)
-          if (!matchingRow) {
-            matchingRow = currentRows.find(currentRow => {
-              const normalize = (str) => toStr(str).trim().toUpperCase().replace(/\s+/g, ' ');
-              return normalize(currentRow.Program) === normalize(savedRow.Program);
-            });
-
-            if (matchingRow) {
-              console.log(`⚠️ Loosely matched by program name only: ${savedRow.Program}`);
-            }
-          }
-
-          if (matchingRow) {
-            // Found match - select it
-            seeded[ch].add(rowKey(matchingRow));
-          } else {
-            console.log(`❌ No match found for saved program ${index}:`, {
-              channel: ch,
-              id: savedId,
-              program: savedRow.Program,
-              day: savedRow.Day,
-              time: savedRow.Time,
-              slot: savedRow.Slot
-            });
-          }
-        });
-      }
+      rows.forEach(r => availableProgramKeys.add(rowKey(r)));
     });
 
-    console.log('📋 Seeded checkbox states:', {
-      seeded: Object.fromEntries(
-        Object.entries(seeded).map(([ch, set]) => [ch, Array.from(set)])
-      ),
-      totalSelected: Object.values(seeded).reduce((sum, set) => sum + set.size, 0)
+    // 2. Iterate through the SAVED selections and check if the key is still available
+    Object.entries(selectedBonusPrograms).forEach(([ch, savedRows]) => {
+      if (!savedRows || !Array.isArray(savedRows)) return;
+
+      savedRows.forEach(savedRow => {
+        const key = rowKey(savedRow);
+
+        // The saved key MUST be present in the new set of available keys
+        if (availableProgramKeys.has(key)) {
+          // If it is, add the key to the initial selection set for its channel
+          if (seeded[ch]) {
+             seeded[ch].add(key);
+          }
+        } else {
+          // console.log(`❌ Saved program no longer available: ${savedRow.Program} on ${ch}`);
+          // This row is effectively dropped from the selection
+        }
+      });
     });
 
-    setCheckedByChannel(seeded);
-  }, [channels, slotBByChannel, selectedBonusPrograms, rowKey, toStr, normSlot]);
+    // seeded is now {ch: Set<rowKey>} containing only valid, re-matched selections
+    return seeded;
+  }, [slotBByChannel, selectedBonusPrograms, rowKey]);
+
+
+  // Initialize component state with the reconciled selection
+  const [checkedByChannel, setCheckedByChannel] = useState(initialSelectedKeys);
+
+  // Use an effect to update the state *only* when a new plan is loaded (initialSelectedKeys changes)
+  // This replaces the entire verbose, slow, and error-prone matching logic in your old useEffect.
+  useEffect(() => {
+    // This runs on mount and whenever initialSelectedKeys changes (i.e., new plan/dfFull loaded)
+    setCheckedByChannel(initialSelectedKeys);
+    // console.log('✅ Updated selection state with reconciled keys.');
+  }, [initialSelectedKeys]);
+
+  // Local UI state: search text per channel
+  const [searchTextByChannel, setSearchTextByChannel] = useState({});
+
+  // ... (rest of the component logic remains largely the same)
+  // The rest of the component now uses `checkedByChannel` which is guaranteed to be correct.
 
   const filteredRowsByChannel = useMemo(() => {
+    // ... (Your existing filtering logic)
     const out = {};
     channels.forEach((ch) => {
       const q = toStr(searchTextByChannel[ch]).toLowerCase();
@@ -183,8 +135,8 @@ export default function BonusProgramSelector({
   const selectAllVisible = useCallback((ch) => {
     setCheckedByChannel((prev) => {
       const next = { ...prev };
-      next[ch] = new Set(next[ch] || []);
-      (filteredRowsByChannel[ch] || []).forEach((r) => next[ch].add(rowKey(r)));
+      next[ch] = new Set(prev[ch] || []); // Start with existing selections
+      (filteredRowsByChannel[ch] || []).forEach((r) => next[ch].add(rowKey(r))); // Add visible ones
       return next;
     });
   }, [filteredRowsByChannel, rowKey]);
@@ -196,6 +148,27 @@ export default function BonusProgramSelector({
       return next;
     });
   }, []);
+
+  const selectAllGlobal = useCallback(() => {
+    setCheckedByChannel((prev) => {
+      const next = { ...prev };
+      channels.forEach((ch) => {
+        next[ch] = new Set(); // Reset to empty set
+        (slotBByChannel[ch] || []).forEach((r) => next[ch].add(rowKey(r))); // Add all available
+      });
+      return next;
+    });
+  }, [channels, slotBByChannel, rowKey]);
+
+  const clearAllGlobal = useCallback(() => {
+    setCheckedByChannel((prev) => {
+      const next = {};
+      channels.forEach((ch) => {
+        next[ch] = new Set(); // clear all
+      });
+      return next;
+    });
+  }, [channels]);
 
   const totalSelected = useMemo(() => {
     return channels.reduce((acc, ch) => acc + (checkedByChannel[ch]?.size || 0), 0);
@@ -214,11 +187,12 @@ export default function BonusProgramSelector({
       payload[ch] = allRows.filter((r) => keys.has(rowKey(r)));
     });
 
-    console.log('💾 Saving selected bonus programs:', {
-      payloadCount: Object.values(payload).reduce((sum, arr) => sum + arr.length, 0),
-      payloadChannels: Object.keys(payload)
-    });
+    // console.log('💾 Saving selected bonus programs:', {
+    //   payloadCount: Object.values(payload).reduce((sum, arr) => sum + arr.length, 0),
+    //   payloadChannels: Object.keys(payload)
+    // });
 
+    // IMPORTANT: Update the external state now that the local state is finalized
     setSelectedBonusPrograms(payload);
     onNext && onNext();
   }, [totalSelected, channels, checkedByChannel, slotBByChannel, rowKey, setSelectedBonusPrograms, onNext]);
@@ -250,27 +224,6 @@ export default function BonusProgramSelector({
 
   const logoPath = (ch) => `/logos/${ch}.png`;
 
-  const selectAllGlobal = useCallback(() => {
-    setCheckedByChannel((prev) => {
-      const next = { ...prev };
-      channels.forEach((ch) => {
-        next[ch] = new Set(next[ch] || []);
-        (slotBByChannel[ch] || []).forEach((r) => next[ch].add(rowKey(r)));
-      });
-      return next;
-    });
-  }, [channels, slotBByChannel, rowKey]);
-
-  const clearAllGlobal = useCallback(() => {
-    setCheckedByChannel((prev) => {
-      const next = {};
-      channels.forEach((ch) => {
-        next[ch] = new Set(); // clear all
-      });
-      return next;
-    });
-  }, [channels]);
-
   return (
     <div style={styles.page}>
       <div style={styles.header}>
@@ -299,6 +252,7 @@ export default function BonusProgramSelector({
         {channels.map((ch) => {
           const rows = filteredRowsByChannel[ch] || [];
           const checked = checkedByChannel[ch] || new Set();
+          // The count here is still from the saved plan, useful as a visual cue
           const savedCount = selectedBonusPrograms?.[ch]?.length || 0;
 
           return (
@@ -365,16 +319,12 @@ export default function BonusProgramSelector({
                       const time = r.Time ?? r.Start_Time ?? r.StartTime ?? '';
                       const rate = r.Rate ?? r.DB_Rate ?? r.Cost ?? '';
                       const tvr = r.TVR ?? r.Rating ?? r.NTVR ?? '';
-                      const programId = r.Id || r.id || r.ID;
-
-                      // Check if this program was in saved selections
-                      const wasSaved = selectedBonusPrograms?.[ch]?.some(saved =>
-                        String(saved.Id || saved.id || saved.ID) === String(programId)
-                      );
+                      // We can check if the current row's stable key was *initially* selected
+                      const wasSaved = initialSelectedKeys?.[ch]?.has(k);
 
                       return (
                         <tr
-                          key={`${k}-${idx}`}
+                          key={k} // Use the stable key for the list key
                           style={wasSaved ? { backgroundColor: '#f0fff4' } : {}}
                         >
                           <td style={styles.td}>
@@ -388,20 +338,20 @@ export default function BonusProgramSelector({
                                 fontSize: 10,
                                 color: '#38a169',
                                 marginLeft: 4
-                              }} title="Previously saved">
+                              }} title="Previously saved and re-validated">
                                 ✓
                               </span>
                             )}
                           </td>
                           <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
                             {toStr(r.Program)}
-                            {programId && (
+                            {r.Id && (
                               <span style={{
                                 fontSize: 10,
                                 color: '#718096',
                                 marginLeft: 4
                               }}>
-                                (ID: {programId})
+                                (ID: {r.Id || r.id || r.ID})
                               </span>
                             )}
                           </td>
