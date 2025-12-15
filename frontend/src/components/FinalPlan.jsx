@@ -2177,7 +2177,8 @@ const propertyGRPTotal = useMemo(() => {
       directId: auth.id
     });
       const payload = {
-        user_id: auth.userId || auth.user_id || "",
+        //user_id: auth.userId || auth.user_id || "",
+        user_id: auth.id,
         user_first_name: auth.firstName || "",
         user_last_name: auth.lastName || "",
         metadata: {
