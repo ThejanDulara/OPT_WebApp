@@ -171,7 +171,7 @@ function App() {
   };
 
   const handleProceedToBonusSelector = () => {
-    setSelectedBonusPrograms({});
+    //setSelectedBonusPrograms({});
     setShowResults(false);
     navigate('/bonus-selector');
   };

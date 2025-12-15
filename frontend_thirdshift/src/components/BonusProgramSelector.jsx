@@ -62,7 +62,7 @@ export default function BonusProgramSelector({
       const matchedRows = allRows.filter((r) => savedKeys.has(rowKey(r)));
 
       // If matches exist, use them; otherwise select everything (or nothing — adjust as needed)
-      const arr = matchedRows.length > 0 ? matchedRows : allRows; // Fallback to all if no match; change to [] for none
+      const arr = matchedRows.length > 0 ? matchedRows : []; // Fallback to all if no match; change to [] for none
 
       seeded[ch] = new Set(arr.map(rowKey));
     });
