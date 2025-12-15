@@ -382,7 +382,7 @@ export default function CommercialBenefitSetup({
                       const slotLabels = {
                         A1: 'A1 - 6.55 News',
                         A2: 'A2 - 9.55 news',
-                        A3: 'A3 - PT WD Prog',
+                        A3: 'A3 - WD Drama + 11.55 News',
                         A4: 'A4 - PT WE Prog',
                         A5: 'A5 - PT B',
                         B: 'B - NPT'

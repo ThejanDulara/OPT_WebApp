@@ -1,6 +1,6 @@
 import React from 'react';
 
-function FrontPage({ onStart, onManagePrograms }) {
+function FrontPage({ onStart, onManagePrograms, onOpenHistory }) {
   return (
     <section style={pageWrapper}>
       {/* Left gradient panel with image */}
@@ -10,13 +10,14 @@ function FrontPage({ onStart, onManagePrograms }) {
             src="/TS-GARA-Mask.png"
             alt="TS GARA Mask"
             style={{
-              height: 520,
+              height: 420,
+              marginBottom: 40,
               filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.25))",
             }}
           />
           <h1 style={leftTitle}>Media Intelligence Platform</h1>
           <p style={leftText}>
-            Where Courage Meets Clarity, The Lions of Media Leadership Powering Data-Driven Business Growth.
+             Where Courage Meets Clarity, The Lions of Media Leadership Powering Data-Driven Business Growth.
           </p>
         </div>
       </div>
@@ -46,13 +47,17 @@ function FrontPage({ onStart, onManagePrograms }) {
           <h1 style={companyName}>MTM Group</h1>
           <p style={tagline}>Where Intelligence Shapes Smarter Media Planning.</p>
 
-          <button onClick={onStart} style={primaryButton}>
-            Start Optimization
-          </button>
+            <button onClick={onStart} style={primaryButton}>
+              Start Optimization
+            </button>
 
-          <button onClick={onManagePrograms} style={secondaryButton}>
-            Manage Program Data
-          </button>
+            <button onClick={onManagePrograms} style={secondaryButton}>
+              Manage Program Data
+            </button>
+
+            <button onClick={onOpenHistory} style={secondaryButton}>
+              View Saved Plans
+            </button>
         </div>
       </div>
     </section>
@@ -151,7 +156,7 @@ const companyName = {
   fontSize: '24px',
   fontWeight: '700',
   color: colors.textDark,
-  marginBottom: '2px',
+  marginBottom: '8px',
 };
 const tagline = {
   fontSize: '18px',
@@ -186,19 +191,21 @@ const primaryButton = {
 
 const secondaryButton = {
   padding: '14px 32px',
-  backgroundColor: colors.white,
-  color: colors.textDark,
-  border: `1px solid ${colors.primary}`,
+  background: colors.white,
   borderRadius: '30px',
   fontSize: '16px',
-  fontWeight: '500',
+  fontWeight: '600',
   cursor: 'pointer',
-  transition: 'all 0.25s ease',
-  display: 'block',
   width: '100%',
-  maxWidth: '240px',
-  marginLeft: 'auto',
-  marginRight: 'auto',
+  maxWidth: '260px',
+  margin: '0 auto 18px',
+  color: colors.accentDark,
+  border: '2px solid transparent',
+  backgroundImage: `linear-gradient(${colors.white}, ${colors.white}),
+                    linear-gradient(135deg, ${colors.primary}, ${colors.accent})`,
+  backgroundOrigin: 'border-box',
+  backgroundClip: 'padding-box, border-box',
+  transition: '0.3s',
 };
 
 // Add hover effects using CSS-in-JS

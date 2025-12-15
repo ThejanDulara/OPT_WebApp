@@ -15,53 +15,59 @@ export default function BonusProgramSelector({
   const fmt = (n) =>
     (Number(n) || 0).toLocaleString('en-LK', { maximumFractionDigits: 0 });
 
-  // A robust row key (since DB schema keys vary)
+  // A robust row key (since DB schema keys vary) — REMOVED r.Rate TO AVOID MISMATCH ON RELOAD
   const rowKey = (r) => [
     r.Channel,
     r.Program,
     r.Day ?? r.Date ?? '',
     r.Time ?? r.Start_Time ?? r.StartTime ?? '',
     r.Slot ?? '',
-    r.Rate ?? '',
   ].map(toStr).join('||');
 
   // Only Slot B (non-prime) rows, group by channel
-    const slotBByChannel = useMemo(() => {
-      const out = {};
-      channels.forEach((ch) => (out[ch] = []));
-      const seen = new Set();
+  const slotBByChannel = useMemo(() => {
+    const out = {};
+    channels.forEach((ch) => (out[ch] = []));
+    const seen = new Set();
 
-      (allDbPrograms || []).forEach((r) => {
-        const ch = r.Channel;
-        if (!ch || !channels.includes(ch)) return;
-        if (normSlot(r.Slot) !== 'B') return;
+    (allDbPrograms || []).forEach((r) => {
+      const ch = r.Channel;
+      if (!ch || !channels.includes(ch)) return;
+      if (normSlot(r.Slot) !== 'B') return;
 
-        const key = [ch, r.Program, r.Day ?? r.Date ?? '', r.Time ?? r.Start_Time ?? r.StartTime ?? ''].join('||');
-        if (seen.has(key)) return; // skip duplicate
-        seen.add(key);
+      const key = [ch, r.Program, r.Day ?? r.Date ?? '', r.Time ?? r.Start_Time ?? r.StartTime ?? ''].join('||');
+      if (seen.has(key)) return; // skip duplicate
+      seen.add(key);
 
-        out[ch].push(r);
-      });
-      return out;
-    }, [allDbPrograms, channels]);
+      out[ch].push(r);
+    });
+    return out;
+  }, [allDbPrograms, channels]);
 
   // Local UI state: search text per channel, and checkbox state per channel
   const [searchTextByChannel, setSearchTextByChannel] = useState({});
   const [checkedByChannel, setCheckedByChannel] = useState({}); // {ch: Set(rowKey)}
 
   // Seed from any previously saved selection
-    useEffect(() => {
-      const seeded = {};
-      channels.forEach((ch) => {
-        const allRows = slotBByChannel[ch] || [];
-        // ✅ If previous selections exist, use them; otherwise select everything
-        const arr = selectedBonusPrograms?.[ch]?.length
-          ? selectedBonusPrograms[ch]
-          : allRows;
-        seeded[ch] = new Set(arr.map(rowKey));
-      });
-      setCheckedByChannel(seeded);
-    }, [channels, slotBByChannel]);
+  useEffect(() => {
+    const seeded = {};
+    channels.forEach((ch) => {
+      const allRows = slotBByChannel[ch] || [];
+
+      // Get saved keys from loaded (old) rows
+      const savedRows = selectedBonusPrograms?.[ch] || [];
+      const savedKeys = new Set(savedRows.map(rowKey));
+
+      // Match to CURRENT rows (robust to data changes)
+      const matchedRows = allRows.filter((r) => savedKeys.has(rowKey(r)));
+
+      // If matches exist, use them; otherwise select everything (or nothing — adjust as needed)
+      const arr = matchedRows.length > 0 ? matchedRows : []; // Fallback to all if no match; change to [] for none
+
+      seeded[ch] = new Set(arr.map(rowKey));
+    });
+    setCheckedByChannel(seeded);
+  }, [channels, slotBByChannel, selectedBonusPrograms]); // Added selectedBonusPrograms to deps
 
   const filteredRowsByChannel = useMemo(() => {
     const out = {};
@@ -157,26 +163,26 @@ export default function BonusProgramSelector({
 
   const logoPath = (ch) => `/logos/${ch}.png`;
 
-    const selectAllGlobal = () => {
-      setCheckedByChannel((prev) => {
-        const next = { ...prev };
-        channels.forEach((ch) => {
-          next[ch] = new Set(next[ch] || []);
-          (slotBByChannel[ch] || []).forEach((r) => next[ch].add(rowKey(r)));
-        });
-        return next;
+  const selectAllGlobal = () => {
+    setCheckedByChannel((prev) => {
+      const next = { ...prev };
+      channels.forEach((ch) => {
+        next[ch] = new Set(next[ch] || []);
+        (slotBByChannel[ch] || []).forEach((r) => next[ch].add(rowKey(r)));
       });
-    };
+      return next;
+    });
+  };
 
-    const clearAllGlobal = () => {
-      setCheckedByChannel((prev) => {
-        const next = {};
-        channels.forEach((ch) => {
-          next[ch] = new Set(); // clear all
-        });
-        return next;
+  const clearAllGlobal = () => {
+    setCheckedByChannel((prev) => {
+      const next = {};
+      channels.forEach((ch) => {
+        next[ch] = new Set(); // clear all
       });
-    };
+      return next;
+    });
+  };
 
 
   return (

@@ -4,24 +4,34 @@ import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import ExcelJS from 'exceljs';
 
+const hostname = window.location.hostname;
+const isLocal =
+  hostname.includes("localhost") || hostname.includes("127.");
+
+const API_BASE = isLocal
+  ? "http://localhost:5000"
+  : "https://optwebapp-production.up.railway.app";
+
 export default function FinalPlan({
   // Accept BOTH naming styles so App.js doesn't have to change
   mainResults: _mainResults,
   bonusResults: _bonusResults,
   benefitResults: _benefitResults,
-  basePlanResult,     // from your current App.js
-  bonusResult,        // from your current App.js
-  totalBudgetInclProperty, // optional explicit budget (unchanged by bonus)
+  basePlanResult,
+  bonusResult,
+  totalBudgetInclProperty,
   propertyPrograms = {},
   styles = {},
   formatLKR = (v) =>
     `LKR ${Number(v ?? 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`,
   formatLKR_1 = (v) =>
     `${Number(v ?? 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`,
-  selectedTG = "", // ADD THIS
+  selectedTG = "",
   optimizationInput,
+  sessionSnapshot = {},   // 🌟 NEW
   onHome,
 }) {
+
   // ---- Normalize inputs (support both prop name styles) ----
   const mainResults = _mainResults || basePlanResult || {};
   const bonusResults = _bonusResults || bonusResult || {};
@@ -852,12 +862,28 @@ const propertyGRPTotal = useMemo(() => {
         kpiSheet.getColumn(2).width = 20;
 
       // ---------- Channel list ----------
-      const channelSet = new Set([
-        ...(mainByChannel || []).map(r => toStr(r.Channel)),
-        ...(flatPropertyPrograms || []).map(r => toStr(r.Channel)),
-        ...(bonusByProgram || []).map(r => toStr(r.Channel)),
-      ].filter(Boolean));
-      const channelList = Array.from(channelSet).sort((a, b) => a.localeCompare(b));
+        // ---------- Channel list (FIXED!) ----------
+        const channelSet = new Set();
+
+        // Main
+        (mainByChannel || []).forEach(r => channelSet.add(toStr(r.Channel)));
+
+        // Property
+        (flatPropertyPrograms || []).forEach(r => channelSet.add(toStr(r.Channel)));
+
+        // Bonus
+        (bonusByProgram || []).forEach(r => channelSet.add(toStr(r.Channel)));
+
+        // Benefit programs (this was missing!)
+        Object.values(benefitCommercialData || {}).forEach(commercial => {
+          (commercial.programs || []).forEach(r => {
+            channelSet.add(toStr(r.Channel));
+          });
+        });
+
+        const channelList = Array.from(channelSet)
+          .filter(ch => ch && ch.trim() !== '')
+          .sort((a, b) => a.localeCompare(b));
 
       // ---------- Headers ----------
     const propertyHeaders = [
@@ -962,8 +988,9 @@ const propertyGRPTotal = useMemo(() => {
 
       // ---------- Build per-channel sheets ----------
       channelList.forEach((ch) => {
-        const sheetTitle = `Channel - ${ch}`.substring(0, 31); // Excel sheet name limit
-        const worksheet = workbook.addWorksheet(sheetTitle);
+            console.log(`[DEBUG] Processing channel: ${ch}`); // ADD THIS
+            const sheetTitle = `${ch}`.substring(0, 31); // Excel sheet name limit
+            const worksheet = workbook.addWorksheet(sheetTitle);
 
             // ====================== TOP DETAIL SECTION (Start from Column B) ======================
             const topRows = [
@@ -1169,7 +1196,7 @@ const propertyGRPTotal = useMemo(() => {
           cell.font = { bold: true };
         });
 
-// Property Benefits Section
+        // Property Benefits Section
         const propHeaderRow = worksheet.addRow([`Property Benefits`]);
 
         propHeaderRow.getCell(1).fill = {
@@ -1269,14 +1296,19 @@ const propertyGRPTotal = useMemo(() => {
         const commercialHeaderRows = [];
         // SECTION: Commercial Programs (Main + Benefit merged)
         let headerAdded = false;
+        let hasCommercialData = false; // ADD THIS
         (allCommercialKeys || []).forEach((commercialKey, idx) => {
          const commDuration = num(commercialDurations[commercialKey] || 0);
+
           const mainPrograms = (mainCommercialData?.[commercialKey]?.programs || [])
             .filter(r => toStr(r.Channel) === ch);
           const benefitPrograms = (benefitCommercialData?.[commercialKey]?.programs || [])
             .filter(r => toStr(r.Channel) === ch);
 
           const mergedPrograms = mergeProgramsForExport(mainPrograms, benefitPrograms);
+
+          if (mergedPrograms.length > 0) {
+                hasCommercialData = true;
 
           worksheet.addRow([]);
 
@@ -1372,14 +1404,25 @@ const propertyGRPTotal = useMemo(() => {
 
         worksheet.addRow(rowData);
       });
-    }
+    }}
     });
 
-
+    // === ADD THIS AFTER THE COMMERCIAL LOOP ===
+    if (!hasCommercialData) {
+      worksheet.addRow([]);
+      const noCommHeader = worksheet.addRow([`Commercial Programs`]);
+      noCommHeader.getCell(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FABF8F' }
+      };
+      worksheet.addRow(['No commercial programs for this channel']);
+    }
 
         // FINAL SECTION: Bonus Programs
         const bonusRows = (bonusByProgram || []).filter(r => toStr(r.Channel) === ch);
         worksheet.addRow([]);
+
         const bonusHeaderRow = worksheet.addRow([`Bonus Programs`]);
 
         bonusHeaderRow.getCell(1).fill = {
@@ -1462,14 +1505,14 @@ const propertyGRPTotal = useMemo(() => {
                 Number(spots)          // Spots
               );
             }
-
             worksheet.addRow(rowData);
           });
+        } else {
+          worksheet.addRow(['No bonus programs for this channel']);
         }
 
-        // ============ ADD THIS RIGHT HERE ============
-  // ============ ADD THIS RIGHT HERE (UPDATED) ============
         // ---------- CALCULATE TOTALS FOR TOTAL ROW ----------
+        const hasAnyData = propRows.length > 0 || hasCommercialData || bonusRows.length > 0;
         const totalRowData = {
           rateCardValue: 0,
           rateCardTotal: 0,
@@ -2124,6 +2167,49 @@ const propertyGRPTotal = useMemo(() => {
   const [tvBudget, setTvBudget] = useState("");
   const [durationName, setDurationName] = useState("");
   const [commercialLanguages, setCommercialLanguages] = useState({});
+
+  const savePlan = async () => {
+    try {
+      const auth = (typeof window !== 'undefined' && window.__AUTH__) || {};
+      const payload = {
+        user_id: auth.userId || auth.user_id || "",
+        user_first_name: auth.firstName || "",
+        user_last_name: auth.lastName || "",
+        metadata: {
+          client_name: clientName || "",
+          brand_name: brandName || "",
+          campaign: campaign || "",
+          activity,
+          tv_budget: tvBudget || "",
+          duration_label: durationName || "",
+          activation_from: fromDate,
+          activation_to: toDate,
+          commercial_names: commercialNames,
+          commercial_languages: commercialLanguages,
+          selected_tg: selectedTG,
+          total_budget: totalBudgetInclProperty,
+        },
+        session_data: sessionSnapshot || {},
+      };
+
+      const res = await fetch(`${API_BASE}/save-plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        console.error("Save plan failed", json);
+        alert(json.error || "Failed to save plan. Plan was not saved.");
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error("Error saving plan:", err);
+      alert("Error saving plan. Please try again.");
+      return false;
+    }
+  };
 
 
     const today = new Date();
@@ -2794,29 +2880,39 @@ const propertyGRPTotal = useMemo(() => {
 
 
              <div style={{marginTop:"20px", textAlign:"right"}}>
-              <button style={s.backHomeButton} onClick={() => setShowExportDialog(false)}>
-                Cancel
-              </button>
-              <button
-                style={s.primaryButton}
-                onClick={() => {
-                  setShowExportDialog(false);
-                  // setExportWithFormulas(false);  <-- REMOVE THIS
-                  handleExport(false); // <-- PASS FALSE DIRECTLY
-                }}
-              >
-                Export
-              </button>
-              <button
-                style={{...s.primaryButton, backgroundColor: '#2d3748', marginLeft: '10px'}}
-                onClick={() => {
-                  setShowExportDialog(false);
-                  // setExportWithFormulas(true); <-- REMOVE THIS
-                  handleExport(true); // <-- PASS TRUE DIRECTLY
-                }}
-              >
-                Export with Formulas
-              </button>
+                <button
+                  style={s.backHomeButton}
+                  onClick={() => setShowExportDialog(false)}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  style={s.primaryButton}
+                  onClick={async () => {
+                    const ok = await savePlan();
+                    if (ok) {
+                      setShowExportDialog(false);
+                      await handleExport(false); // normal export
+                    }
+                  }}
+                >
+                  Save & Export
+                </button>
+
+                <button
+                  style={{ ...s.primaryButton, backgroundColor: '#2d3748', marginLeft: '10px' }}
+                  onClick={async () => {
+                    const ok = await savePlan();
+                    if (ok) {
+                      setShowExportDialog(false);
+                      await handleExport(true); // export with formulas
+                    }
+                  }}
+                >
+                  Save & Export with Formulas
+                </button>
+
             </div>
          </div>
           </div>
