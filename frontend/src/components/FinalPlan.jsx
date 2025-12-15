@@ -2171,13 +2171,8 @@ const propertyGRPTotal = useMemo(() => {
   const savePlan = async () => {
     try {
       const auth = (typeof window !== 'undefined' && window.__AUTH__) || {};
-      console.log("SAVE PLAN AUTH SNAPSHOT", {
-      rawAuth: window.__AUTH__,
-      resolvedUserId: auth.userId || auth.user_id,
-      directId: auth.id
-    });
       const payload = {
-        //user_id: auth.userId || auth.user_id || "",
+        user_id: auth.userId || auth.user_id || "",
         user_id: auth.id,
         user_first_name: auth.firstName || "",
         user_last_name: auth.lastName || "",
