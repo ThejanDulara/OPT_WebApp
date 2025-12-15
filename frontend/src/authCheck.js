@@ -8,7 +8,7 @@ export async function checkAuth() {
   // Flask backend
   const apiBase = isLocal
     ? "http://localhost:8000/api"
-    : "https://mtmbackend-production.up.railway.app/api;
+    : "https://mtmbackend-production.up.railway.app/api";
 
   // Main portal for login
   const portalBase = isLocal
