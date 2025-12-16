@@ -12,7 +12,7 @@ export default function ChannelSelector({ initialSelectedChannels = [], onBack, 
 
   // Fetch channels
   useEffect(() => {
-    fetch("https://optwebapp-production.up.railway.app/channels")
+    fetch("https://optwebapp-production-60b4.up.railway.app/channels")
       .then((res) => res.json())
       .then((data) => setChannels(data.channels || []))
       .catch(() => setChannels([]))

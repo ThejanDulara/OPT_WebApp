@@ -22,12 +22,12 @@ function ProgramUpdater({ onBack }) {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    fetch('https://optwebapp-production.up.railway.app/channels')
+    fetch('https://optwebapp-production-60b4.up.railway.app/channels')
       .then(res => res.json())
       .then(data => {
         setChannels(data.channels || []);
         if (data.channels.includes('DERANA TV')) {
-          fetch(`https://optwebapp-production.up.railway.app/programs?channel=DERANA TV`)
+          fetch(`https://optwebapp-production-60b4.up.railway.app/programs?channel=DERANA TV`)
             .then(res => res.json())
             .then(data => setPrograms(data.programs || []));
         }
@@ -39,7 +39,7 @@ function ProgramUpdater({ onBack }) {
     setSelectedChannel(channel);
     setSearchTerm('');
     setSlotFilter('');
-    fetch(`https://optwebapp-production.up.railway.app/programs?channel=${channel}`)
+    fetch(`https://optwebapp-production-60b4.up.railway.app/programs?channel=${channel}`)
       .then(res => res.json())
       .then(data => setPrograms(data.programs || []));
   };
@@ -88,7 +88,7 @@ function ProgramUpdater({ onBack }) {
   const deleteProgram = (program, slot) => {
     if (!window.confirm(`Are you sure you want to delete "${program}" from slot "${slot}"?`)) return;
 
-    fetch('https://optwebapp-production.up.railway.app/delete-program', {
+    fetch('https://optwebapp-production-60b4.up.railway.app/delete-program', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channel: selectedChannel, program, slot })
@@ -104,7 +104,7 @@ function ProgramUpdater({ onBack }) {
   const saveChanges = () => {
     setIsSaving(true);
 
-    fetch('https://optwebapp-production.up.railway.app/update-programs', {
+    fetch('https://optwebapp-production-60b4.up.railway.app/update-programs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channel: selectedChannel, programs })
@@ -119,7 +119,7 @@ function ProgramUpdater({ onBack }) {
 
   const createChannel = () => {
     if (!newChannelName) return;
-    fetch('https://optwebapp-production.up.railway.app/create-channel', {
+    fetch('https://optwebapp-production-60b4.up.railway.app/create-channel', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newChannelName })
@@ -135,7 +135,7 @@ function ProgramUpdater({ onBack }) {
   };
 
   const downloadAllProgramsExcel = () => {
-    fetch('https://optwebapp-production.up.railway.app/export-all-programs')
+    fetch('https://optwebapp-production-60b4.up.railway.app/export-all-programs')
       .then(res => res.blob())
       .then(blob => {
         const url = window.URL.createObjectURL(blob);

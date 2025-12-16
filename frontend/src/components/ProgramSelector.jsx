@@ -6,7 +6,7 @@ function ProgramSelector({ onSubmit, onBack, negotiatedRates,selectedChannels,se
   const [selectedPrograms, setSelectedPrograms] = useState({});
 
     useEffect(() => {
-      fetch('https://optwebapp-production.up.railway.app/all-programs')
+      fetch('https://optwebapp-production-60b4.up.railway.app/all-programs')
         .then(res => res.json())
         .then(data => {
           const grouped = {};

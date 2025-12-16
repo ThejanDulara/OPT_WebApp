@@ -122,7 +122,7 @@ useEffect(() => {
     }));
   }
 
-  fetch(`https://optwebapp-production.up.railway.app/programs?channel=${encodeURIComponent(selectedChannel)}`)
+  fetch(`https://optwebapp-production-60b4.up.railway.app/programs?channel=${encodeURIComponent(selectedChannel)}`)
     .then(res => res.json())
     .then(data => {
       const rows = (data.programs || []).map(p => {

@@ -10,7 +10,7 @@ const isLocal =
 
 const API_BASE = isLocal
   ? "http://localhost:5000"
-  : "https://optwebapp-production.up.railway.app";
+  : "https://optwebapp-production-60b4.up.railway.app";
 
 export default function FinalPlan({
   // Accept BOTH naming styles so App.js doesn't have to change

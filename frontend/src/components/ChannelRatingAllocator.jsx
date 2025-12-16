@@ -428,7 +428,7 @@ function ChannelRatingAllocator({
     setIsProcessing(true);
     setStopRequested(false);
 
-    fetch('https://optwebapp-production.up.railway.app/optimize-by-budget-share', {
+    fetch('https://optwebapp-production-60b4.up.railway.app/optimize-by-budget-share', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
