@@ -2191,7 +2191,7 @@ const propertyGRPTotal = useMemo(() => {
         },
         session_data: sessionSnapshot || {},
       };
-
+      console.log("🚨 SAVE PAYLOAD", payload);
       const res = await fetch(`${API_BASE}/save-plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
