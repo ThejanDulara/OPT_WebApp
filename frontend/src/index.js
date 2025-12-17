@@ -32,33 +32,18 @@ async function startApp() {
 
   let authPayload = {};
 
-  // Support both old (boolean) and new (object) / raw user styles:
+  // Support both old (boolean) and new (object) styles:
   if (typeof result === "object") {
-    // Accept either { authorized, userId, firstName, lastName, isAdmin }
-    // or raw user { id, first_name, last_name, is_admin }
-    const {
-      authorized,
-      userId,
-      id,
-      firstName,
-      first_name,
-      lastName,
-      last_name,
-      isAdmin,
-      is_admin,
-    } = result;
+    const { authorized, userId, firstName, lastName, isAdmin } = result;
     if (authorized === false) return;
 
     authPayload = {
-      userId: userId || id || result.id || "",
-      firstName: firstName || result.firstName || first_name || "",
-      lastName: lastName || result.lastName || last_name || "",
-      isAdmin: !!(isAdmin || result.isAdmin || is_admin),
+      userId: userId || "",
+      firstName: firstName || "",
+      lastName: lastName || "",
+      isAdmin: !!isAdmin,
     };
   }
-
-  // Helpful debug for environments where auth shape varies
-  console.log("🌟 Auth payload:", authPayload);
 
   if (typeof window !== "undefined") {
     window.__AUTH__ = authPayload; // 🌟 used by FinalPlan & History
