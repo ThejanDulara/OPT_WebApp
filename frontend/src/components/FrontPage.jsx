@@ -51,7 +51,18 @@ function FrontPage({ onStart, onManagePrograms, onOpenHistory }) {
               Start Optimization
             </button>
 
-            <button onClick={onManagePrograms} style={secondaryButton}>
+            <button
+              onClick={() => {
+                if (!window.__AUTH__?.canUpdateData) {
+                  alert(
+                    "You do not have access to manage program data.\n\nPlease contact the administrators for verification."
+                  );
+                  return;
+                }
+                onManagePrograms();
+              }}
+              style={secondaryButton}
+            >
               Manage Program Data
             </button>
 

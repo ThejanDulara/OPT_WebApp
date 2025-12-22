@@ -44,6 +44,7 @@ export async function checkAuth() {
 
       // backend returns: is_admin = 1 or 0
       isAdmin: user.is_admin === 1 || user.is_admin === "1",
+      canUpdateData: user.can_update_data === 1 || user.can_update_data === "1",
     };
 
   } catch (err) {

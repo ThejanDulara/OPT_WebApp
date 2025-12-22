@@ -34,7 +34,7 @@ async function startApp() {
 
   // Support both old (boolean) and new (object) styles:
   if (typeof result === "object") {
-    const { authorized, userId, firstName, lastName, isAdmin } = result;
+    const { authorized, userId, firstName, lastName, isAdmin ,canUpdateData } = result;
     if (authorized === false) return;
 
     authPayload = {
@@ -42,6 +42,7 @@ async function startApp() {
       firstName: firstName || "",
       lastName: lastName || "",
       isAdmin: !!isAdmin,
+      canUpdateData: !!canUpdateData,
     };
   }
 
