@@ -573,10 +573,37 @@ function App() {
 
 
           {/** STEP 12 */}
-          <Route
-            path="/program-updater"
-            element={<ProgramUpdater onBack={() => navigate('/')} />}
-          />
+        <Route
+          path="/program-updater"
+          element={
+            window.__AUTH__?.canUpdateData ? (
+              <ProgramUpdater onBack={() => navigate('/')} />
+            ) : (
+              <div style={{ padding: "60px", textAlign: "center" }}>
+                <h2 style={{ color: "#c53030" }}>Access Restricted</h2>
+                <p style={{ marginTop: "12px", fontSize: "16px" }}>
+                  You do not have permission to access the Program Updater.
+                </p>
+                <p style={{ marginTop: "8px", color: "#4a5568" }}>
+                  Please contact the administrators for verification.
+                </p>
+                <button
+                  style={{
+                    marginTop: "24px",
+                    padding: "10px 20px",
+                    borderRadius: "6px",
+                    border: "none",
+                    background: "#edf2f7",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => navigate("/")}
+                >
+                  Back to Home
+                </button>
+              </div>
+            )
+          }
+        />
 
         </Routes>
 
