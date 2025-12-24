@@ -1,85 +1,95 @@
 // BonusChannelBudgetSetup.jsx
 import React, { useMemo, useState } from 'react';
+import { toast } from 'react-toastify';
 
 export default function BonusChannelBudgetSetup({
-                  // Required inputs
-                  channels = [],
-                  channelMoney = {},
-                  optimizationInput = {},
-                  initialState = null,
-                  onSaveState = () => {},
-                  onBack,
-                  onProceed
-                }) {
-
+  channels = [],
+  channelMoney = {},
+  optimizationInput = {},
+  initialState = null,
+  onSaveState = () => {},
+  onBack,
+  onProceed
+}) {
   // --- helpers ---
   const num = (v) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
   const fmtLKR = (n) => `Rs. ${Number(n || 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`;
 
-      // Number of commercials
-    const [numCommercials, setNumCommercials] = useState(
-      initialState?.numCommercials ??
-      optimizationInput?.numCommercials ??
-      1
-    );
+  // Number of commercials
+  const [numCommercials, setNumCommercials] = useState(
+    initialState?.numCommercials ??
+    optimizationInput?.numCommercials ??
+    1
+  );
 
-    // Durations
-    const [durations, setDurations] = useState(
-      initialState?.durations ??
-      (
-        optimizationInput?.durations?.slice(0, optimizationInput?.numCommercials) ??
-        Array(optimizationInput?.numCommercials || 1).fill(30)
+  // Durations
+  const [durations, setDurations] = useState(
+    initialState?.durations ??
+    (
+      optimizationInput?.durations?.slice(0, optimizationInput?.numCommercials) ??
+      Array(optimizationInput?.numCommercials || 1).fill(30)
+    )
+  );
+
+  // Global budget proportions (default)
+  const [budgetProportions, setBudgetProportions] = useState(
+    initialState?.budgetProportions ??
+    (
+      optimizationInput?.budgetProportions?.slice(0, optimizationInput?.numCommercials) ??
+      Array(optimizationInput?.numCommercials || 1).fill(
+        +(100 / (optimizationInput?.numCommercials || 1)).toFixed(2)
       )
-    );
+    )
+  );
 
-    // Budget proportions
-    const [budgetProportions, setBudgetProportions] = useState(
-      initialState?.budgetProportions ??
-      (
-        optimizationInput?.budgetProportions?.slice(0, optimizationInput?.numCommercials) ??
-        Array(optimizationInput?.numCommercials || 1).fill(
-          +(100 / (optimizationInput?.numCommercials || 1)).toFixed(2)
-        )
-      )
-    );
+  // NEW: Channel-specific commercial splits
+  const [channelCommercialSplits, setChannelCommercialSplits] = useState(() => {
+    if (initialState?.channelCommercialSplits) return initialState.channelCommercialSplits;
 
-    // Max spots
-    const [maxSpots, setMaxSpots] = useState(
-      initialState?.maxSpots ??
-      optimizationInput?.maxSpots ??
-      10
-    );
+    // Initialize with global proportions for each channel
+    const seed = {};
+    (channels || []).forEach(ch => {
+      seed[ch] = (budgetProportions || []).map(v => num(v));
+    });
+    return seed;
+  });
 
-    // Time limit
-    const [timeLimit, setTimeLimit] = useState(
-      initialState?.timeLimit ??
-      optimizationInput?.timeLimit ??
-      120
-    );
+  // Max spots
+  const [maxSpots, setMaxSpots] = useState(
+    initialState?.maxSpots ??
+    optimizationInput?.maxSpots ??
+    10
+  );
 
-    // Bonus % per channel
-    const [bonusPctByChannel, setBonusPctByChannel] = useState(
-      initialState?.bonusPctByChannel ??
-      channels.reduce((acc, ch) => {
-        acc[ch] = 0;
-        return acc;
-      }, {})
-    );
+  // Time limit
+  const [timeLimit, setTimeLimit] = useState(
+    initialState?.timeLimit ??
+    optimizationInput?.timeLimit ??
+    120
+  );
 
-    // Channel budget tolerance
-    const [channelBounds, setChannelBounds] = useState(
-      initialState?.channelBounds ??
-      channels.reduce((acc, ch) => {
-        acc[ch] = optimizationInput?.budgetBound ?? 0;
-        return acc;
-      }, {})
-    );
+  // Bonus % per channel
+  const [bonusPctByChannel, setBonusPctByChannel] = useState(
+    initialState?.bonusPctByChannel ??
+    channels.reduce((acc, ch) => {
+      acc[ch] = 0;
+      return acc;
+    }, {})
+  );
 
-
+  // Channel budget tolerance
+  const [channelBounds, setChannelBounds] = useState(
+    initialState?.channelBounds ??
+    channels.reduce((acc, ch) => {
+      acc[ch] = optimizationInput?.budgetBound ?? 0;
+      return acc;
+    }, {})
+  );
 
   const handleBonusPctChange = (ch, v) => {
     setBonusPctByChannel(prev => ({ ...prev, [ch]: num(v) }));
   };
+
   const handleBoundChange = (ch, v) => {
     setChannelBounds(prev => ({ ...prev, [ch]: Math.max(0, num(v)) }));
   };
@@ -88,7 +98,7 @@ export default function BonusChannelBudgetSetup({
   const baseChannelBudget = useMemo(() => {
     const map = {};
     (channels || []).forEach(ch => {
-      const base = num(channelMoney?.[ch]?.chAmount); // from channel share step
+      const base = num(channelMoney?.[ch]?.chAmount);
       map[ch] = base;
     });
     return map;
@@ -98,25 +108,56 @@ export default function BonusChannelBudgetSetup({
     const map = {};
     (channels || []).forEach(ch => {
       const base = baseChannelBudget[ch] || 0;
-      const pct  = num(bonusPctByChannel[ch]);
+      const pct = num(bonusPctByChannel[ch]);
       map[ch] = (base * pct) / 100.0;
     });
     return map;
   }, [channels, baseChannelBudget, bonusPctByChannel]);
 
-  // Derived: per-channel, per-commercial budgets off bonus budget
+  // Derived: per-channel, per-commercial budgets using channel-specific splits
   const perChannelCommercialBudgets = useMemo(() => {
     const out = {};
     (channels || []).forEach(ch => {
       const b = bonusBudget[ch] || 0;
-      out[ch] = (budgetProportions || []).map(p => (b * num(p)) / 100.0);
+      const splits = channelCommercialSplits[ch] || budgetProportions.map(v => num(v));
+      out[ch] = splits.map(p => (b * num(p)) / 100.0);
     });
     return out;
-  }, [channels, bonusBudget, budgetProportions]);
+  }, [channels, bonusBudget, budgetProportions, channelCommercialSplits]);
+
+  // Handle channel commercial split changes
+  const handleChannelCommercialChange = (ch, idx, val) => {
+    setChannelCommercialSplits(prev => {
+      const next = Array.isArray(prev[ch]) ? [...prev[ch]] : [];
+      next[idx] = num(val);
+      return { ...prev, [ch]: next };
+    });
+  };
+
+  // Apply global commercial percentages to all channels
+  const applyGlobalCommercialToAllChannels = () => {
+    const next = {};
+    (channels || []).forEach(ch => {
+      next[ch] = budgetProportions.map(v => num(v));
+    });
+    setChannelCommercialSplits(next);
+    toast.info('Applied global commercial percentages to all channels');
+  };
 
   // Validation helpers
   const totalPct = budgetProportions.reduce((a, b) => a + num(b), 0);
-  const pctOk    = Math.abs(totalPct - 100) <= 0.01;
+  const pctOk = Math.abs(totalPct - 100) <= 0.01;
+
+  // Validate channel commercial splits
+  const channelCommercialErrors = useMemo(() => {
+    const errs = {};
+    (channels || []).forEach(ch => {
+      const arr = channelCommercialSplits[ch] || budgetProportions.map(v => num(v));
+      const sum = arr.reduce((a, v) => a + num(v), 0);
+      if (Math.abs(sum - 100) > 0.01) errs[ch] = true;
+    });
+    return errs;
+  }, [channels, channelCommercialSplits, budgetProportions, num]);
 
   const handleNumCommercialsChange = (next) => {
     const n = Math.max(1, parseInt(next || 1, 10));
@@ -134,6 +175,18 @@ export default function BonusChannelBudgetSetup({
     while (p.length < n) p.push(even);
     if (rest > 0) p[n - 1] = num(p[n - 1]) + rest;
     setBudgetProportions(p);
+
+    // Update channel splits for new number of commercials
+    setChannelCommercialSplits(prev => {
+      const nextSplits = {};
+      (channels || []).forEach(ch => {
+        const current = prev[ch] || [];
+        const newArr = current.slice(0, n);
+        while (newArr.length < n) newArr.push(even);
+        nextSplits[ch] = newArr;
+      });
+      return nextSplits;
+    });
   };
 
   const handleDurationChange = (i, v) => {
@@ -155,20 +208,28 @@ export default function BonusChannelBudgetSetup({
       return;
     }
     if (!pctOk) {
-      alert('Commercial budget percentages must total 100%.');
+      alert('Global commercial budget percentages must total 100%.');
       return;
     }
 
-      // ⭐ SAVE STATE
-      onSaveState({
-        numCommercials,
-        durations,
-        budgetProportions,
-        maxSpots,
-        timeLimit,
-        bonusPctByChannel,
-        channelBounds
-      });
+    // Check channel commercial splits
+    const hasChannelErrors = Object.keys(channelCommercialErrors).length > 0;
+    if (hasChannelErrors) {
+      alert("Some channels have commercial splits that don't total 100%. Please fix them.");
+      return;
+    }
+
+    // ⭐ SAVE STATE
+    onSaveState({
+      numCommercials,
+      durations,
+      budgetProportions,
+      channelCommercialSplits,
+      maxSpots,
+      timeLimit,
+      bonusPctByChannel,
+      channelBounds
+    });
 
     // assemble payload for next pages
     const payload = {
@@ -179,17 +240,20 @@ export default function BonusChannelBudgetSetup({
       timeLimit: parseInt(timeLimit, 10),
 
       // bonus specifics
-      bonusPctByChannel,                 // { ch: % }
-      bonusBudget,                       // { ch: Rs }
-      channelAllowPctByChannel: channelBounds,                     // { ch: ± Rs } (used as channel-level budget tolerance in bonus opt)
-      baseChannelBudget,                 // { ch: Rs } (for reference)
-      perChannelCommercialBudgets        // { ch: [Rs, Rs, ...] }
+      bonusPctByChannel,
+      bonusBudget,
+      channelAllowPctByChannel: channelBounds,
+      baseChannelBudget,
+      commercial_budgets: perChannelCommercialBudgets,
+
+      // NEW: channel-specific commercial percentages
+      channel_commercial_pct_map: channelCommercialSplits
     };
 
     onProceed && onProceed(payload);
   };
 
-  // --- styles (aligned with your existing look) ---
+  // --- styles ---
   const styles = {
     page: { padding: '32px', maxWidth: 1200, margin: '0 auto', background: '#d5e9f7', borderRadius: 12 },
     title: { fontSize: 24, fontWeight: 600, color: '#2d3748', marginBottom: 16 },
@@ -210,7 +274,7 @@ export default function BonusChannelBudgetSetup({
     logo: { height: 34, width: 'auto', objectFit: 'contain', borderRadius: 4 },
     twoCol: {
       display: 'grid',
-      gridTemplateColumns: 'minmax(240px,1fr) minmax(240px,1fr)', // prevents narrow wrap
+      gridTemplateColumns: 'minmax(240px,1fr) minmax(240px,1fr)',
       gap: 16,
       alignItems: 'center',
       marginBottom: 8
@@ -219,14 +283,46 @@ export default function BonusChannelBudgetSetup({
       display: 'flex',
       alignItems: 'center',
       gap: 8,
-      flexWrap: 'nowrap'                // keep label + input on one line
+      flexWrap: 'nowrap'
     },
     formLabel: {
-      marginBottom: 0,                  // no vertical spacing now
+      marginBottom: 0,
       fontSize: 14,
       fontWeight: 500,
       color: '#2d3748'
     },
+    errorText: { color: '#e53e3e', fontSize: 12, marginTop: 4 },
+    commercialSplitRow: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 4,
+      marginLeft: 8
+    },
+    applyGlobalBtn: {
+      marginTop: 8,
+      padding: '6px 10px',
+      border: '1px solid #cbd5e0',
+      background: '#edf2f7',
+      borderRadius: 6,
+      cursor: 'pointer',
+      fontSize: 14
+    },
+    commercialHeader: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 12,
+      marginBottom: 8
+    },
+    commercialPctInput: {
+      width: 44,
+      padding: '6px 6px',
+      fontSize: 13,
+      textAlign: 'center',
+      border: '1px solid #e2e8f0',
+      borderRadius: 6
+    }
 
   };
 
@@ -288,6 +384,14 @@ export default function BonusChannelBudgetSetup({
         <div style={styles.pctHint(pctOk)}>
           Total must be 100% — Current Total: {totalPct.toFixed(2)}%
         </div>
+
+        <button
+          type="button"
+          onClick={applyGlobalCommercialToAllChannels}
+          style={styles.applyGlobalBtn}
+        >
+          Apply these percentages to all channels
+        </button>
       </div>
 
       {/* Channels */}
@@ -298,6 +402,9 @@ export default function BonusChannelBudgetSetup({
             const base = baseChannelBudget[ch] || 0;
             const bonus = bonusBudget[ch] || 0;
             const comBudgets = perChannelCommercialBudgets[ch] || [];
+            const channelSplits = channelCommercialSplits[ch] || budgetProportions.map(v => num(v));
+            const hasError = channelCommercialErrors[ch];
+
             return (
               <div key={ch} style={styles.card}>
                 <div style={styles.channelHeader}>
@@ -327,18 +434,40 @@ export default function BonusChannelBudgetSetup({
                   <span style={styles.pill}>{fmtLKR(bonus)}</span>
                 </div>
 
-                <div style={{ ...styles.row, marginTop: 10 }}>
+                <div style={styles.commercialHeader}>
                   <span style={{ ...styles.label, minWidth: 180 }}>Commercial-wise Budgets:</span>
+                  <span style={styles.smallNote}>Override percentages:</span>
                 </div>
-                {comBudgets.map((val, i) => (
-                  <div key={i} style={{ ...styles.row, marginLeft: 8 }}>
-                    <span style={{ minWidth: 90 }}>Com {i + 1}:</span>
-                    <span style={styles.pill}>{fmtLKR(val)}</span>
-                    <span style={styles.smallNote}>
-                      ({num(budgetProportions[i])}% of bonus; {num(durations[i])}s)
-                    </span>
-                  </div>
-                ))}
+
+                {comBudgets.map((val, i) => {
+                  const splitPct = channelSplits[i] || 0;
+                  const amt = (bonus * splitPct) / 100;
+
+                  return (
+                    <div key={i} style={styles.commercialSplitRow}>
+                      <span style={{ minWidth: 90 }}>Com {i + 1}:</span>
+                        <input
+                          type="number"
+                          value={splitPct}
+                          onChange={(e) => handleChannelCommercialChange(ch, i, e.target.value)}
+                          style={{
+                            ...styles.commercialPctInput,
+                            borderColor: hasError ? '#e53e3e' : '#e2e8f0'
+                          }}
+                        />
+
+                      <span>%</span>
+                      <span style={styles.pill}>{fmtLKR(amt)}</span>
+                      <span style={styles.smallNote}>
+                        ({num(durations[i])}s)
+                      </span>
+                    </div>
+                  );
+                })}
+
+                {hasError && (
+                  <div style={styles.errorText}>Commercial splits must total 100%</div>
+                )}
 
                 <div style={{ ...styles.row, marginTop: 12 }}>
                   <span style={styles.label}>± Allowable Channel Budget (Rs.):</span>
