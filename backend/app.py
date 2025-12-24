@@ -1222,9 +1222,6 @@ def optimize_by_benefit_share():
 
 @app.route('/optimize-bonus', methods=['POST'])
 def optimize_bonus():
-    """
-    Bonus optimization with channel-specific commercial splits.
-    """
     data = request.get_json()
 
     # Map frontend → backend names
@@ -1233,7 +1230,7 @@ def optimize_bonus():
     channel_bounds = data.get('channel_bounds') or data.get('channelAllowPctByChannel')
     commercial_budgets = data.get('commercial_budgets') or data.get('commercialTargetsByChannel')
 
-    # NEW: Channel commercial percentages
+    # NEW: Add channel commercial percentages
     channel_commercial_pct_map = data.get('channel_commercial_pct_map') or {}
     budget_proportions = data.get('budget_proportions') or []
     num_commercials = data.get('num_commercials', 1)
@@ -1245,123 +1242,58 @@ def optimize_bonus():
     if df_full.empty:
         return jsonify({"success": False, "message": "⚠️ df_full/programRows is empty"}), 400
 
-    # Validate and sanitize data
-    for col in ['NCost', 'NTVR', 'Cost', 'TVR']:
-        if col in df_full.columns:
-            df_full[col] = pd.to_numeric(df_full[col], errors='coerce').fillna(0.0)
-
-    if 'Commercial' not in df_full.columns and num_commercials > 1:
-        return jsonify({"success": False, "message": "Commercial column missing"}), 400
-
     results = []
     for channel in df_full['Channel'].unique():
         df_ch = df_full[df_full['Channel'] == channel].copy()
-
-        # Skip if no bonus budget
-        bonus_budget = float(bonus_budgets.get(channel, 0))
-        if bonus_budget <= 0:
-            continue
-
-        budget_bound = float(channel_bounds.get(channel, 0))
-
-        # Get commercial budgets or percentages for this channel
+        bonus_budget = bonus_budgets.get(channel, 0)
+        budget_bound = channel_bounds.get(channel, 0)
         comm_budgets = commercial_budgets.get(channel, {})
 
-        # Get channel-specific commercial percentages
-        ch_comm_pcts = channel_commercial_pct_map.get(channel, budget_proportions)
-        if isinstance(ch_comm_pcts, list):
-            # Ensure array has correct length
-            if len(ch_comm_pcts) < num_commercials:
-                last_val = ch_comm_pcts[-1] if ch_comm_pcts else (100.0 / num_commercials)
-                ch_comm_pcts = ch_comm_pcts + [last_val] * (num_commercials - len(ch_comm_pcts))
-        else:
-            # Default to equal split
-            ch_comm_pcts = [100.0 / num_commercials] * num_commercials
-
-        # Set up LP for this channel
+        # set up an LP for this channel
         prob = LpProblem(f"Maximize_NTVR_{channel}", LpMaximize)
         x = {i: LpVariable(f"x_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer')
              for i in df_ch.index}
 
-        # Maximise NTVR for this channel
+        # maximise NTVR for this channel
         prob += lpSum(df_ch.loc[i, 'NTVR'] * x[i] for i in df_ch.index)
 
-        # Channel budget constraint
+        # channel budget constraint
         total_cost = lpSum(df_ch.loc[i, 'NCost'] * x[i] for i in df_ch.index)
         prob += total_cost >= bonus_budget - budget_bound
         prob += total_cost <= bonus_budget + budget_bound
 
-        # Commercial-wise constraints using percentages
-        for comm_idx in range(num_commercials):
-            # Get percentage for this commercial
-            comm_pct = float(ch_comm_pcts[comm_idx])
+        # 🔥 FIXED: commercial-wise budget bounds with 0% handling
+        for c in df_ch['Commercial'].unique():
+            indices = df_ch[df_ch['Commercial'] == c].index
+            target = comm_budgets.get(c, 0)
 
-            # Filter indices for this commercial
-            indices = df_ch[df_ch['Commercial'] == comm_idx].index
-
-            if len(indices) == 0:
-                continue
-
-            # If percentage is 0, force all spots to 0
-            if comm_pct == 0:
+            # If target is 0 or negative, FORCE all spots to 0
+            if target <= 0:
                 for i in indices:
-                    prob += x[i] == 0
-                continue
-
-            # Commercial cost expression
-            comm_cost = lpSum(df_ch.loc[i, 'NCost'] * x[i] for i in indices)
-
-            # Target budget for this commercial
-            target = (comm_pct / 100.0) * bonus_budget
-
-            # Apply tolerance only if percentage > 0
-            if comm_pct > 0:
-                lower_bound = target * 0.95  # -5%
-                upper_bound = target * 1.05  # +5%
-
-                prob += comm_cost >= lower_bound
-                prob += comm_cost <= upper_bound
+                    prob += x[i] == 0  # ⭐ This forces 0 spots!
             else:
-                # If 0%, force 0 cost
-                prob += comm_cost == 0
+                # Normal case with tolerance
+                comm_cost = lpSum(df_ch.loc[i, 'NCost'] * x[i] for i in indices)
+                prob += comm_cost >= 0.95 * target
+                prob += comm_cost <= 1.05 * target
 
-        # Solve
+        # solve
         solver = PULP_CBC_CMD(msg=True, timeLimit=time_limit)
         prob.solve(solver)
-
-        if prob.status != 1:  # Not optimal
-            results.append({
-                "channel": channel,
-                "success": False,
-                "solver_status": LpStatus[prob.status],
-                "message": f"Solver failed with status: {LpStatus[prob.status]}"
-            })
+        if prob.status != 1:
+            results.append({"channel": channel, "success": False, "solver_status": LpStatus[prob.status]})
             continue
 
-        # Collect results
+        # collect results
         df_ch['Spots'] = df_ch.index.map(lambda i: int(x[i].varValue) if x[i].varValue else 0)
         df_ch['Total_Cost'] = df_ch['Spots'] * df_ch['NCost']
         df_ch['Total_NTVR'] = df_ch['Spots'] * df_ch['NTVR']
-        df_ch_active = df_ch[df_ch['Spots'] > 0].copy()
+        df_ch = df_ch[df_ch['Spots'] > 0]
 
         # Convert numpy types to native Python types
-        total_cost_ch = float(df_ch_active['Total_Cost'].sum())
-        total_ntvr_ch = float(df_ch_active['Total_NTVR'].sum())
+        total_cost_ch = float(df_ch['Total_Cost'].sum())
+        total_ntvr_ch = float(df_ch['Total_NTVR'].sum())
         cprp_ch = float(total_cost_ch / total_ntvr_ch) if total_ntvr_ch else None
-
-        # Calculate commercial breakdown for this channel
-        commercial_breakdown = {}
-        if num_commercials > 1:
-            for comm_idx in range(num_commercials):
-                df_comm = df_ch_active[df_ch_active['Commercial'] == comm_idx]
-                if not df_comm.empty:
-                    comm_cost = float(df_comm['Total_Cost'].sum())
-                    comm_rating = float(df_comm['Total_NTVR'].sum())
-                    commercial_breakdown[f"Commercial_{comm_idx + 1}"] = {
-                        "cost": round(comm_cost, 2),
-                        "rating": round(comm_rating, 2),
-                        "percentage": round((comm_cost / total_cost_ch * 100), 2) if total_cost_ch > 0 else 0.0
-                    }
 
         results.append({
             "channel": channel,
@@ -1370,68 +1302,16 @@ def optimize_bonus():
             "total_cost": round(total_cost_ch, 2),
             "total_ntvr": round(total_ntvr_ch, 2),
             "cprp": round(cprp_ch, 2) if cprp_ch else None,
-            "commercial_breakdown": commercial_breakdown,
-            "details": json.loads(df_ch_active.to_json(orient='records'))
+            "details": json.loads(df_ch.to_json(orient='records'))
         })
-
-    # Calculate overall totals
-    successful_results = [r for r in results if r["success"]]
-    if not successful_results:
-        return jsonify({
-            "success": False,
-            "message": "No feasible solution found for any channel",
-            "results": results
-        }), 200
-
-    # Prepare comprehensive summaries
-    total_bonus_cost = sum(r["total_cost"] for r in successful_results)
-    total_bonus_rating = sum(r["total_ntvr"] for r in successful_results)
-
-    # Channel summary
-    channel_summary = []
-    for r in successful_results:
-        channel_summary.append({
-            "Channel": r["channel"],
-            "Total_Cost": r["total_cost"],
-            "Total_Rating": r["total_ntvr"],
-            "CPRP": r["cprp"],
-            "Commercial_Breakdown": r["commercial_breakdown"]
-        })
-
-    # Commercial summary across all channels
-    commercial_summary = []
-    if num_commercials > 1:
-        for comm_idx in range(num_commercials):
-            comm_cost_total = 0
-            comm_rating_total = 0
-
-            for r in successful_results:
-                df_details = pd.DataFrame(r["details"])
-                if not df_details.empty and 'Commercial' in df_details.columns:
-                    df_comm = df_details[df_details['Commercial'] == comm_idx]
-                    if not df_comm.empty:
-                        comm_cost_total += float(df_comm['Total_Cost'].sum())
-                        comm_rating_total += float(df_comm['Total_NTVR'].sum())
-
-            if comm_cost_total > 0:
-                cprp_comm = comm_cost_total / comm_rating_total if comm_rating_total > 0 else 0
-                commercial_summary.append({
-                    "commercial_index": comm_idx,
-                    "total_cost": round(comm_cost_total, 2),
-                    "total_rating": round(comm_rating_total, 2),
-                    "cprp": round(cprp_comm, 2)
-                })
 
     return jsonify({
         "success": True,
         "solver_status": "Optimal",
         "totals": {
-            "bonus_total_cost": total_bonus_cost,
-            "bonus_total_rating": total_bonus_rating,
-            "bonus_cprp": round(total_bonus_cost / total_bonus_rating, 2) if total_bonus_rating > 0 else 0
+            "bonus_total_cost": sum(r["total_cost"] for r in results if r["success"]),
+            "bonus_total_rating": sum(r["total_ntvr"] for r in results if r["success"]),
         },
-        "channel_summary": channel_summary,
-        "commercial_summary": commercial_summary,
         "tables": {
             "by_channel": [
                 {
@@ -1441,7 +1321,7 @@ def optimize_bonus():
                     "Total_Cost": r["total_cost"],
                     "Total_Rating": r["total_ntvr"],
                 }
-                for r in successful_results
+                for r in results if r["success"]
             ],
             "by_program": [
                 {
@@ -1449,11 +1329,10 @@ def optimize_bonus():
                     "Channel": r["channel"],
                     "Slot": "B"
                 }
-                for r in successful_results
+                for r in results if r["success"]
                 for d in r["details"]
             ]
-        },
-        "results": successful_results
+        }
     })
 
 @app.route('/save-plan', methods=['POST'])
