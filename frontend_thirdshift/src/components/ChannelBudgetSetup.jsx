@@ -28,7 +28,12 @@ export default function ChannelBudgetSetup({
   // styles
   styles,
   // ✅ NEW: get from parent instead of local
-  propertyPercents, setPropertyPercents
+  propertyPercents, setPropertyPercents,
+  // NEW: per-channel commercial splits
+  channelCommercialSplits, handleChannelCommercialSplitChange,
+  perChannelCommercialErrors,
+  applyGlobalCommercialsToAllChannels
+
 }) {
   const handleInputChange = (channel, value) => {
     setBudgetShares(prev => ({ ...prev, [channel]: toNumber(value) }));
@@ -449,6 +454,44 @@ export default function ChannelBudgetSetup({
                       </div>
                     )}
                   </div>
+
+                  {Number(optimizationInput?.numCommercials) > 1 && (
+                      <div style={enhancedStyles.splitContainer}>
+                        {Array.from({ length: Number(optimizationInput?.numCommercials || 1) }).map((_, idx2) => {
+                          const globalPct = toNumber(budgetProportions?.[idx2] ?? 0);
+                          const chPct = toNumber(channelCommercialSplits?.[ch]?.[idx2] ?? globalPct);
+                          const chAmt = (available * chPct) / 100;
+
+                          const hasCommErr = !!perChannelCommercialErrors?.[ch];
+
+                          return (
+                            <div key={idx2} style={enhancedStyles.inputRow}>
+                              <span style={{ ...styles.label, minWidth: '80px' }}>
+                                Com {idx2 + 1}:
+                              </span>
+
+                              <input
+                                type="number"
+                                value={channelCommercialSplits?.[ch]?.[idx2] ?? budgetProportions?.[idx2] ?? ''}
+                                onChange={e => handleChannelCommercialSplitChange(ch, idx2, e.target.value)}
+                                style={{ ...styles.numberInput, width: '70px', borderColor: hasCommErr ? '#e53e3e' : '#e2e8f0' }}
+                              />
+                              <span style={styles.percentSymbol}>%</span>
+
+                              <span style={enhancedStyles.amountBox}>
+                                {formatLKR(chAmt)}
+                              </span>
+                            </div>
+                          );
+                        })}
+
+                        {!!perChannelCommercialErrors?.[ch] && (
+                          <div style={{ color: '#e53e3e', fontSize: 12, marginTop: '4px' }}>
+                            Commercial % must total 100% for this channel
+                          </div>
+                        )}
+                      </div>
+                    )}
                 </div>
               );
             })}
@@ -488,6 +531,23 @@ export default function ChannelBudgetSetup({
             </button>
           </div>
         </div>
+          {Number(optimizationInput?.numCommercials) > 1 && (
+          <div style={enhancedStyles.summaryRow}>
+            <span style={enhancedStyles.summaryLabel}>Global Commercial defaults:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={enhancedStyles.summaryValue}>
+                {budgetProportions.map((p, i) => `C${i + 1}:${toNumber(p)}%`).join('  ')}
+              </span>
+              <button
+                type="button"
+                onClick={applyGlobalCommercialsToAllChannels}
+                style={styles.smallSyncBtn}
+              >
+                Apply to all channels
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 🔁 RE-ADDED: Global Defaults & Optimization Settings (side-by-side) */}

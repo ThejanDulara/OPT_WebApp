@@ -89,6 +89,45 @@ function ChannelRatingAllocator({
         Array(numCom).fill((100 / numCom).toFixed(2))
     );
 
+      // Per-channel Commercial splits (default from global commercial proportions)
+      const [channelCommercialSplits, setChannelCommercialSplits] = useState(() => {
+        const seed = {};
+        (channels || []).forEach(ch => {
+          seed[ch] = (budgetProportions || []).map(v => toNumber(v));
+        });
+        return seed;
+      });
+
+      const perChannelCommercialErrors = useMemo(() => {
+        const errs = {};
+        const n = safeOpt.numCommercials ?? 1;
+        if (n <= 1) return errs;
+
+        (channels || []).forEach(ch => {
+          const arr = channelCommercialSplits[ch] || [];
+          const sum = Array.from({ length: n }).reduce((a, _, i) => a + toNumber(arr[i]), 0);
+          if (Math.abs(sum - 100) > 0.01) errs[ch] = true;
+        });
+        return errs;
+      }, [channels, channelCommercialSplits, safeOpt.numCommercials, toNumber]);
+
+      const applyGlobalCommercialsToAllChannels = () => {
+        const next = {};
+        (channels || []).forEach(ch => {
+          next[ch] = (budgetProportions || []).map(v => toNumber(v));
+        });
+        setChannelCommercialSplits(next);
+        toast.info('Applied global commercial split to all channels');
+      };
+
+      const handleChannelCommercialSplitChange = (ch, idx, value) => {
+        setChannelCommercialSplits(prev => {
+          const n = safeOpt.numCommercials ?? 1;
+          const arr = Array.isArray(prev[ch]) ? [...prev[ch]] : Array(n).fill(0);
+          arr[idx] = toNumber(value);
+          return { ...prev, [ch]: arr };
+        });
+      };
 
   // channelMoney now supports onCost + comBenefit
     const channelMoney = useMemo(() => {
@@ -123,9 +162,8 @@ function ChannelRatingAllocator({
       setPropertyPrograms(initialState.propertyPrograms || {});
       setPropertyPercents(initialState.propertyPercents || {});
       setBudgetProportions(initialState.budgetProportions || []);
+      setChannelCommercialSplits(initialState.channelCommercialSplits || {});
     }, [initialState]);
-
-
 
   // Pass up channelMoney
   useEffect(() => {
@@ -305,6 +343,11 @@ function ChannelRatingAllocator({
       alert(`Fix property programs total before optimizing:\n${msg}`);
       return;
     }
+    if (Object.keys(perChannelCommercialErrors).length > 0) {
+      alert("Each channel's Commercial % total must equal 100%.");
+      return;
+    }
+
 
     const channel_prime_pct_map = {};
     const channel_nonprime_pct_map = {};
@@ -330,7 +373,8 @@ function ChannelRatingAllocator({
           propertyAmounts,
           propertyPrograms,
           propertyPercents,
-          budgetProportions
+          budgetProportions,
+          channelCommercialSplits
         });
       }
 
@@ -406,7 +450,8 @@ function ChannelRatingAllocator({
       nonprime_pct: nonPrimePct,
       channel_prime_pct_map,
       channel_nonprime_pct_map,
-      budget_proportions: budgetProportions.map(p => parseFloat(p))
+      budget_proportions: budgetProportions.map(p => parseFloat(p)),
+      channel_commercial_pct_map: channelCommercialSplits
     };
 
     if (typeof onSaveState === "function") {
@@ -421,7 +466,8 @@ function ChannelRatingAllocator({
         propertyAmounts,
         propertyPrograms,
         propertyPercents,
-        budgetProportions
+        budgetProportions,
+        channelCommercialSplits
       });
     }
 
@@ -752,6 +798,11 @@ function ChannelRatingAllocator({
         propertyPercents={propertyPercents}
         setPropertyPercents={setPropertyPercents}
         styles={styles}
+        channelCommercialSplits={channelCommercialSplits}
+        handleChannelCommercialSplitChange={handleChannelCommercialSplitChange}
+        perChannelCommercialErrors={perChannelCommercialErrors}
+        applyGlobalCommercialsToAllChannels={applyGlobalCommercialsToAllChannels}
+
       />
     </div>
   );

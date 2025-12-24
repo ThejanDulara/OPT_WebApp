@@ -26,6 +26,19 @@ export default function CommercialBenefitSetup({
       optimizationInput?.budgetProportions ??
       Array(optimizationInput?.numCommercials || 1).fill((100 / (optimizationInput?.numCommercials || 1)).toFixed(2))
     );
+    // NEW: Per-channel Commercial budget splits
+    const [channelCommercialSplits, setChannelCommercialSplits] = useState(() => {
+      if (safeInit.channelCommercialSplits) return safeInit.channelCommercialSplits;
+
+      const seed = {};
+      (channels || []).forEach(ch => {
+        // ✅ Use inline logic instead of toNum
+        seed[ch] = (budgetProportions || []).map(v =>
+          isNaN(parseFloat(v)) ? 0 : parseFloat(v)
+        );
+      });
+      return seed;
+    });
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [stopRequested, setStopRequested] = useState(false);
@@ -71,6 +84,18 @@ export default function CommercialBenefitSetup({
     });
     return errs;
   }, [benefitChannels, channelSplits]);
+
+    const perChannelCommercialErrors = useMemo(() => {
+      const errs = {};
+      if ((optimizationInput?.numCommercials || 1) <= 1) return errs;
+
+      benefitChannels.forEach(ch => {
+        const arr = channelCommercialSplits[ch] || [];
+        const sum = arr.reduce((a, v) => a + toNum(v), 0);
+        if (Math.abs(sum - 100) > 0.01) errs[ch] = true;
+      });
+      return errs;
+    }, [benefitChannels, channelCommercialSplits, optimizationInput, toNum]);
 
   // Small countdown indicator (same UX feel)
   const [countdown, setCountdown] = useState(null);
@@ -134,6 +159,24 @@ export default function CommercialBenefitSetup({
     next[i] = val;
     setBudgetProportions(next);
   };
+
+    const handleChannelCommercialChange = (ch, idx, val) => {
+      setChannelCommercialSplits(prev => {
+        const next = Array.isArray(prev[ch]) ? [...prev[ch]] : [];
+        next[idx] = toNum(val);
+        return { ...prev, [ch]: next };
+      });
+    };
+
+    const applyGlobalCommercialToAllChannels = () => {
+      const next = {};
+      benefitChannels.forEach(ch => {
+        next[ch] = budgetProportions.map(v => toNum(v));
+      });
+      setChannelCommercialSplits(next);
+      toast.info('Applied global Commercial split to all channels');
+    };
+
 
   const styles = {
     container: { padding: '32px', maxWidth: '1200px', margin: '0 auto', backgroundColor: '#d5e9f7', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' },
@@ -232,7 +275,8 @@ export default function CommercialBenefitSetup({
       prime_pct: primePct,
       nonprime_pct: nonPrimePct,
       channel_slot_pct_map,
-      budget_proportions: budgetProportions.map(p => parseFloat(p))
+      budget_proportions: budgetProportions.map(p => parseFloat(p)),
+      channel_commercial_pct_map: channelCommercialSplits
     };
 
     // ⭐⭐⭐ SAVE CURRENT STATE BEFORE OPTIMIZING ⭐⭐⭐
@@ -243,7 +287,8 @@ export default function CommercialBenefitSetup({
         maxSpots,
         timeLimit,
         budgetProportions,
-        channelSplits
+        channelSplits,
+        channelCommercialSplits
       });
     }
 
@@ -409,6 +454,42 @@ export default function CommercialBenefitSetup({
                 )}
                 {hasErr && <div style={styles.error}>Splits must total 100%</div>}
               </div>
+              {Number(optimizationInput?.numCommercials || 1) > 1 && (
+  <div style={{ marginTop: 12 }}>
+    <strong style={styles.label}>Commercial Split</strong>
+
+    {Array.from({ length: optimizationInput.numCommercials }).map((_, ci) => {
+      const pct = toNum(channelCommercialSplits[ch]?.[ci] ?? budgetProportions?.[ci] ?? 0);
+      const amt = (comBenefit * pct) / 100;
+
+      return (
+        <div key={ci} style={{ display:'flex', alignItems:'center', gap:8, marginTop:6 }}>
+          <span style={{ ...styles.label, minWidth: 110 }}>
+            Commercial {ci + 1}:
+          </span>
+
+          <input
+            type="number"
+            value={pct}
+            onChange={e => handleChannelCommercialChange(ch, ci, e.target.value)}
+            style={{
+              ...styles.numberInput,
+              width: 70,
+              borderColor: perChannelCommercialErrors[ch] ? '#e53e3e' : '#e2e8f0'
+            }}
+          />
+          <span style={styles.percentSymbol}>%</span>
+          <span style={styles.amountBox}>{formatLKR(amt)}</span>
+        </div>
+      );
+    })}
+
+    {perChannelCommercialErrors[ch] && (
+      <div style={styles.error}>Commercial % must total 100%</div>
+    )}
+  </div>
+)}
+
             </div>
           );
         })}
@@ -481,6 +562,13 @@ export default function CommercialBenefitSetup({
           <div style={{ background:'#edf2f7', padding:'8px 12px', borderRadius:6, fontSize:14, color:'#4a5568', marginTop:8 }}>
             Total must be 100% — Current: {budgetProportions.reduce((a,b)=>a+(isNaN(parseFloat(b))?0:parseFloat(b)),0).toFixed(2)}%
           </div>
+          <button
+              type="button"
+              onClick={applyGlobalCommercialToAllChannels}
+              style={{ marginTop: 8, padding: '6px 10px', border: '1px solid #cbd5e0', background: '#edf2f7', borderRadius: 6 }}
+            >
+              Apply global commercial split to all channels
+          </button>
         </div>
       )}
 

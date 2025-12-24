@@ -126,7 +126,34 @@ function App() {
         setBonusSetupState(session.bonusSetupState || null);
         setSelectedBonusPrograms(session.selectedBonusPrograms || {});
         setSelectedClient(session.selectedClient || "Other");
+        setAllocatorState(session.allocatorState || null);
+        // NEW: Check if allocatorState has commercial splits, if not, initialize them
+        if (session.allocatorState && !session.allocatorState.channelCommercialSplits) {
+          // Initialize with default from budgetProportions
+          const defaultSplits = {};
+          const channels = session.channels || [];
+          const budgetProportions = session.allocatorState?.budgetProportions || [];
 
+          channels.forEach(ch => {
+            defaultSplits[ch] = budgetProportions.map(v => parseFloat(v) || 0);
+          });
+
+          session.allocatorState.channelCommercialSplits = defaultSplits;
+        }
+
+        setBenefitState(session.benefitState || null);
+        // NEW: Same check for benefitState
+        if (session.benefitState && !session.benefitState.channelCommercialSplits) {
+          const defaultSplits = {};
+          const channels = session.channels || [];
+          const budgetProportions = session.benefitState?.budgetProportions || [];
+
+          channels.forEach(ch => {
+            defaultSplits[ch] = budgetProportions.map(v => parseFloat(v) || 0);
+          });
+
+          session.benefitState.channelCommercialSplits = defaultSplits;
+        }
         // Navigate user to Step 1
         navigate('/select-channels');
 
@@ -441,10 +468,24 @@ function App() {
                 channels={channels}
                 selectedBonusPrograms={selectedBonusPrograms}
                 bonusBudgetsByChannel={bonusSharesInput?.bonusBudget || {}}
-                bonusCommercialPercentsByChannel={(bonusSharesInput?.budgetProportions || []).reduce((m, pct, i) => {
-                  m[`com_${i + 1}`] = Number(pct) || 0;
-                  return m;
-                }, {})}
+                // NEW CORRECTED CODE IN App.js
+                bonusCommercialPercentsByChannel={
+                  // If we have specific per-channel overrides, use them!
+                  bonusSharesInput?.channel_commercial_pct_map
+                    ? Object.entries(bonusSharesInput.channel_commercial_pct_map).reduce((acc, [ch, pcts]) => {
+                        const chMap = {};
+                        pcts.forEach((pct, i) => {
+                          chMap[`com_${i + 1}`] = Number(pct) || 0;
+                        });
+                        acc[ch] = chMap;
+                        return acc;
+                      }, {})
+                    // Otherwise fallback to global proportions
+                    : (bonusSharesInput?.budgetProportions || []).reduce((m, pct, i) => {
+                        m[`com_${i + 1}`] = Number(pct) || 0;
+                        return m;
+                      }, {})
+                }
                 commercialDurationsByChannel={(bonusSharesInput?.durations || []).reduce((m, dur, i) => {
                   m[`com_${i + 1}`] = Number(dur) || 30;
                   return m;
@@ -525,6 +566,7 @@ function App() {
               bonusSetupState,      // bonus setup inputs
               selectedBonusPrograms,
               selectedClient,       // Cargills or other
+
             };
 
             return (
