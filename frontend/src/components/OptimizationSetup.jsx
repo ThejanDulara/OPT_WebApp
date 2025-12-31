@@ -1,6 +1,14 @@
 import React, { useState } from 'react';
 
 function OptimizationSetup({ onSubmit, onBack, initialValues }) {
+  const formatWithCommas = (value) => {
+      if (value === '' || value === null || value === undefined) return '';
+      return Number(value).toLocaleString('en-LK');
+    };
+
+    const removeCommas = (value) => {
+      return value.replace(/,/g, '');
+    };
   const [numCommercials, setNumCommercials] = useState(initialValues?.numCommercials || 1);
   const [durations, setDurations] = useState(initialValues?.durations || ['']);
   const [budgetProportions, setBudgetProportions] = useState(initialValues?.budgetProportions || [100]);
@@ -262,9 +270,16 @@ function OptimizationSetup({ onSubmit, onBack, initialValues }) {
           <div style={enhancedStyles.formGroup}>
             <label style={enhancedStyles.label}>Total Budget (Rs.):</label>
             <input
-              type="number"
-              value={budget}
-              onChange={e => setBudget(e.target.value)}
+              type="text"
+              value={formatWithCommas(budget)}
+              onChange={e => {
+                const rawValue = removeCommas(e.target.value);
+
+                // allow only numbers
+                if (!/^\d*$/.test(rawValue)) return;
+
+                setBudget(rawValue);
+              }}
               required
               style={enhancedStyles.input}
             />
