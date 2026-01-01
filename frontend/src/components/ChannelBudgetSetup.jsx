@@ -35,6 +35,14 @@ export default function ChannelBudgetSetup({
   applyGlobalCommercialsToAllChannels
 
 }) {
+
+    const formatWithCommas = (value) => {
+      if (value === '' || value === null || value === undefined) return '';
+      return Number(value).toLocaleString('en-LK');
+    };
+
+    const removeCommas = (value) => value.replace(/,/g, '');
+
   const handleInputChange = (channel, value) => {
     setBudgetShares(prev => ({ ...prev, [channel]: toNumber(value) }));
   };
@@ -365,11 +373,18 @@ export default function ChannelBudgetSetup({
                       <div style={enhancedStyles.inputRow}>
                         <label style={{ ...styles.label, minWidth: '100px' }}>Property Amount:</label>
                         <input
-                          type="number"
-                          value={propertyAmounts[ch] ?? 0}
-                          onChange={e => handlePropertyAmount(ch, e.target.value)}
+                          type="text"
+                          value={formatWithCommas(propertyAmounts[ch] ?? '')}
+                          onChange={e => {
+                            const rawValue = removeCommas(e.target.value);
+
+                            // allow only digits
+                            if (!/^\d*$/.test(rawValue)) return;
+
+                            handlePropertyAmount(ch, rawValue);
+                          }}
                           style={{ ...styles.numberInput, width: '120px' }}
-                          min="0"
+                          inputMode="numeric"
                         />
                         <span>LKR</span>
                       </div>
