@@ -55,6 +55,15 @@ export default function FinalPlan({
   const toStr = (v) => (v == null ? '' : String(v));
   const safeFx = (v, d = 2) => (Number.isFinite(+v) ? (+v).toFixed(d) : (0).toFixed(d));
 
+      // ---------- Formatting helpers ----------
+    const formatWithCommas = (value) => {
+      if (value === '' || value === null || value === undefined) return '';
+      return Number(value).toLocaleString('en-LK');
+    };
+
+    const removeCommas = (value) => value.replace(/,/g, '');
+
+
      // put near your other helpers
     const normalizeCommercial = (raw, { zeroBasedNumeric = false } = {}) => {
       const s = toStr(raw).trim();
@@ -2165,6 +2174,7 @@ const propertyGRPTotal = useMemo(() => {
   const [activity] = useState("TV Schedule");  // fixed
   const [campaign, setCampaign] = useState("");
   const [tvBudget, setTvBudget] = useState("");
+  const [tvBudgetDraft, setTvBudgetDraft] = useState('');
   const [durationName, setDurationName] = useState("");
   const [commercialLanguages, setCommercialLanguages] = useState({});
 
@@ -2780,13 +2790,27 @@ const propertyGRPTotal = useMemo(() => {
                 onChange={(e) => setCampaign(e.target.value)}
               />
 
-              <label>TV Budget</label>
-              <input
-                type="number"
-                style={s.inputBox}
-                value={tvBudget}
-                onChange={(e) => setTvBudget(e.target.value)}
-              />
+            <label>TV Budget</label>
+            <input
+              type="text"
+              style={s.inputBox}
+              value={tvBudgetDraft || formatWithCommas(tvBudget)}
+              onChange={(e) => {
+                const raw = removeCommas(e.target.value);
+                if (!/^\d*$/.test(raw)) return;
+
+                // show commas while typing
+                setTvBudgetDraft(formatWithCommas(raw));
+
+                // store clean numeric value
+                setTvBudget(raw);
+              }}
+              onBlur={() => {
+                // cleanup draft on blur
+                setTvBudgetDraft('');
+              }}
+              inputMode="numeric"
+            />
 
               <label>Duration</label>
               <input
