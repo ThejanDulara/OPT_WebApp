@@ -48,6 +48,18 @@ export default function ChannelBudgetSetup({
     setBudgetShares(prev => ({ ...prev, [channel]: toNumber(value) }));
   };
 
+    // 🔁 Share ↔ Amount helpers (UI only)
+    const shareToAmount = (sharePct) =>
+      (totalBudget * (toNumber(sharePct) || 0)) / 100;
+
+    const amountToShare = (amount) =>
+      totalBudget > 0
+        ? ((toNumber(amount) || 0) / totalBudget) * 100
+        : 0;
+
+    // UI-only draft amounts while typing
+    const [draftAmounts, setDraftAmounts] = useState({});
+
   // Countdown for processing
   const [countdown, setCountdown] = useState(null);
   const formatMMSS = (secs) => {
@@ -357,15 +369,51 @@ export default function ChannelBudgetSetup({
                   {/* Channel percentage input */}
                   <div style={enhancedStyles.inputRow}>
                     <label style={{ ...styles.label, minWidth: '100px' }}>Budget Share:</label>
+                    {/* Amount input */}
+                    <input
+                      type="text"
+                      value={
+                        draftAmounts[ch] ??
+                        formatWithCommas(
+                          shareToAmount(budgetShares[ch] ?? 0).toFixed(0)
+                        )
+                      }
+                      onChange={e => {
+                    const raw = removeCommas(e.target.value);
+                    if (!/^\d*$/.test(raw)) return;
+
+                    // ✅ store formatted value while typing
+                    setDraftAmounts(prev => ({
+                      ...prev,
+                      [ch]: formatWithCommas(raw)
+                    }));
+
+                    const newShare = amountToShare(raw);
+                        setBudgetShares(prev => ({
+                          ...prev,
+                          [ch]: Number(newShare.toFixed(2))
+                        }));
+                      }}
+                      onBlur={() => {
+                        // cleanup draft once user leaves field
+                        setDraftAmounts(prev => {
+                          const copy = { ...prev };
+                          delete copy[ch];
+                          return copy;
+                        });
+                      }}
+                      style={{ ...styles.numberInput, width: '110px' }}
+                    />
+                    <span>LKR</span>
+
+                    {/* Share input */}
                     <input
                       type="number"
                       value={budgetShares[ch] ?? ''}
                       onChange={e => handleInputChange(ch, e.target.value)}
                       style={{ ...styles.numberInput, width: '70px' }}
-                      min="0"
-                      max="100"
                     />
-                    <span style={styles.percentSymbol}>%</span>
+                    <span>%</span>
                   </div>
 
                   {/* Property amount & percentage inputs */}
