@@ -171,6 +171,68 @@ function ProgramUpdater({ onBack }) {
       });
   }, [programs, searchTerm, slotFilter]);
 
+    const formatTime12Hour = (time24) => {
+      if (!time24) return '';
+      const [h, m] = time24.split(':').map(Number);
+
+      const period = h >= 12 ? 'PM' : 'AM';
+      const hour12 = h % 12 || 12;
+
+      return `${hour12}.${m.toString().padStart(2, '0')} ${period}`;
+    };
+
+    const combineTimeRange = (start, end) => {
+      if (!start || !end) return '';
+      return `${formatTime12Hour(start)} – ${formatTime12Hour(end)}`;
+    };
+
+    const parseTime12To24 = (time12) => {
+      if (!time12) return '';
+
+      const cleaned = time12
+        .trim()                       // remove leading/trailing spaces
+        .replace(/\./g, ':')          // dot → colon
+        .replace(/\s+/g, ' ');        // normalize spaces
+
+      const match = cleaned.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (!match) return '';
+
+      let [, h, m, period] = match;
+      h = parseInt(h, 10);
+      m = parseInt(m, 10);
+      period = period.toUpperCase();
+
+      if (period === 'PM' && h !== 12) h += 12;
+      if (period === 'AM' && h === 12) h = 0;
+
+      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+    };
+
+    const splitTimeRange = (range) => {
+      if (!range) return { start: '', end: '' };
+
+      const normalized = range
+        .trim()
+        .replace(/\s*-\s*/g, ' – ')
+        .replace(/\s+/g, ' ');
+
+      if (normalized.includes('–')) {
+        const [start12, end12] = normalized.split('–').map(s => s.trim());
+        return {
+          start: parseTime12To24(start12),
+          end: parseTime12To24(end12),
+        };
+      }
+
+      return {
+        start: parseTime12To24(normalized),
+        end: '',
+      };
+    };
+
+
+
+
   const isSpecialChannel = SPECIAL_CHANNELS.includes(selectedChannel);
   const isDeranaTV = selectedChannel === "DERANA TV";
 
@@ -324,9 +386,38 @@ function ProgramUpdater({ onBack }) {
                   <td style={styles.tableCell}>
                     <input type="text" value={p.day || ''} onChange={(e) => handleProgramChange(p.originalIndex, 'day', e.target.value)} style={styles.inputCell}/>
                   </td>
-                  <td style={styles.tableCell}>
-                    <input type="text" value={p.time || ''} onChange={(e) => handleProgramChange(p.originalIndex, 'time', e.target.value)} style={styles.inputCell}/>
-                  </td>
+                    <td style={styles.tableCell}>
+                      {(() => {
+                        const { start, end } = splitTimeRange(p.time);
+
+                        return (
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <input
+                              type="time"
+                              value={start}
+                              onChange={(e) => {
+                                const newTime = combineTimeRange(e.target.value, end);
+                                handleProgramChange(p.originalIndex, 'time', newTime);
+                              }}
+                              style={{ ...styles.inputCell, minWidth: '110px' }}
+                            />
+
+                            <span>–</span>
+
+                            <input
+                              type="time"
+                              value={end}
+                              onChange={(e) => {
+                                const newTime = combineTimeRange(start, e.target.value);
+                                handleProgramChange(p.originalIndex, 'time', newTime);
+                              }}
+                              style={{ ...styles.inputCell, minWidth: '110px' }}
+                            />
+                          </div>
+                        );
+                      })()}
+                    </td>
+
                   <td style={styles.tableCell}>
                     <input type="text" value={p.program} onChange={(e) => handleProgramChange(p.originalIndex, 'program', e.target.value)} style={styles.inputCell}/>
                   </td>
