@@ -100,6 +100,67 @@ export default function PropertyProgramsEditor({
 
   if (visibleChannels.length === 0) return null;
 
+      const formatTime12Hour = (time24) => {
+      if (!time24) return '';
+      const [h, m] = time24.split(':').map(Number);
+
+      const period = h >= 12 ? 'PM' : 'AM';
+      const hour12 = h % 12 || 12;
+
+      return `${hour12}.${m.toString().padStart(2, '0')} ${period}`;
+    };
+
+    const combineTimeRange = (start, end) => {
+      if (!start) return '';
+      if (start && !end) return formatTime12Hour(start);
+      return `${formatTime12Hour(start)} – ${formatTime12Hour(end)}`;
+    };
+
+    const parseTime12To24 = (time12) => {
+      if (!time12) return '';
+
+      const cleaned = time12
+        .trim()
+        .replace(/\./g, ':')
+        .replace(/\s+/g, ' ');
+
+      const match = cleaned.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (!match) return '';
+
+      let [, h, m, period] = match;
+      h = parseInt(h, 10);
+      m = parseInt(m, 10);
+      period = period.toUpperCase();
+
+      if (period === 'PM' && h !== 12) h += 12;
+      if (period === 'AM' && h === 12) h = 0;
+
+      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+    };
+
+    const splitTimeRange = (range) => {
+      if (!range) return { start: '', end: '' };
+
+      const normalized = range
+        .trim()
+        .replace(/\s*-\s*/g, ' – ')
+        .replace(/\s+/g, ' ');
+
+      if (normalized.includes('–')) {
+        const [start12, end12] = normalized.split('–').map(s => s.trim());
+        return {
+          start: parseTime12To24(start12),
+          end: parseTime12To24(end12),
+        };
+      }
+
+      return {
+        start: parseTime12To24(normalized),
+        end: '',
+      };
+    };
+
+
   return (
     <div style={{ marginTop: 16 }}>
       <h3 style={styles.sectionTitle}>On cost breakdown (per channel)</h3>
@@ -214,12 +275,35 @@ export default function PropertyProgramsEditor({
                           />
                         </td>
                         <td style={styles.td}>
-                          <input
-                            type="text"
-                            value={r.time}
-                            onChange={e => handleChange(ch, r.id, 'time', e.target.value)}
-                            style={{ ...styles.numberInput, width: 100 }}
-                          />
+                          {(() => {
+                            const { start, end } = splitTimeRange(r.time);
+
+                            return (
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                <input
+                                  type="time"
+                                  value={start}
+                                  onChange={(e) => {
+                                    const newVal = combineTimeRange(e.target.value, end);
+                                    handleChange(ch, r.id, 'time', newVal);
+                                  }}
+                                  style={{ ...styles.numberInput, width: 110 }}
+                                />
+
+                                <span>–</span>
+
+                                <input
+                                  type="time"
+                                  value={end}
+                                  onChange={(e) => {
+                                    const newVal = combineTimeRange(start, e.target.value);
+                                    handleChange(ch, r.id, 'time', newVal);
+                                  }}
+                                  style={{ ...styles.numberInput, width: 110 }}
+                                />
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td style={styles.td}>
                           <select
