@@ -53,7 +53,10 @@ function FrontPage({ onStart, onManagePrograms, onOpenHistory }) {
 
             <button
               onClick={() => {
-                if (!window.__AUTH__?.canUpdateData) {
+                if (
+                  !window.__AUTH__?.canUpdateData &&
+                  window.location.hostname !== "localhost"
+                ) {
                   alert(
                     "You do not have access to manage program data.\n\nPlease contact the administrators for verification."
                   );
