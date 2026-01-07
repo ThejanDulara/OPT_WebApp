@@ -1280,12 +1280,26 @@ def optimize_bonus():
         # solve
         solver = PULP_CBC_CMD(msg=True, timeLimit=time_limit)
         prob.solve(solver)
+
         if prob.status != 1:
-            results.append({"channel": channel, "success": False, "solver_status": LpStatus[prob.status]})
+            results.append({
+                "channel": channel,
+                "success": False,
+                "solver_status": LpStatus[prob.status]
+            })
             continue
 
-        # collect results
         df_ch['Spots'] = df_ch.index.map(lambda i: int(x[i].varValue) if x[i].varValue else 0)
+
+        # 🚨 BUSINESS infeasibility
+        if bonus_budget > 0 and df_ch['Spots'].sum() == 0:
+            results.append({
+                "channel": channel,
+                "success": False,
+                "solver_status": "Infeasible (No feasible allocation under constraints)"
+            })
+            continue
+
         df_ch['Total_Cost'] = df_ch['Spots'] * df_ch['NCost']
         df_ch['Total_NTVR'] = df_ch['Spots'] * df_ch['NTVR']
         df_ch = df_ch[df_ch['Spots'] > 0]
