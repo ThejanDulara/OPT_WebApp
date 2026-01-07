@@ -169,6 +169,16 @@ export default function BonusResults({
   // ---------------- derive structures ----------------
   const byProgram = useMemo(() => result?.tables?.by_program || [], [result]);
   const byChannel = useMemo(() => result?.tables?.by_channel || [], [result]);
+  const infeasibleChannels = useMemo(() => {
+      const map = {};
+      (byChannel || []).forEach(r => {
+        if (r.success === false || r.solver_status !== 'Optimal') {
+          map[r.Channel] = r.solver_status || 'Infeasible';
+        }
+      });
+      return map;
+    }, [byChannel]);
+
   const totals = result?.totals || {};
 
   const { mapById, mapByKey } = useMemo(() => {
@@ -390,10 +400,19 @@ export default function BonusResults({
             )}
 
             {Object.entries(channelMap).map(([ch, data]) => {
+                {infeasibleChannels[ch] && (
+              <div style={s.warn}>
+                ⚠️ <strong>Optimization infeasible for this channel</strong><br />
+                Solver status: {infeasibleChannels[ch]}<br />
+                Please review bonus budget, commercial splits, or tolerance.
+              </div>
+            )}
+
               const chCost = data.cost;
               const chGRP = Object.values(data.rowsByCommercial).flat().reduce((sum, r) => sum + (num(r.TVR) * num(r.Spots)), 0);
               const chRating = data.rating;
-              const chCPRP = chRating > 0 ? chCost / chRating : 0;
+              const isInfeasible = infeasibleChannels[ch];
+              const chCPRP = (!isInfeasible && chRating > 0) ? chCost / chRating : 0;
 
               const commercials = Object.keys(data.rowsByCommercial).sort((a, b) => {
                 if (!a && b) return 1;
@@ -448,11 +467,24 @@ export default function BonusResults({
                           </tr>
                         </thead>
                         <tbody>
-                          {commercials.length === 0 && (
-                            <tr>
-                              <td style={s.td} colSpan={11}>(No programs for this channel)</td>
-                            </tr>
-                          )}
+                        {commercials.length === 0 && (
+                          <tr>
+                            <td
+                              colSpan={11}
+                              style={{
+                                ...s.td,
+                                textAlign: 'center',
+                                color: infeasibleChannels[ch] ? '#742a2a' : '#4a5568',
+                                fontWeight: infeasibleChannels[ch] ? 700 : 400,
+                                background: infeasibleChannels[ch] ? '#fff5f5' : 'transparent',
+                              }}
+                            >
+                              {infeasibleChannels[ch]
+                                ? '⚠️ Optimization infeasible for this channel. Please adjust constraints and try again.'
+                                : '(No programs for this channel)'}
+                            </td>
+                          </tr>
+                        )}
                           {commercials.map((comKey, idx) => {
                             const rows = data.rowsByCommercial[comKey] || [];
                             if (!rows || rows.length === 0) return null;
@@ -547,7 +579,24 @@ export default function BonusResults({
                   )}
                   {channelSummaryRows.map((r, i) => (
                     <tr key={i}>
-                      <td style={s.summaryTd}>{toStr(r.Channel)}</td>
+                      <td style={s.summaryTd}>
+                          {toStr(r.Channel)}
+                          {infeasibleChannels[r.Channel] && (
+                            <span
+                              style={{
+                                marginLeft: 8,
+                                padding: '2px 6px',
+                                fontSize: 11,
+                                borderRadius: 6,
+                                background: '#fffbea',
+                                border: '1px solid #f6e05e',
+                                color: '#744210'
+                              }}
+                            >
+                              Infeasible
+                            </span>
+                          )}
+                        </td>
                       <td style={{ ...s.summaryTd, textAlign: 'right' }}>{num(r.Spots)}</td>
                       <td style={{ ...s.summaryTd, textAlign: 'right' }}>{formatLKR(num(r.Total_Cost))}</td>
                       <td style={{ ...s.summaryTd, textAlign: 'right' }}>{safeFixed(num(r.GRP))}</td>
