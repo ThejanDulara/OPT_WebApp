@@ -1317,11 +1317,13 @@ def optimize_bonus():
                 {
                     "Channel": r["channel"],
                     "Slot": "B",
-                    "Spots": sum(d["Spots"] for d in r["details"]),
-                    "Total_Cost": r["total_cost"],
-                    "Total_Rating": r["total_ntvr"],
+                    "Spots": sum(d["Spots"] for d in r.get("details", [])),
+                    "Total_Cost": r.get("total_cost", 0),
+                    "Total_Rating": r.get("total_ntvr", 0),
+                    "solver_status": r.get("solver_status"),
+                    "success": r.get("success", False)
                 }
-                for r in results if r["success"]
+                for r in results
             ],
             "by_program": [
                 {
