@@ -263,7 +263,7 @@ function ProgramUpdater({ onBack }) {
             </li>
             <li>Always make sure to use the SRL Program name.</li>
             <li>If it is a new program, please edit the name once you get data from SRL.</li>
-            <li>Please use the given format when updating the time column.</li>
+            <li>Please use the 24-hour clock format when updating the time column.</li>
           </ul>
         </div>
 

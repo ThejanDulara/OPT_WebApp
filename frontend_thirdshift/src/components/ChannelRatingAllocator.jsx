@@ -29,7 +29,7 @@ function ChannelRatingAllocator({
   const [isProcessing, setIsProcessing] = useState(false);
   const [stopRequested, setStopRequested] = useState(false);
   const [propertyPercents, setPropertyPercents] = useState({});
-
+  const [usePercentageMode, setUsePercentageMode] = useState(false);
   // Property programs table (per channel)
   const [propertyPrograms, setPropertyPrograms] = useState(() => {
     const seed = {};
@@ -290,6 +290,21 @@ function ChannelRatingAllocator({
   ];
 
   const handleSubmit = () => {
+        // 🔒 Validation based on input mode
+    if (usePercentageMode) {
+      if (Math.abs(enteredPctTotal - 100) > 0.01) {
+        alert('Total channel percentage must equal 100%');
+        return;
+      }
+    } else {
+      const sumAmounts = Object.values(channelMoney)
+        .reduce((a, v) => a + toNumber(v.chAmount), 0);
+
+      if (Math.abs(sumAmounts - totalBudget) > 1) {
+        alert('Total channel budget must equal the total budget');
+        return;
+      }
+    }
     if (Math.abs(enteredPctTotal - 100) > 0.01) {
       alert('Total channel budget % must equal 100%');
       return;
@@ -752,12 +767,14 @@ function ChannelRatingAllocator({
   return (
     <div style={styles.container}>
       <ToastContainer position="top-right" autoClose={3000} />
-      <h2 style={styles.title}>Allocate Desired Budget Percentage per Channel</h2>
+      <h2 style={styles.title}>Allocate Desired Budget per Channel</h2>
 
       <ChannelBudgetSetup
         channels={channels}
          optimizationInput={safeOpt}
         // state
+        usePercentageMode={usePercentageMode}
+        setUsePercentageMode={setUsePercentageMode}
         budgetShares={budgetShares}
         setBudgetShares={setBudgetShares}
         maxSpots={maxSpots}

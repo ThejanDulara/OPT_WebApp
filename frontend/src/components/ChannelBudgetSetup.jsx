@@ -6,6 +6,8 @@ export default function ChannelBudgetSetup({
   channels,
   optimizationInput,
   // state + setters / handlers
+  usePercentageMode,
+  setUsePercentageMode,
   budgetShares, setBudgetShares,
   maxSpots, setMaxSpots,
   timeLimit, setTimeLimit,
@@ -47,18 +49,6 @@ export default function ChannelBudgetSetup({
   const handleInputChange = (channel, value) => {
     setBudgetShares(prev => ({ ...prev, [channel]: toNumber(value) }));
   };
-
-    // 🔁 Share ↔ Amount helpers (UI only)
-    const shareToAmount = (sharePct) =>
-      (totalBudget * (toNumber(sharePct) || 0)) / 100;
-
-    const amountToShare = (amount) =>
-      totalBudget > 0
-        ? ((toNumber(amount) || 0) / totalBudget) * 100
-        : 0;
-
-    // UI-only draft amounts while typing
-    const [draftAmounts, setDraftAmounts] = useState({});
 
   // Countdown for processing
   const [countdown, setCountdown] = useState(null);
@@ -322,6 +312,17 @@ export default function ChannelBudgetSetup({
 
   return (
     <>
+    {/* 🔁 Budget Input Mode */}
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={usePercentageMode}
+              onChange={e => setUsePercentageMode(e.target.checked)}
+            />
+            Input budget as percentage
+          </label>
+        </div>
       {/* Channel rows - Two channels per row */}
       <div style={{ marginBottom: '20px' }}>
         {channelRows.map((row, rowIndex) => (
@@ -369,51 +370,48 @@ export default function ChannelBudgetSetup({
                   {/* Channel percentage input */}
                   <div style={enhancedStyles.inputRow}>
                     <label style={{ ...styles.label, minWidth: '100px' }}>Budget Share:</label>
-                    {/* Amount input */}
+                    {/* Channel Budget (Amount) */}
                     <input
                       type="text"
-                      value={
-                        draftAmounts[ch] ??
-                        formatWithCommas(
-                          shareToAmount(budgetShares[ch] ?? 0).toFixed(0)
-                        )
-                      }
+                      disabled={usePercentageMode}
+                      value={formatWithCommas(channelMoney[ch]?.chAmount || 0)}
                       onChange={e => {
-                    const raw = removeCommas(e.target.value);
-                    if (!/^\d*$/.test(raw)) return;
+                        if (usePercentageMode) return;
 
-                    // ✅ store formatted value while typing
-                    setDraftAmounts(prev => ({
-                      ...prev,
-                      [ch]: formatWithCommas(raw)
-                    }));
+                        const raw = removeCommas(e.target.value);
+                        if (!/^\d*$/.test(raw)) return;
 
-                    const newShare = amountToShare(raw);
+                        const amt = toNumber(raw);
                         setBudgetShares(prev => ({
                           ...prev,
-                          [ch]: Number(newShare.toFixed(2))
+                          [ch]: totalBudget > 0 ? (amt / totalBudget) * 100 : 0
                         }));
                       }}
-                      onBlur={() => {
-                        // cleanup draft once user leaves field
-                        setDraftAmounts(prev => {
-                          const copy = { ...prev };
-                          delete copy[ch];
-                          return copy;
-                        });
+                      style={{
+                        ...styles.numberInput,
+                        width: '110px',
+                        backgroundColor: usePercentageMode ? '#edf2f7' : 'white'
                       }}
-                      style={{ ...styles.numberInput, width: '110px' }}
                     />
                     <span>LKR</span>
 
-                    {/* Share input */}
+                    {/* Channel Share (%) */}
                     <input
                       type="number"
-                      value={budgetShares[ch] ?? ''}
-                      onChange={e => handleInputChange(ch, e.target.value)}
-                      style={{ ...styles.numberInput, width: '70px' }}
+                      disabled={!usePercentageMode}
+                      value={usePercentageMode ? (budgetShares[ch] ?? '') : 0}
+                      onChange={e => {
+                        if (!usePercentageMode) return;
+                        handleInputChange(ch, e.target.value);
+                      }}
+                      style={{
+                        ...styles.numberInput,
+                        width: '70px',
+                        backgroundColor: !usePercentageMode ? '#edf2f7' : 'white'
+                      }}
                     />
                     <span>%</span>
+
                   </div>
 
                   {/* Property amount & percentage inputs */}
