@@ -183,6 +183,9 @@ export default function PropertyProgramsEditor({
                 {ch}
               </h4>
             </div>
+            <div style={{ fontSize: 12, color: '#718096' }}>
+              ⏱ Please use the <strong>24-hour time format</strong> when updating the time column.
+            </div>
               <div style={{ fontSize: 13, color: totals.ok ? '#2d3748' : '#e53e3e' }}>
                 Target: <strong>{formatLKR(totals.target)}</strong> &nbsp;|&nbsp;
                 Entered: <strong>{formatLKR(totals.totalBudget)}</strong> &nbsp;|&nbsp;
