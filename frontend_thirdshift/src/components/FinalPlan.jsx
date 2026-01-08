@@ -8,9 +8,21 @@ const hostname = window.location.hostname;
 const isLocal =
   hostname.includes("localhost") || hostname.includes("127.");
 
-const API_BASE = isLocal
-  ? "http://localhost:5000"
+const API_BASE_SAVE = "https://optwebapp-production.up.railway.app"; // ✅ ALWAYS
+const API_BASE_READ = isLocal
+  ? "http://localhost:5000"      // if you read anything locally
   : "https://optwebapp-production.up.railway.app";
+
+// ✅ LOCAL DEV AUTH (matches backend contract)
+const auth = isLocal
+  ? {
+      user_id: 1,
+      userId: 1,
+      user_first_name: "Thejan",
+      user_last_name: "Dulara",
+    }
+  : (window.__AUTH__ || {});
+
 
 export default function FinalPlan({
   // Accept BOTH naming styles so App.js doesn't have to change
@@ -2182,9 +2194,9 @@ const propertyGRPTotal = useMemo(() => {
     try {
       const auth = (typeof window !== 'undefined' && window.__AUTH__) || {};
       const payload = {
-        user_id: auth.userId || auth.user_id || "",
-        user_first_name: auth.firstName || "",
-        user_last_name: auth.lastName || "",
+        user_id: Number(auth.userId || auth.user_id || (isLocal ? 1 : "")),
+        user_first_name: auth.user_first_name || (isLocal ? "Thejan" : ""),
+        user_last_name: auth.user_last_name || (isLocal ? "Dulara" : ""),
         metadata: {
           client_name: clientName || "",
           brand_name: brandName || "",
@@ -2202,7 +2214,7 @@ const propertyGRPTotal = useMemo(() => {
         session_data: sessionSnapshot || {},
       };
       console.log("🚨 SAVE PAYLOAD", payload);
-      const res = await fetch(`${API_BASE}/save-plan`, {
+      const res = await fetch(`${API_BASE_SAVE}/save-plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
