@@ -2194,9 +2194,15 @@ const propertyGRPTotal = useMemo(() => {
     try {
       const auth = (typeof window !== 'undefined' && window.__AUTH__) || {};
       const payload = {
-        user_id: Number(auth.userId || auth.user_id || (isLocal ? 1 : "")),
-        user_first_name: auth.user_first_name || (isLocal ? "Thejan" : ""),
-        user_last_name: auth.user_last_name || (isLocal ? "Dulara" : ""),
+            user_id: Number(auth.userId || auth.user_id || 1),
+
+            user_first_name: isLocal
+              ? "Thejan"
+              : (auth.firstName || ""),
+
+            user_last_name: isLocal
+              ? "Dulara"
+              : (auth.lastName || ""),
         metadata: {
           client_name: clientName || "",
           brand_name: brandName || "",
