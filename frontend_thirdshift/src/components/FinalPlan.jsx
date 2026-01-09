@@ -825,18 +825,18 @@ const propertyGRPTotal = useMemo(() => {
         { Metric: 'CPRP', Value: cprp_InclPropertyBonus },
       ];
 
+        // ---------- Build KPI sheet ----------
         const kpiSheet = workbook.addWorksheet('Final KPIs');
-
 
         // --- Add header ---
         const header = kpiSheet.addRow(['KPI', 'Value']);
 
-        // --- Header styling (Light Excel Green + bold) ---
+        // --- Header styling ---
         header.eachCell((cell) => {
           cell.fill = {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: 'C6EFCE' }   // light Excel green
+            fgColor: { argb: 'C6EFCE' }
           };
           cell.font = { bold: true };
           cell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -848,39 +848,184 @@ const propertyGRPTotal = useMemo(() => {
           };
         });
 
-        // --- Add KPI rows ---
-        kpiRows.forEach((row) => {
-          const r = kpiSheet.addRow([row.Metric, row.Value]);
+        if (useFormulas) {
+          // ---------- FORMULA MODE ONLY ----------
 
-          r.height = 20;
+          const colLetter = (n) => {
+            let s = '';
+            while (n > 0) {
+              let m = (n - 1) % 26;
+              s = String.fromCharCode(65 + m) + s;
+              n = Math.floor((n - 1) / 26);
+            }
+            return s;
+          };
 
-          r.eachCell((cell) => {
-            cell.alignment = {
-              wrapText: true,
-              vertical: 'middle'
-            };
-            cell.border = {
-              top: { style: 'thin' },
-              left: { style: 'thin' },
-              bottom: { style: 'thin' },
-              right: { style: 'thin' },
-            };
+          const summaryHeadersFormula = [
+            'Channel',
+            'Total Cost',
+            'Rate Card Value',
+            'ROI',
+            ...allCommercialKeys.map(k => `No of Spots - ${commercialNames[k] || k.replace('_', ' ')}`),
+            'Num of value adds',
+            'Total GRP',
+            'Total NGRP',
+            'CPRP',
+            'NCRP'
+          ];
+
+          const totalGrpColLetter  = colLetter(summaryHeadersFormula.indexOf('Total GRP') + 1);
+          const totalNgrpColLetter = colLetter(summaryHeadersFormula.indexOf('Total NGRP') + 1);
+
+          const summarySheetName = 'Channel Summary (All-In)';
+
+          const formulaRows = [
+            ['Client', clientName],
+            ['Investment', {
+              formula: `INDEX('${summarySheetName}'!B:B, MATCH("Total", '${summarySheetName}'!A:A, 0))`
+            }],
+            ['SSCL', { formula: 'B3*2.5641%' }],
+            ['VAT', { formula: '(B3+B4)*18%' }],
+            ['Total Investment with TAX', { formula: 'B3+B4+B5' }],
+            ['Total GRP', {
+              formula: `INDEX('${summarySheetName}'!${totalGrpColLetter}:${totalGrpColLetter}, MATCH("Total", '${summarySheetName}'!A:A, 0))`
+            }],
+            ['Total NGRP', {
+              formula: `INDEX('${summarySheetName}'!${totalNgrpColLetter}:${totalNgrpColLetter}, MATCH("Total", '${summarySheetName}'!A:A, 0))`
+            }],
+            ['CPRP', { formula: 'IFERROR(B3/B7,0)' }],
+            ['NCPR', { formula: 'IFERROR(B3/B8,0)' }],
+          ];
+
+          formulaRows.forEach(row => {
+            const r = kpiSheet.addRow(row);
+            r.height = 20;
+
+            r.eachCell(cell => {
+              cell.alignment = { vertical: 'middle', wrapText: true };
+              cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' },
+              };
+            });
           });
+
+        // ✅ FORMAT ALL VALUES — FORMULA MODE ONLY
+        kpiSheet.eachRow((row, rowNum) => {
+          if (rowNum === 1) return; // skip header
+
+          const cell = row.getCell(2);
+
+          // Only format numeric or formula cells
+          if (typeof cell.value === 'number' || cell.value?.formula) {
+            cell.numFmt = '#,##0';   // comma separated, NO decimals
+          }
         });
 
+        } else {
+          // ---------- VALUE MODE (UNCHANGED) ----------
+          kpiRows.forEach((row) => {
+            const r = kpiSheet.addRow([row.Metric, row.Value]);
+            r.height = 20;
 
+            r.eachCell((cell) => {
+              cell.alignment = { wrapText: true, vertical: 'middle' };
+              cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' },
+              };
+            });
+          });
+        }
+    // ================== REACH & FREQUENCY TABLE (FORMULA MODE ONLY) ==================
+    if (useFormulas) {
+      const startRow = 14;     // where the table starts
+      const startCol = 1;      // Column A
 
+      const headerFill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'C6EFCE' } // same as KPI header
+      };
+
+      const thinBorder = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      };
+
+      // --- Row 14: Title ---
+      const titleRow = kpiSheet.getRow(startRow);
+      titleRow.getCell(startCol).value = 'REACH & FREQUENCY';
+      titleRow.getCell(startCol).font = { bold: true };
+      titleRow.getCell(startCol).fill = headerFill;
+      titleRow.getCell(startCol).alignment = { horizontal: 'left', vertical: 'middle' };
+      titleRow.getCell(startCol).border = thinBorder;
+
+      // Merge title across columns A → K
+      kpiSheet.mergeCells(startRow, startCol, startRow, startCol + 10);
+
+      for (let c = startCol; c <= startCol + 10; c++) {
+        const cell = titleRow.getCell(c);
+        cell.fill = headerFill;
+        cell.border = thinBorder;
+      }
+
+      // --- Row 15: Frequency row ---
+      const freqRow = kpiSheet.getRow(startRow + 1);
+      freqRow.getCell(startCol).value = 'Frequency';
+      freqRow.getCell(startCol).font = { bold: true };
+      freqRow.getCell(startCol).border = thinBorder;
+
+      for (let i = 1; i <= 10; i++) {
+        const cell = freqRow.getCell(startCol + i);
+        cell.value = `${i}+`;
+        cell.font = { bold: true };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = thinBorder;
+      }
+
+      // --- Row 16: Reach row ---
+      const reachRow = kpiSheet.getRow(startRow + 2);
+      reachRow.getCell(startCol).value = 'Reach';
+      reachRow.getCell(startCol).font = { bold: true };
+      reachRow.getCell(startCol).border = thinBorder;
+
+      for (let i = 1; i <= 10; i++) {
+        const cell = reachRow.getCell(startCol + i);
+        cell.value = '';               // empty – user input
+        cell.font = { bold: true };    // user-entered values appear bold
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = thinBorder;
+      }
+
+      // Optional: column widths for neat look
+      for (let c = startCol; c <= startCol + 10; c++) {
+        kpiSheet.getColumn(c).width = 10;
+      }
+    }
+    // ================== END REACH & FREQUENCY TABLE ==================
+
+        // --- Final sheet styling ---
         removeGridlines(kpiSheet);
-        // --- Auto-fit Metric column width ---
+
+        // Auto-fit KPI column
         let maxMetricLen = 0;
-        kpiRows.forEach((r) => {
-          if (r.Metric.length > maxMetricLen) maxMetricLen = r.Metric.length;
+        kpiSheet.eachRow((row, rowNum) => {
+          if (rowNum === 1) return;
+          const txt = String(row.getCell(1).value || '');
+          if (txt.length > maxMetricLen) maxMetricLen = txt.length;
         });
 
         kpiSheet.getColumn(1).width = Math.min(Math.max(maxMetricLen * 1.2, 20), 50);
-
-        // Value column width
         kpiSheet.getColumn(2).width = 20;
+
+      const commercial1Name = commercialNames[allCommercialKeys[0]]?.trim();
 
       // ---------- Channel list ----------
         // ---------- Channel list (FIXED!) ----------
@@ -1688,6 +1833,20 @@ const propertyGRPTotal = useMemo(() => {
         // Add Total Row
         const totalRow = worksheet.addRow(totalRowValues);
 
+                // ✅ TV Budget (Top section) = Total row's Total Budget (Column K)
+        const TV_BUDGET_TOP_ROW = 6;          // TV Budget is row 6 in your topRows block
+        const TV_BUDGET_VALUE_COL = 3;        // Column C holds the value
+        const TOTAL_BUDGET_COL = 'K';         // Total Budget column in sheet is K
+
+        worksheet.getRow(TV_BUDGET_TOP_ROW).getCell(TV_BUDGET_VALUE_COL).value = {
+          formula: `${TOTAL_BUDGET_COL}${totalRow.number}`
+        };
+
+        // Optional formatting (comma, no decimals)
+        worksheet.getRow(TV_BUDGET_TOP_ROW).getCell(TV_BUDGET_VALUE_COL).numFmt = '#,##0';
+        worksheet.getRow(TV_BUDGET_TOP_ROW).getCell(TV_BUDGET_VALUE_COL).font = { bold: true };
+
+
         // ... (Keep the rest of the styling logic below unchanged) ...
         // Color the total row with the same orange color as commercial headers (first 18 columns only)
         for (let c = 1; c <= 18; c++) {
@@ -2003,6 +2162,33 @@ const propertyGRPTotal = useMemo(() => {
           };
         }
         });
+    // ================= NUMBER FORMATTING (CHANNEL SHEET ONLY) =================
+
+    // Column mapping (based on your structure)
+    const MONEY_COLS = [8, 9, 10, 11, 12, 17]; // H, I, J, K, L, Q
+    const DECIMAL_COLS = [13, 14, 15, 16];    // M, N, O, P
+
+    worksheet.eachRow((row, rowNum) => {
+      // Skip very top metadata rows
+      if (rowNum <= propHeaderRow.number) return;
+
+      // --- MONEY COLUMNS: comma separated, NO decimals ---
+      MONEY_COLS.forEach(colIdx => {
+        const cell = row.getCell(colIdx);
+        if (typeof cell.value === 'number' || cell.value?.formula) {
+          cell.numFmt = '#,##0';
+        }
+      });
+
+      // --- TVR / NTVR / GRP / NGRP: 2 decimals, NO commas ---
+      DECIMAL_COLS.forEach(colIdx => {
+        const cell = row.getCell(colIdx);
+        if (typeof cell.value === 'number' || cell.value?.formula) {
+          cell.numFmt = '0.00';
+        }
+      });
+    });
+
     removeGridlines(worksheet);
       });
 
@@ -2010,74 +2196,221 @@ const propertyGRPTotal = useMemo(() => {
       const summarySheet = workbook.addWorksheet('Channel Summary (All-In)');
       summarySheet.properties.showGridLines = false;
 
-      const summaryHeaders = [
-        'Channel', 'Cost', 'Property value', 'Total Cost',
-        'Spot Buying GRP', 'Property GRP', 'Bonus GRP', 'Total GRP',
-        'Spot Buying NGRP', 'Property NGRP', 'Bonus NGRP', 'Total NGRP', 'CPRP'
-      ];
+      // 1. Define Headers based on mode
+      let summaryHeaders = [];
+      if (useFormulas) {
+        summaryHeaders = [
+          'Channel',
+          'Total Cost',
+          'Rate Card Value',
+          'ROI',
+          ...allCommercialKeys.map(k => `No of Spots - ${commercialNames[k] || k.replace('_', ' ')}`),
+          'Num of value adds',
+          'Total GRP',
+          'Total NGRP',
+          'CPRP',
+          'NCRP'
+        ];
+      } else {
+        // Keep Original Headers for No-Formula Export
+        summaryHeaders = [
+          'Channel', 'Cost', 'Property value', 'Total Cost',
+          'Spot Buying GRP', 'Property GRP', 'Bonus GRP', 'Total GRP',
+          'Spot Buying NGRP', 'Property NGRP', 'Bonus NGRP', 'Total NGRP', 'CPRP'
+        ];
+      }
 
-      // --- Header Row ---
+      // 2. Add and Style Header Row
       const headerRow = summarySheet.addRow(summaryHeaders);
-
       headerRow.eachCell((cell) => {
-        cell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'C6EFCE' }  // same Excel light green as KPI sheet
-        };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'C6EFCE' } };
         cell.font = { bold: true };
-        cell.alignment = { horizontal: 'center', vertical: 'middle',wrapText: true  };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+      });
+
+        const colLetter = (n) => {
+          let s = '';
+          while (n > 0) {
+            let m = (n - 1) % 26;
+            s = String.fromCharCode(65 + m) + s;
+            n = Math.floor((n - 1) / 26);
+          }
+          return s;
+        };
+
+        const totalGrpColIdx  = summaryHeaders.findIndex(h => h === 'Total GRP') + 1;
+        const totalNgrpColIdx = summaryHeaders.findIndex(h => h === 'Total NGRP') + 1;
+
+        const totalGrpColLetter  = colLetter(totalGrpColIdx);
+        const totalNgrpColLetter = colLetter(totalNgrpColIdx);
+
+            // Set same width for all columns in summary sheet
+        summarySheet.columns.forEach(col => {
+          col.width = 12;   // 👈 change this number if you want wider/narrower
+        });
+
+
+
+      // 3. Add Data Rows
+      combinedChannelRows.forEach((r) => {
+        const chName = toStr(r.Channel);
+        const safeSheetName = chName.substring(0, 31).replace(/[\[\]\?\*\\\/]/g, '');
+
+        if (useFormulas) {
+          // --- NEW DYNAMIC FORMULA ROW ---
+          const idx = summarySheet.rowCount + 1;
+
+        // --- Find Total row dynamically from channel sheet ---
+        const channelSheet = workbook.getWorksheet(safeSheetName);
+
+        let totalRowInChannelSheet = null;
+
+        channelSheet.eachRow((row) => {
+          if (row.getCell(1).value === 'Total') {
+            totalRowInChannelSheet = row.number;
+          }
+        });
+
+        let propertyStartRow = null;
+        let propertyEndRow = null;
+
+        channelSheet.eachRow((row) => {
+          const val = (row.getCell(1).value || '').toString().trim();
+
+          // Start summing AFTER Property Benefits header
+          if (val === 'Property Benefits') {
+            propertyStartRow = row.number + 1;
+          }
+
+          // Stop BEFORE first commercial name (Commercial 1)
+          if (propertyStartRow && !propertyEndRow && val === commercial1Name) {
+            propertyEndRow = row.number - 1;
+          }
+        });
+
+        if (!propertyStartRow || !propertyEndRow || propertyEndRow < propertyStartRow) {
+          console.warn(`Property section detection failed for channel: ${chName}`);
+        }
+
+        // Safety check
+        if (!totalRowInChannelSheet) {
+          console.warn(`Total row not found for channel: ${chName}`);
+          return;
+        }
+
+          const rowData = [
+            chName, // A: Channel
+            { formula: `'${safeSheetName}'!K${totalRowInChannelSheet}` }, // B: Total Cost (Col K in channel sheet)
+            { formula: `'${safeSheetName}'!J${totalRowInChannelSheet}` }, // C: Rate Card Value (Col J)
+            { formula: `IFERROR(C${idx}/B${idx}, 0)` },                   // D: ROI
+          ];
+
+          // Dynamic Commercial Spot Columns
+          allCommercialKeys.forEach(k => {
+            // Logic to sum spots for a specific commercial in that channel
+            // Usually handled by summing column R in the channel sheet for that specific range
+            // For simplicity, we can fetch the value from the channel sheet's calculation
+            rowData.push({ formula: `SUMIF('${safeSheetName}'!B:B, "*${commercialNames[k] || k}*", '${safeSheetName}'!R:R)` });
+          });
+
+            rowData.push({
+              formula: `SUM('${safeSheetName}'!R${propertyStartRow}:R${propertyEndRow})`
+            });
+
+          // GRP, NGRP, CPRP from Channel Sheet
+          rowData.push({ formula: `'${safeSheetName}'!O${totalRowInChannelSheet}` }); // Total GRP
+          rowData.push({ formula: `'${safeSheetName}'!P${totalRowInChannelSheet}` }); // Total NGRP
+          rowData.push({
+              formula: `IFERROR(B${idx}/${totalGrpColLetter}${idx}, 0)`
+            });
+          rowData.push({
+              formula: `IFERROR(B${idx}/${totalNgrpColLetter}${idx}, 0)`
+            });
+
+          summarySheet.addRow(rowData);
+
+        } else {
+          // --- ORIGINAL NO-FORMULA ROW ---
+          summarySheet.addRow([
+            r.Channel, Number(r.Cost_LKR), Number(r.Property_LKR), Number(r.TotalCost_LKR),
+            Number(r.GRP_Spot), Number(r.GRP_Property), Number(r.GRP_Bonus), Number(r.GRP_Total),
+            Number(r.NGRP_Spot), Number(r.NGRP_Property), Number(r.NGRP_Bonus), Number(r.NGRP_Total),
+            Number(r.CPRP_LKR)
+          ]);
+        }
+      });
+
+      // 4. Add Summary Total Row (Formula Mode Only)
+      if (useFormulas) {
+        const lastDataRow = summarySheet.rowCount;
+        const totalIdx = lastDataRow + 1;
+        const commCount = allCommercialKeys.length;
+
+        const totalRowData = [
+          'Total',
+          { formula: `SUM(B2:B${lastDataRow})` }, // Total Cost
+          { formula: `SUM(C2:C${lastDataRow})` }, // Rate Card Value
+          { formula: `IFERROR(C${totalIdx}/B${totalIdx}, 0)` }, // ROI %
+        ];
+
+        // Sum for all dynamic commercial columns + Value adds
+        for (let i = 0; i < commCount + 1; i++) {
+          const colLetter = String.fromCharCode(69 + i);
+          totalRowData.push({ formula: `SUM(${colLetter}2:${colLetter}${lastDataRow})` });
+        }
+
+        // GRP, NGRP Sums
+        const grpCol = String.fromCharCode(69 + commCount + 1);
+        const ngrpCol = String.fromCharCode(69 + commCount + 2);
+        totalRowData.push({ formula: `SUM(${grpCol}2:${grpCol}${lastDataRow})` });
+        totalRowData.push({ formula: `SUM(${ngrpCol}2:${ngrpCol}${lastDataRow})` });
+
+        // Final CPRP / NCRP for totals
+        totalRowData.push({ formula: `IFERROR(B${totalIdx}/${grpCol}${totalIdx}, 0)` }); // CPRP
+        totalRowData.push({ formula: `IFERROR(B${totalIdx}/${ngrpCol}${totalIdx}, 0)` }); // NCRP
+
+        const finalTotalRow = summarySheet.addRow(totalRowData);
+        finalTotalRow.eachCell(cell => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FABF8F' } }; // Orange Fill
+          cell.font = { bold: true };
+        });
+      }
+
+    // 5. Apply Percentages and Money Formatting
+    summarySheet.eachRow((row, rowNum) => {
+      if (rowNum === 1) return; // skip header
+
+      row.eachCell((cell, colNum) => {
+        if (!useFormulas) return;
+
+        // ROI column → percentage (keep decimals)
+        if (colNum === 4) {
+          cell.numFmt = '0.00%';
+          return;
+        }
+
+        // All other numeric columns → comma separated, NO decimals
+        if (typeof cell.value === 'number' || cell.value?.formula) {
+          cell.numFmt = '#,##0';
+        }
+      });
+    });
+
+    // 6. Apply borders to ALL cells in summary sheet
+    summarySheet.eachRow({ includeEmpty: false }, (row) => {
+      row.eachCell({ includeEmpty: false }, (cell) => {
         cell.border = {
           top: { style: 'thin' },
           left: { style: 'thin' },
           bottom: { style: 'thin' },
-          right: { style: 'thin' },
+          right: { style: 'thin' }
         };
       });
-
-      // --- Add Data Rows ---
-      combinedChannelRows.forEach((r) => {
-        const row = summarySheet.addRow([
-          r.Channel,
-          Number(r.Cost_LKR),
-          Number(r.Property_LKR),
-          Number(r.TotalCost_LKR),
-            // ✔ Correct Spot GRP (already in r)
-            Number(r.GRP_Spot),
-
-            // ✔ Correct Property GRP (manual + benefit)
-            Number(r.GRP_Property),
-
-            // ✔ Correct Bonus GRP
-            Number(r.GRP_Bonus),
-          Number(r.GRP_Total),
-          Number(r.NGRP_Spot),
-          Number(r.NGRP_Property),
-          Number(r.NGRP_Bonus),
-          Number(r.NGRP_Total),
-          Number(r.CPRP_LKR),
-        ]);
-
-        row.eachCell((cell) => {
-          cell.alignment = { horizontal: 'right', vertical: 'middle' };
-          cell.border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' },
-          };
-        });
-
-        // make first column (Channel) left-aligned
-        row.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
-      });
-
-      // --- FIXED COLUMN WIDTHS (all = 10) ---
-      summarySheet.columns.forEach((col) => {
-        col.width = 13;
-      });
-      removeGridlines(summarySheet);
+    });
+    removeGridlines(summarySheet);
     }
+
 
 
       // ---------- Save ----------
@@ -2086,16 +2419,17 @@ const propertyGRPTotal = useMemo(() => {
 
     // 1. Prepare file parts
     const clientPart = clientName ? `_${clientName}` : "";
+    const brandPart = brandName ? `_${brandName}` : "";
     // Create a period string like "_2023-10-01_to_2023-10-07"
     const periodPart = `_${fromDate}_to_${toDate}`;
 
     // 2. Determine base name based on the formula flag
     const baseName = useFormulas
-      ? 'Final_Plan_By_Channel_With_Formulas'
-      : 'Final_Plan_By_Channel';
+      ? 'Final_Plan_F'
+      : 'Final_Plan';
 
     // 3. Combine them: Name + Client + Period + Extension
-    const filename = `${baseName}${clientPart}${periodPart}.xlsx`;
+    const filename = `${baseName}${clientPart}${brandPart}${periodPart}.xlsx`;
 
     try {
       const buffer = await workbook.xlsx.writeBuffer();
@@ -2189,6 +2523,8 @@ const propertyGRPTotal = useMemo(() => {
   const [tvBudgetDraft, setTvBudgetDraft] = useState('');
   const [durationName, setDurationName] = useState("");
   const [commercialLanguages, setCommercialLanguages] = useState({});
+  const [commercialError, setCommercialError] = useState('');
+
 
   const savePlan = async () => {
     try {
@@ -2197,11 +2533,11 @@ const propertyGRPTotal = useMemo(() => {
             user_id: Number(auth.userId || auth.user_id || 1),
 
             user_first_name: isLocal
-              ? "Thejan"
+              ? "Dev"
               : (auth.firstName || ""),
 
             user_last_name: isLocal
-              ? "Dulara"
+              ? "Thejan"
               : (auth.lastName || ""),
         metadata: {
           client_name: clientName || "",
@@ -2255,6 +2591,24 @@ const propertyGRPTotal = useMemo(() => {
     const [fromDate, setFromDate] = useState(fmtDate(today));
     const [toDate, setToDate] = useState(fmtDate(nextWeek));
 
+    const validateCommercialNames = () => {
+      const names = allCommercialKeys.map(
+        k => (commercialNames[k] || '').trim()
+      );
+
+      // 1️⃣ Empty check
+      if (names.some(n => n === '')) {
+        return { ok: false, message: 'All commercial names are required.' };
+      }
+
+      // 2️⃣ Uniqueness check
+      const unique = new Set(names);
+      if (unique.size !== names.length) {
+        return { ok: false, message: 'Commercial names must be unique.' };
+      }
+
+      return { ok: true };
+    };
 
   // ---------- Render ---<button type="button" onClick={handleExport} style={s.exportButton}>-------
   return (
@@ -2919,6 +3273,18 @@ const propertyGRPTotal = useMemo(() => {
                     </div>
                   );
                 })}
+            {commercialError && (
+              <div style={{
+                background: '#fed7d7',
+                color: '#742a2a',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                marginBottom: '12px',
+                fontSize: '14px'
+              }}>
+                {commercialError}
+              </div>
+            )}
 
 
              <div style={{marginTop:"20px", textAlign:"right"}}>
@@ -2931,26 +3297,40 @@ const propertyGRPTotal = useMemo(() => {
 
                 <button
                   style={s.primaryButton}
-                  onClick={async () => {
-                    const ok = await savePlan();
-                    if (ok) {
-                      setShowExportDialog(false);
-                      await handleExport(false); // normal export
-                    }
-                  }}
+                    onClick={async () => {
+                      const v = validateCommercialNames();
+                      if (!v.ok) {
+                        setCommercialError(v.message);
+                        return;
+                      }
+
+                      setCommercialError('');
+                      const ok = await savePlan();
+                      if (ok) {
+                        setShowExportDialog(false);
+                        await handleExport(false);
+                      }
+                    }}
                 >
                   Save & Export
                 </button>
 
                 <button
                   style={{ ...s.primaryButton, backgroundColor: '#2d3748', marginLeft: '10px' }}
-                  onClick={async () => {
-                    const ok = await savePlan();
-                    if (ok) {
-                      setShowExportDialog(false);
-                      await handleExport(true); // export with formulas
-                    }
-                  }}
+                    onClick={async () => {
+                      const v = validateCommercialNames();
+                      if (!v.ok) {
+                        setCommercialError(v.message);
+                        return;
+                      }
+
+                      setCommercialError('');
+                      const ok = await savePlan();
+                      if (ok) {
+                        setShowExportDialog(false);
+                        await handleExport(true);
+                      }
+                    }}
                 >
                   Save & Export with Formulas
                 </button>
