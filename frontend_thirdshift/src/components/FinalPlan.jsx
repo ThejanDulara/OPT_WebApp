@@ -1829,9 +1829,73 @@ const propertyGRPTotal = useMemo(() => {
             Number(totalRowData.spots)                 // Col 18
           ];
         }
-
+        let taxRowNumbers = null;
         // Add Total Row
         const totalRow = worksheet.addRow(totalRowValues);
+
+        // ================== SSCL / VAT / GRAND TOTAL (FORMULA MODE ONLY) ==================
+        if (useFormulas) {
+          const ORANGE = 'FABF8F';
+          const TOTAL_BUDGET_COL = 'K';
+          const LABEL_COL = 1;
+          const VALUE_COL = 11; // Column K
+          const BORDER_END_COL = 11; // up to Total Budget column
+
+          const totalBudgetCell = `${TOTAL_BUDGET_COL}${totalRow.number}`;
+
+          // ---- SSCL ----
+          const ssclRow = worksheet.addRow([
+            'SSCL', '', '', '', '', '', '', '', '',
+            '', // J
+            { formula: `${totalBudgetCell}*2.5641%` } // K
+          ]);
+
+          // ---- VAT ----
+          const vatRow = worksheet.addRow([
+            'VAT', '', '', '', '', '', '', '', '',
+            '',
+            { formula: `(${totalBudgetCell}+K${ssclRow.number})*18%` }
+          ]);
+
+          // ---- GRAND TOTAL ----
+          const grandTotalRow = worksheet.addRow([
+            'Grand Total', '', '', '', '', '', '', '', '',
+            '',
+            { formula: `${totalBudgetCell}+K${ssclRow.number}+K${vatRow.number}` }
+          ]);
+      // ✅ remember tax rows for border logic below
+        taxRowNumbers = new Set([ssclRow.number, vatRow.number, grandTotalRow.number]);
+
+
+          // ---------- COMMON STYLING ----------
+          [ssclRow, vatRow, grandTotalRow].forEach((row) => {
+            for (let c = 1; c <= BORDER_END_COL; c++) {
+              const cell = row.getCell(c);
+
+              // Fill
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: ORANGE }
+              };
+
+              // Border (row-level look)
+              cell.border = {
+                top: { style: 'thin' },
+                bottom: { style: 'thin' },
+                left: c === 1 ? { style: 'thin' } : undefined,
+                right: c === BORDER_END_COL ? { style: 'thin' } : undefined,
+              };
+
+              // Bold
+              cell.font = { bold: true };
+            }
+
+            // Number formatting for value cell
+            row.getCell(VALUE_COL).numFmt = '#,##0';
+          });
+        }
+        // ================== END SSCL / VAT / GRAND TOTAL ==================
 
                 // ✅ TV Budget (Top section) = Total row's Total Budget (Column K)
         const TV_BUDGET_TOP_ROW = 6;          // TV Budget is row 6 in your topRows block
@@ -1976,23 +2040,17 @@ const propertyGRPTotal = useMemo(() => {
         const firstDateRow = r3.number + 1;   // date header rows end at r3
 
 
-        // === VERTICAL BORDER at START (first date column) ===
-        for (let r = firstDateRow; r <= worksheet.rowCount; r++) {
-          const cell = worksheet.getRow(r).getCell(startCol);
-          cell.border = {
-            ...cell.border,
-            left: { style: 'thin' }
-          };
-        }
+    // === VERTICAL BORDER at START (first date column) ===
+    // ⛔ stop at TOTAL row (do NOT apply to SSCL / VAT / Grand Total)
+    const lastRowForDateVertical = totalRowNumber || totalRow.number;
 
-        // === VERTICAL BORDER at END (last date column) ===
-    //    for (let r = firstDateRow; r <= worksheet.rowCount; r++) {
-      //    const cell = worksheet.getRow(r).getCell(lastCol);
-     //     cell.border = {
-       //     ...cell.border,
-     //       right: { style: 'thin' }
-      //    };
-      //  }
+    for (let r = firstDateRow; r <= lastRowForDateVertical; r++) {
+      const cell = worksheet.getRow(r).getCell(startCol);
+      cell.border = {
+        ...cell.border,
+        left: { style: 'thin' }
+      };
+    }
 
         // ⭐ Vertical borders for first 20 columns (header → end of bonus section, excluding total row)
         const bonusEndRow = bonusStartRow + bonusRows.length -1 ;
@@ -2052,32 +2110,45 @@ const propertyGRPTotal = useMemo(() => {
           cell.font = { bold: true };
         }
 
-    // --- 1) HORIZONTAL THIN BORDERS ---
-    for (let r = firstBorderRow; r <= lastRow; r++) {
-      const row = worksheet.getRow(r);
+        // --- 1) HORIZONTAL THIN BORDERS ---
+        for (let r = firstBorderRow; r <= lastRow; r++) {
+          const row = worksheet.getRow(r);
 
-      // For total row, only apply borders to first 18 columns
-      if (r === totalRowNumber) {
-        for (let c = 1; c <= 18; c++) {
-          const cell = row.getCell(c);
-          cell.border = {
-            ...cell.border,
-            top: { style: 'thin' },
-            bottom: { style: 'thin' }
-          };
+          // For total row, only apply borders to first 18 columns
+          if (r === totalRowNumber) {
+            for (let c = 1; c <= 18; c++) {
+              const cell = row.getCell(c);
+              cell.border = {
+                ...cell.border,
+                top: { style: 'thin' },
+                bottom: { style: 'thin' }
+              };
+            }
+
+          // ✅ NEW: for SSCL/VAT/Grand Total rows, stop at Total Budget column (K)
+          } else if (useFormulas && taxRowNumbers && taxRowNumbers.has(r)) {
+            for (let c = 1; c <= 11; c++) { // 11 = Column K
+              const cell = row.getCell(c);
+              cell.border = {
+                ...cell.border,
+                top: { style: 'thin' },
+                bottom: { style: 'thin' }
+              };
+            }
+
+          } else {
+            // For all other rows, apply borders to all columns
+            for (let c = 1; c <= lastCol; c++) {
+              const cell = row.getCell(c);
+              cell.border = {
+                ...cell.border,
+                top: { style: 'thin' },
+                bottom: { style: 'thin' }
+              };
+            }
+          }
         }
-      } else {
-        // For all other rows, apply borders to all columns
-        for (let c = 1; c <= lastCol; c++) {
-          const cell = row.getCell(c);
-          cell.border = {
-            ...cell.border,
-            top: { style: 'thin' },
-            bottom: { style: 'thin' }
-          };
-        }
-      }
-    }
+
 
     // --- 2) VERTICAL DOTTED BORDERS (INSIDE DATE AREA ONLY) ---
     // Stop at the row before the total row (bonus section ends before total row)
