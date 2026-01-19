@@ -182,7 +182,16 @@ function ProgramUpdater({ onBack }) {
     };
 
     const combineTimeRange = (start, end) => {
-      if (!start || !end) return '';
+      if (!start && !end) return '';
+
+      if (start && !end) {
+        return formatTime12Hour(start);
+      }
+
+      if (!start && end) {
+        return formatTime12Hour(end);
+      }
+
       return `${formatTime12Hour(start)} – ${formatTime12Hour(end)}`;
     };
 
