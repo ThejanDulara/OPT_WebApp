@@ -798,7 +798,67 @@ const propertyGRPTotal = useMemo(() => {
       }
     };
 
+
+        // ---------- IMAGE HELPERS ----------
+        const getBase64FromUrl = async (url) => {
+          const res = await fetch(url);
+          const blob = await res.blob();
+
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        };
+
+        const agencyLogoMap = {
+          "Third Shift Media (Pvt) Ltd": "/tsm_logo.png",
+          "Media Factory (Pvt) Ltd": "/mf_logo.png",
+          "Midas Media (Pvt) Ltd": "/md_logo.png",
+        };
+
+        const agencyLogoDimensions = {
+          "Third Shift Media (Pvt) Ltd": { width: 643, height: 388 },
+          "Media Factory (Pvt) Ltd": {width: 743, height: 388},
+          "Midas Media (Pvt) Ltd": { width: 643, height: 388 },
+        };
+
+
       const workbook = new ExcelJS.Workbook();
+
+      // ---------- LOAD AGENCY LOGO ----------
+            const logoPath = agencyLogoMap[agencyName];
+
+            let logoImageId = null;
+
+            if (logoPath) {
+              const logoBase64 = await getBase64FromUrl(logoPath);
+              logoImageId = workbook.addImage({
+                base64: logoBase64,
+                extension: "png",
+              });
+            }
+
+    // ---------- LOGO SIZE CALC ----------
+        const logoDim = agencyLogoDimensions[agencyName];
+
+        let logoWidth = 220;   // desired max width in Excel pixels
+        let logoHeight = 90;   // fallback height
+
+        if (logoDim) {
+          const aspectRatio = logoDim.width / logoDim.height;
+
+          // constrain by width
+          logoHeight = Math.round(logoWidth / aspectRatio);
+
+          // optional: cap height if logo is too tall
+          const MAX_HEIGHT = 120;
+          if (logoHeight > MAX_HEIGHT) {
+            logoHeight = MAX_HEIGHT;
+            logoWidth = Math.round(logoHeight * aspectRatio);
+          }
+        }
 
       // ---------- Build KPI sheet ----------
       const mainSpotNGRP = (mainByChannel || []).reduce((a, r) => a + num(r.Total_Rating), 0)
@@ -880,13 +940,14 @@ const propertyGRPTotal = useMemo(() => {
           const summarySheetName = 'Channel Summary (All-In)';
 
           const formulaRows = [
+            ['Agency', agencyName],
             ['Client', clientName],
             ['Investment', {
               formula: `INDEX('${summarySheetName}'!B:B, MATCH("Total", '${summarySheetName}'!A:A, 0))`
             }],
-            ['SSCL', { formula: 'B3*2.5641%' }],
-            ['VAT', { formula: '(B3+B4)*18%' }],
-            ['Total Investment with TAX', { formula: 'B3+B4+B5' }],
+            ['SSCL', { formula: 'B4*2.5641%' }],
+            ['VAT', { formula: '(B4+B5)*18%' }],
+            ['Total Investment with TAX', { formula: 'B4+B5+B6' }],
             ['Total GRP', {
               formula: `INDEX('${summarySheetName}'!${totalGrpColLetter}:${totalGrpColLetter}, MATCH("Total", '${summarySheetName}'!A:A, 0))`
             }],
@@ -1023,7 +1084,7 @@ const propertyGRPTotal = useMemo(() => {
         });
 
         kpiSheet.getColumn(1).width = Math.min(Math.max(maxMetricLen * 1.2, 20), 50);
-        kpiSheet.getColumn(2).width = 20;
+        kpiSheet.getColumn(2).width = 23;
 
       const commercial1Name = commercialNames[allCommercialKeys[0]]?.trim();
 
@@ -1158,9 +1219,12 @@ const propertyGRPTotal = useMemo(() => {
             const sheetTitle = `${ch}`.substring(0, 31); // Excel sheet name limit
             const worksheet = workbook.addWorksheet(sheetTitle);
 
+
             // ====================== TOP DETAIL SECTION (Start from Column B) ======================
             const topRows = [
+              ["", "Agency :", agencyName],
               ["", "Client :", clientName],
+              ["", "Channel :", ch],
               ["", "Activity :", activity],
               ["", "Brand :", brandName],
               ["", "Campaign :", campaign],
@@ -1201,6 +1265,16 @@ const propertyGRPTotal = useMemo(() => {
             worksheet.getColumn(1).width = 2;   // empty spacer
             worksheet.getColumn(2).width =50;//abel column
             worksheet.getColumn(3).width = 50;  // value column
+
+            worksheet.addImage(logoImageId, {
+              tl: { col: 5, row: 0 },
+              ext: {
+                width: logoWidth,
+                height: logoHeight
+              },
+              editAs: "absolute"
+            });
+
 
         // ================== DATE RANGE ROW ===================
         // Build date listno
@@ -1898,7 +1972,7 @@ const propertyGRPTotal = useMemo(() => {
         // ================== END SSCL / VAT / GRAND TOTAL ==================
 
                 // ✅ TV Budget (Top section) = Total row's Total Budget (Column K)
-        const TV_BUDGET_TOP_ROW = 6;          // TV Budget is row 6 in your topRows block
+        const TV_BUDGET_TOP_ROW = 8;          // TV Budget is row 6 in your topRows block
         const TV_BUDGET_VALUE_COL = 3;        // Column C holds the value
         const TOTAL_BUDGET_COL = 'K';         // Total Budget column in sheet is K
 
@@ -2585,6 +2659,7 @@ const propertyGRPTotal = useMemo(() => {
 
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [clientName, setClientName] = useState("");
+  const [agencyName, setAgencyName] = useState('Third Shift Media (Pvt) Ltd');
   const [brandName, setBrandName] = useState("");
   const [refNo, setRefNo] = useState("");
   const [commercialNames, setCommercialNames] = useState({});
@@ -3199,15 +3274,41 @@ const propertyGRPTotal = useMemo(() => {
                   onChange={(e) => setToDate(e.target.value)}
                 />
               </div>
-
             </div>
 
-              <label>Client</label>
+            {/* Agency */}
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ display: "block", marginBottom: "6px" }}>
+                Agency
+              </label>
+              <select
+                style={s.inputBox}
+                value={agencyName}
+                onChange={(e) => setAgencyName(e.target.value)}
+              >
+                <option value="Third Shift Media (Pvt) Ltd">
+                  Third Shift Media (Pvt) Ltd
+                </option>
+                <option value="Media Factory (Pvt) Ltd">
+                  Media Factory (Pvt) Ltd
+                </option>
+                <option value="Midas Media (Pvt) Ltd">
+                  Midas Media (Pvt) Ltd
+                </option>
+              </select>
+            </div>
+
+            {/* Client */}
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ display: "block",marginBottom: "6px" }}>
+                Client
+              </label>
               <input
                 style={s.inputBox}
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
               />
+            </div>
 
               <label>Activity</label>
               <div style={{
