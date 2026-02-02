@@ -773,8 +773,8 @@ export default function FinalPlan({
     (bonusByProgram || []).length,
     (flatPropertyPrograms || []).length,
   ]);
-
   // ---------- Export ----------
+
   const handleExport = async (useFormulas = false) => {
 
     const removeGridlines = (ws) => {
@@ -1065,8 +1065,8 @@ export default function FinalPlan({
       });
     }
     // ================== REACH & FREQUENCY TABLE (FORMULA MODE ONLY) ==================
+    const startRow = 14;
     if (useFormulas) {
-      const startRow = 14;     // where the table starts
       const startCol = 1;      // Column A
 
       const headerFill = {
@@ -1133,6 +1133,119 @@ export default function FinalPlan({
       }
     }
     // ================== END REACH & FREQUENCY TABLE ==================
+    // ================== PT / NPT PERCENTAGE TABLE (FORMULA MODE ONLY) ==================
+      if (useFormulas) {
+        // ---- position: 1 blank row after Reach & Frequency table ----
+        const ptTableStartRow = startRow + 4; // Reach & Frequency ends at startRow+2
+        const ptTableStartCol = 1;            // Column A
+
+        // ---- Get the list of unique channel names to reference their sheets ----
+        // We use combinedChannelRows which you already calculated earlier in the function
+        const channelNamesList = combinedChannelRows.map(r => r.Channel);
+
+        // ---- styles (same as Reach & Frequency) ----
+        const headerFill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'C6EFCE' }
+        };
+
+        const thinBorder = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+
+        // ================= HEADER =================
+        const ptHeaderRow = kpiSheet.getRow(ptTableStartRow);
+        ptHeaderRow.values = [
+          'PT/NPT percentage',
+          'BUDGET',
+          'GRP',
+          'SPOT'
+        ];
+
+        ptHeaderRow.eachCell(cell => {
+          cell.fill = headerFill;
+          cell.font = { bold: true };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.border = thinBorder;
+        });
+
+        // ================= PT ROW =================
+        const ptRow = kpiSheet.getRow(ptTableStartRow + 1);
+        ptRow.getCell(1).value = 'PT';
+        ptRow.getCell(1).font = { bold: true };
+
+        // PT Budget %: Sum Column K (Budget) from all channel sheets where Slot (Col G) is A1-A5
+        const ptBudgetSumFormula = channelNamesList.map(ch =>
+          `SUMPRODUCT(--ISNUMBER(MATCH('${ch}'!G:G,{"A","A1","A2","A3","A4","A5"},0)),'${ch}'!K:K)`
+        ).join('+');
+
+        ptRow.getCell(2).value = { formula: `(${ptBudgetSumFormula}) / B5` }; // B5 is Investment
+        ptRow.getCell(2).numFmt = '0.00%';
+
+        // PT GRP %: Sum Column O (GRP) from all channel sheets where Slot (Col G) is A1-A5
+        const ptGRPSumFormula = channelNamesList.map(ch =>
+          `SUMPRODUCT(--ISNUMBER(MATCH('${ch}'!G:G,{"A","A1","A2","A3","A4","A5"},0)),'${ch}'!O:O)`
+        ).join('+');
+
+        ptRow.getCell(3).value = { formula: `(${ptGRPSumFormula}) / B9` }; // B9 is Total GRP
+        ptRow.getCell(3).numFmt = '0.00%';
+
+        // PT Spot %: Sum Column R (Spots) and divide by total exposure in summary
+        const ptSpotSumFormula = channelNamesList.map(ch =>
+          `SUMPRODUCT(--ISNUMBER(MATCH('${ch}'!G:G,{"A","A1","A2","A3","A4","A5"},0)),'${ch}'!R:R)`
+        ).join('+');
+
+        ptRow.getCell(4).value = {
+          formula: `(${ptSpotSumFormula}) / INDEX('Channel Summary (All-In)'!A:Z, MATCH("Total",'Channel Summary (All-In)'!A:A,0), MATCH("Total Exposure",'Channel Summary (All-In)'!1:1,0))`
+        };
+        ptRow.getCell(4).numFmt = '0.00%';
+
+        ptRow.eachCell(cell => {
+          cell.border = thinBorder;
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        });
+
+        // ================= NPT ROW =================
+        const nptRow = kpiSheet.getRow(ptTableStartRow + 2);
+        nptRow.getCell(1).value = 'NPT';
+        nptRow.getCell(1).font = { bold: true };
+
+        // NPT Budget %: Sum Column K where Slot (Col G) is "B"
+        const nptBudgetSumFormula = channelNamesList.map(ch =>
+          `SUMPRODUCT(--('${ch}'!G:G="B"),'${ch}'!K:K)`
+        ).join('+');
+
+        nptRow.getCell(2).value = { formula: `(${nptBudgetSumFormula}) / B5` };
+        nptRow.getCell(2).numFmt = '0.00%';
+
+        // NPT GRP %: Sum Column O where Slot (Col G) is "B"
+        const nptGRPSumFormula = channelNamesList.map(ch =>
+          `SUMPRODUCT(--('${ch}'!G:G="B"),'${ch}'!O:O)`
+        ).join('+');
+
+        nptRow.getCell(3).value = { formula: `(${nptGRPSumFormula}) / B9` };
+        nptRow.getCell(3).numFmt = '0.00%';
+
+        // NPT Spot %: Sum Column R where Slot (Col G) is "B"
+        const nptSpotSumFormula = channelNamesList.map(ch =>
+          `SUMPRODUCT(--('${ch}'!G:G="B"),'${ch}'!R:R)`
+        ).join('+');
+
+        nptRow.getCell(4).value = {
+          formula: `(${nptSpotSumFormula}) / INDEX('Channel Summary (All-In)'!A:Z, MATCH("Total",'Channel Summary (All-In)'!A:A,0), MATCH("Total Exposure",'Channel Summary (All-In)'!1:1,0))`
+        };
+        nptRow.getCell(4).numFmt = '0.00%';
+
+        nptRow.eachCell(cell => {
+          cell.border = thinBorder;
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        });
+      }
+      // ================== END PT / NPT PERCENTAGE TABLE ==================
 
     // --- Final sheet styling ---
     removeGridlines(kpiSheet);
