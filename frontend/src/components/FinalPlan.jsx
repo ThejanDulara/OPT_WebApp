@@ -884,7 +884,7 @@ const propertyGRPTotal = useMemo(() => {
     };
 
 
-    const workbook = new ExcelJS.Workbook();
+     const workbook = new ExcelJS.Workbook();
 
     // ---------- LOAD AGENCY LOGO ----------
     const logoPath = agencyLogoMap[agencyName];
@@ -918,31 +918,6 @@ const propertyGRPTotal = useMemo(() => {
         logoWidth = Math.round(logoHeight * aspectRatio);
       }
     }
-
-    // ---------- Build KPI sheet ----------
-    const mainSpotNGRP = (mainByChannel || []).reduce((a, r) => a + num(r.Total_Rating), 0)
-      || (mainByProgram || []).reduce((a, r) => a + num(r.Total_Rating), 0);
-
-    const propertyBudgetTotal = (flatPropertyPrograms || []).reduce((a, r) => a + num(r.Budget), 0);
-    const propertyNGRPTotal = propertyNGRP_InclBenefit;
-
-    const totalNGRP_InclPropertyBonus = mainSpotNGRP + propertyNGRPTotal + bonusNGRP;
-    const cprp_InclPropertyBonus = totalNGRP_InclPropertyBonus > 0
-      ? budgetInclProperty / totalNGRP_InclPropertyBonus
-      : 0;
-
-    const kpiRows = [
-      { Metric: 'Total Budget', Value: budgetInclProperty },
-      { Metric: 'Spot Buying GRP', Value: mainSpotGRP },
-      { Metric: 'Property GRP', Value: propertyGRPTotal },
-      { Metric: 'Bonus GRP', Value: bonusGRP },
-      { Metric: 'Total GRP', Value: totalGRP_InclPropertyBonus },
-      { Metric: 'Spot Buying NGRP', Value: mainSpotNGRP },
-      { Metric: 'Property NGRP ', Value: propertyNGRP_InclBenefit },
-      { Metric: 'Bonus NGRP', Value: bonusNGRP },
-      { Metric: 'Total NGRP', Value: totalNGRP_InclPropertyBonus },
-      { Metric: 'CPRP', Value: cprp_InclPropertyBonus },
-    ];
 
     // ---------- Build KPI sheet ----------
     const mainSpotNGRP = (mainByChannel || []).reduce((a, r) => a + num(r.Total_Rating), 0)
@@ -2889,7 +2864,7 @@ const propertyGRPTotal = useMemo(() => {
 
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [clientName, setClientName] = useState("");
-  const [agencyName, setAgencyName] = useState('Media Factory (Pvt) Ltd');
+  const [agencyName, setAgencyName] = useState('Third Shift Media (Pvt) Ltd');
   const [brandName, setBrandName] = useState("");
   const [refNo, setRefNo] = useState("");
   const [commercialNames, setCommercialNames] = useState({});
@@ -3744,3 +3719,4 @@ const propertyGRPTotal = useMemo(() => {
     </div>
   );
 }
+
