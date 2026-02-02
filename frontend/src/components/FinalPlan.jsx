@@ -879,7 +879,7 @@ const propertyGRPTotal = useMemo(() => {
 
     const agencyLogoDimensions = {
       "Third Shift Media (Pvt) Ltd": { width: 643, height: 388 },
-      "Media Factory (Pvt) Ltd": {width: 5630, height: 862},
+      "Media Factory (Pvt) Ltd": {width: 5630, height: 1700},
       "Midas Media (Pvt) Ltd": { width: 1861, height: 568 },
     };
 
@@ -2751,7 +2751,7 @@ const propertyGRPTotal = useMemo(() => {
 
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [clientName, setClientName] = useState("");
-  const [agencyName, setAgencyName] = useState('Third Shift Media (Pvt) Ltd');
+  const [agencyName, setAgencyName] = useState('Media Factory (Pvt) Ltd');
   const [brandName, setBrandName] = useState("");
   const [refNo, setRefNo] = useState("");
   const [commercialNames, setCommercialNames] = useState({});

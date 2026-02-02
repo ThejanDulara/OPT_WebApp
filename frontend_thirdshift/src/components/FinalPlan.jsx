@@ -879,7 +879,7 @@ export default function FinalPlan({
 
     const agencyLogoDimensions = {
       "Third Shift Media (Pvt) Ltd": { width: 643, height: 388 },
-      "Media Factory (Pvt) Ltd": {width: 5630, height: 862},
+      "Media Factory (Pvt) Ltd": { width: 5630, height: 1700},
       "Midas Media (Pvt) Ltd": { width: 1861, height: 568 },
     };
 
