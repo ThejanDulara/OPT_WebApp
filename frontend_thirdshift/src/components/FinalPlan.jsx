@@ -1664,8 +1664,9 @@ export default function FinalPlan({
               // Col M: TVR (Static Value)
               Number(tvr),
 
+              //Number(ntvr),
               // Col N: NTVR (Static Value)
-              Number(ntvr),
+              { formula: `M${idx}/30*C${idx}` },
 
               // Col O: GRP = TVR(M) * Spots(R)
               { formula: `M${idx}*R${idx}` },
@@ -1796,7 +1797,8 @@ export default function FinalPlan({
                   { formula: `I${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // Total Budget (LKR) - This is the correction!
                   { formula: `J${worksheet.rowCount + 1}-K${worksheet.rowCount + 1}` }, // Total Saving (LKR)
                   Number(tvr), // TVR - Keep as value
-                  Number(ntvr), // NTVR - Keep as value
+                  //Number(ntvr), // NTVR - Keep as value
+                  { formula: `M${worksheet.rowCount + 1}/30*C${worksheet.rowCount + 1}` },
                   { formula: `M${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // GRP
                   { formula: `N${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // NGRP
                   { formula: `K${worksheet.rowCount + 1}/P${worksheet.rowCount + 1}` }, // CPRP
@@ -1902,7 +1904,8 @@ export default function FinalPlan({
               Number(totalBudget), // Total Budget (LKR)
               { formula: `J${worksheet.rowCount + 1}-K${worksheet.rowCount + 1}` }, // Total Saving (LKR)
               Number(tvr), // TVR
-              Number(ntvr), // NTVR
+              //Number(ntvr), // NTVR
+              { formula: `M${worksheet.rowCount + 1}/30*C${worksheet.rowCount + 1}` },
               { formula: `M${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // GRP
               { formula: `N${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // NGRP
               { formula: `K${worksheet.rowCount + 1}/P${worksheet.rowCount + 1}` }, // CPRP

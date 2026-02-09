@@ -1665,7 +1665,8 @@ const propertyGRPTotal = useMemo(() => {
               Number(tvr),
 
               // Col N: NTVR (Static Value)
-              Number(ntvr),
+              //Number(ntvr),
+              { formula: `M${idx}/30*C${idx}` },
 
               // Col O: GRP = TVR(M) * Spots(R)
               { formula: `M${idx}*R${idx}` },
@@ -1796,7 +1797,8 @@ const propertyGRPTotal = useMemo(() => {
                   { formula: `I${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // Total Budget (LKR) - This is the correction!
                   { formula: `J${worksheet.rowCount + 1}-K${worksheet.rowCount + 1}` }, // Total Saving (LKR)
                   Number(tvr), // TVR - Keep as value
-                  Number(ntvr), // NTVR - Keep as value
+                  //Number(ntvr), // NTVR - Keep as value
+                  { formula: `M${worksheet.rowCount + 1}/30*C${worksheet.rowCount + 1}` },
                   { formula: `M${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // GRP
                   { formula: `N${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // NGRP
                   { formula: `K${worksheet.rowCount + 1}/P${worksheet.rowCount + 1}` }, // CPRP
@@ -1902,7 +1904,8 @@ const propertyGRPTotal = useMemo(() => {
               Number(totalBudget), // Total Budget (LKR)
               { formula: `J${worksheet.rowCount + 1}-K${worksheet.rowCount + 1}` }, // Total Saving (LKR)
               Number(tvr), // TVR
-              Number(ntvr), // NTVR
+              //Number(ntvr), // NTVR
+              { formula: `M${worksheet.rowCount + 1}/30*C${worksheet.rowCount + 1}` },
               { formula: `M${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // GRP
               { formula: `N${worksheet.rowCount + 1}*R${worksheet.rowCount + 1}` }, // NGRP
               { formula: `K${worksheet.rowCount + 1}/P${worksheet.rowCount + 1}` }, // CPRP
