@@ -610,12 +610,21 @@ function ChannelRatingAllocator({
       fontWeight: '600',
       marginBottom: '24px'
     },
+
+    title2: {
+      color: '#2d3748',
+      fontSize: '15px',
+      fontWeight: '500',
+      marginBottom: '24px'
+    },
+
     channelInputs: {
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
       gap: '16px',
       marginBottom: '24px'
     },
+
     inputGroup: { display: 'flex', alignItems: 'center', gap: '8px' },
     label: { color: '#4a5568', fontWeight: '500', fontSize: '14px' },
     numberInput: {
@@ -768,6 +777,7 @@ function ChannelRatingAllocator({
     <div style={styles.container}>
       <ToastContainer position="top-right" autoClose={3000} />
       <h2 style={styles.title}>Allocate Desired Budget per Channel</h2>
+      <h3 style={styles.title2}>Note : Only the spot buying budget will be optimized here. The commercial benefit budget will be optimized in the next step.</h3>
 
       <ChannelBudgetSetup
         channels={channels}
