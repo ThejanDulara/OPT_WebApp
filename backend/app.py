@@ -908,6 +908,7 @@ def optimize_by_benefit_share():
         total_budget = float(data.get('budget', 0))
         budget_bound = float(data.get('budget_bound', 0))
         num_commercials = int(data.get('num_commercials', 1))
+        channel_max_spots = data.get("channel_max_spots") or {}
         min_spots = int(data.get('min_spots', 0))
         max_spots = int(data.get('max_spots', 10))
         prime_pct_global = float(data.get('prime_pct', 80))
@@ -958,7 +959,27 @@ def optimize_by_benefit_share():
         prob = LpProblem("Maximize_TVR_CommercialBenefit", LpMaximize)
 
         # Variables: Integer spots per row
-        x = {i: LpVariable(f"x_ben_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
+        #x = {i: LpVariable(f"x_ben_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
+        x = {}
+
+        for i in df_full.index:
+            ch = df_full.loc[i, "Channel"]
+
+            ch_cap = channel_max_spots.get(ch)
+
+            try:
+                ch_cap = int(ch_cap)
+            except:
+                ch_cap = None
+
+            upper_bound = ch_cap if ch_cap is not None else max_spots
+
+            x[i] = LpVariable(
+                f"x_ben_{i}",
+                lowBound=min_spots,
+                upBound=upper_bound,
+                cat='Integer'
+            )
 
         # Objective: Maximize Total NTVR (Rating)
         prob += lpSum(df_full.loc[i, 'NTVR'] * x[i] for i in df_full.index)
