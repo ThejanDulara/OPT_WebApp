@@ -1282,6 +1282,8 @@ def optimize_bonus():
     max_spots = data.get('max_spots') or data.get('maxSpots', 20)
     time_limit = data.get('time_limit') or data.get('timeLimitSec', 120)
 
+    channel_max_spots = data.get("channel_max_spots") or {}
+
     if df_full.empty:
         return jsonify({"success": False, "message": "⚠️ df_full/programRows is empty"}), 400
 
@@ -1294,9 +1296,25 @@ def optimize_bonus():
 
         # set up an LP for this channel
         prob = LpProblem(f"Maximize_NTVR_{channel}", LpMaximize)
-        x = {i: LpVariable(f"x_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer')
-             for i in df_ch.index}
+        #x = {i: LpVariable(f"x_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer')
+            # for i in df_ch.index}
+        # Channel-specific per-program cap
+        ch_cap = channel_max_spots.get(channel, max_spots)
 
+        try:
+            ch_cap = int(ch_cap)
+        except:
+            ch_cap = max_spots
+
+        x = {
+            i: LpVariable(
+                f"x_{i}",
+                lowBound=min_spots,
+                upBound=ch_cap,  # ✅ use channel-specific cap
+                cat='Integer'
+            )
+            for i in df_ch.index
+        }
         # maximise NTVR for this channel
         prob += lpSum(df_ch.loc[i, 'NTVR'] * x[i] for i in df_ch.index)
 
