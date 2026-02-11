@@ -609,6 +609,8 @@ def optimize_by_budget_share():
     # Optional: global commercial shares (used as defaults)
     budget_proportions = data.get("budget_proportions", []) or []
 
+    channel_max_spots = data.get("channel_max_spots") or {}
+
     # NEW: per-channel commercial share overrides
     # Expected shape: { "Channel 1": [pct_com1, pct_com2, ...], ... }
     channel_commercial_pct_map = data.get('channel_commercial_pct_map') or {}
@@ -628,8 +630,28 @@ def optimize_by_budget_share():
         return jsonify({"error": "Commercial splits provided, but 'Commercial' column missing"}), 400
 
     prob = LpProblem("Maximize_TVR_With_Channel_and_Slot_Budget_Shares", LpMaximize)
-    x = {i: LpVariable(f"x2_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
+    #x = {i: LpVariable(f"x2_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
+    x = {}
 
+    for i in df_full.index:
+        ch = df_full.loc[i, "Channel"]
+
+        # if override exists → use it
+        ch_cap = channel_max_spots.get(ch)
+
+        try:
+            ch_cap = int(ch_cap)
+        except:
+            ch_cap = None
+
+        upper_bound = ch_cap if ch_cap is not None else max_spots
+
+        x[i] = LpVariable(
+            f"x2_{i}",
+            lowBound=min_spots,
+            upBound=upper_bound,
+            cat='Integer'
+        )
     # Objective: maximize NTVR * spots
     prob += lpSum(df_full.loc[i, 'NTVR'] * x[i] for i in df_full.index)
 
