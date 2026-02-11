@@ -1,9 +1,16 @@
 // PropertyProgramsEditor.jsx
-import React, { useMemo } from 'react';
+import React, { useMemo , useEffect  } from 'react';
 
 const num = v => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
 const iNum = v => (isNaN(parseInt(v)) ? 0 : parseInt(v));
 const fmt2 = v => Number(v || 0).toFixed(2);
+const isEmpty = v => v === '' || v === null || v === undefined;
+
+const validateRow = (row) => ({
+  duration: isEmpty(row.duration) || Number(row.duration) <= 0,
+  pt_npt: isEmpty(row.pt_npt),
+});
+
 
 function makeRow() {
   return {
@@ -46,7 +53,8 @@ export default function PropertyProgramsEditor({
   propertyPrograms,        // { [channel]: Row[] }
   setPropertyPrograms,     // updater from parent
   formatLKR,
-  styles
+  styles,
+  setRequiredRowsValid
 }) {
   // Derived per-channel totals & validity
   const perChannelTotals = useMemo(() => {
@@ -61,6 +69,38 @@ export default function PropertyProgramsEditor({
     });
     return out;
   }, [channels, propertyPrograms, propertyAmounts]);
+
+    // 🔒 Validate required fields (Duration + PT/NPT) for all added rows
+    const requiredFieldValidation = useMemo(() => {
+      let valid = true;
+
+      (channels || []).forEach(ch => {
+        if (!hasProperty[ch]) return;
+
+        const rows = propertyPrograms[ch] || [];
+        rows.forEach(r => {
+          if (!r) return;
+
+          const durationMissing = !r.duration || Number(r.duration) <= 0;
+          const ptMissing = !r.pt_npt;
+
+          if (durationMissing || ptMissing) {
+            valid = false;
+          }
+        });
+      });
+
+      return valid;
+    }, [channels, hasProperty, propertyPrograms]);
+
+
+    // 🔔 Inform parent whether all required fields are filled
+    useEffect(() => {
+      if (typeof setRequiredRowsValid === "function") {
+        setRequiredRowsValid(requiredFieldValidation);
+      }
+    }, [requiredFieldValidation, setRequiredRowsValid]);
+
 
   const handleAddRow = (ch) => {
     setPropertyPrograms(prev => {
@@ -161,6 +201,7 @@ export default function PropertyProgramsEditor({
     };
 
 
+
   return (
     <div style={{ marginTop: 16 }}>
       <h3 style={styles.sectionTitle}>On cost breakdown (per channel)</h3>
@@ -221,6 +262,7 @@ export default function PropertyProgramsEditor({
                 </thead>
                 <tbody>
                   {rows.map((r) => {
+                    const errors = validateRow(r);
                     const { NTVR, NCost, NGRP, GRP, rateCardTotal} = computeComputed(r);
                     const totalBudget = num(r.budget);
                     const onCost = num(r.budget);
@@ -246,14 +288,25 @@ export default function PropertyProgramsEditor({
                           />
                         </td>
                         <td style={{ ...styles.td, textAlign: 'right' }}>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={r.duration}
-                            onChange={e => handleChange(ch, r.id, 'duration', e.target.value)}
-                            style={{ ...styles.numberInput, width: 110, textAlign: 'right' }}
-                          />
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={r.duration}
+                          onChange={e => handleChange(ch, r.id, 'duration', e.target.value)}
+                          style={{
+                            ...styles.numberInput,
+                            width: 110,
+                            textAlign: 'right',
+                            borderColor: errors.duration ? '#e53e3e' : undefined
+                          }}
+                        />
+                        {errors.duration && (
+                          <div style={{ color: '#e53e3e', fontSize: 11 }}>
+                            Duration is required
+                          </div>
+                        )}
+
                         </td>
 
                         <td style={styles.td}>
@@ -309,11 +362,21 @@ export default function PropertyProgramsEditor({
                           })()}
                         </td>
                         <td style={styles.td}>
-                          <select
-                            value={r.pt_npt}
-                            onChange={(e) => handleChange(ch, r.id, "pt_npt", e.target.value)}
-                            style={{ ...styles.numberInput, width: 120 }}
-                          >
+                        <select
+                          value={r.pt_npt}
+                          onChange={(e) => handleChange(ch, r.id, "pt_npt", e.target.value)}
+                          style={{
+                            ...styles.numberInput,
+                            width: 120,
+                            borderColor: errors.pt_npt ? '#e53e3e' : undefined
+                          }}
+                        >
+                        {errors.pt_npt && (
+                          <div style={{ color: '#e53e3e', fontSize: 11 }}>
+                            Please select PT / NPT
+                          </div>
+                        )}
+
                             <option value="">Select</option>
                             <option value="A">{r.pt_npt === "A" ? "A" : "A (PT)"}</option>
                             <option value="B">{r.pt_npt === "B" ? "B" : "B (NPT)"}</option>

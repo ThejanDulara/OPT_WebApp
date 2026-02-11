@@ -79,7 +79,8 @@ export default function ChannelBudgetSetup({
   }, [isProcessing, timeLimit]);
 
   // disable optimize if property program totals don't match or while processing
-  const disableOptimize = isProcessing || (propertyValidation && !propertyValidation.ok);
+  const [requiredRowsValid, setRequiredRowsValid] = useState(true);
+  const disableOptimize = isProcessing || (propertyValidation && !propertyValidation.ok) || !requiredRowsValid;
   const anyPropertyOn = Object.values(hasProperty || {}).some(Boolean);
 
   const handlePercentChange = (ch, which, val) => {
@@ -714,6 +715,7 @@ export default function ChannelBudgetSetup({
           toNumber={toNumber}
           formatLKR={formatLKR}
           styles={styles}
+          setRequiredRowsValid={setRequiredRowsValid}
         />
       )}
 
