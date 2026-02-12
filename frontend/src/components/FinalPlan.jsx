@@ -3104,7 +3104,7 @@ const propertyGRPTotal = useMemo(() => {
       <div style={{ marginBottom: '16px' }}>
         <label>
           <input type="checkbox" checked={mergeBenefit} onChange={e => setMergeBenefit(e.target.checked)} />
-          Merge matching benefit programs into main (sum spots)
+          Merge matching Commercial benefit programs into Spot Buying Programs
         </label>
       </div>
 
