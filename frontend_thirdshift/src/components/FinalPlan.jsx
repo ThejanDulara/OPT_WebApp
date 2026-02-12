@@ -40,9 +40,11 @@ export default function FinalPlan({
     `${Number(v ?? 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`,
   selectedTG = "",
   optimizationInput,
-  sessionSnapshot = {},   // 🌟 NEW
+  sessionSnapshot = {},
+  initialMetadata = null,
   onHome,
 }) {
+  console.log("FinalPlan rendered. initialMetadata:", initialMetadata);
 
   // ---- Normalize inputs (support both prop name styles) ----
   const mainResults = _mainResults || basePlanResult || {};
@@ -879,7 +881,7 @@ export default function FinalPlan({
 
     const agencyLogoDimensions = {
       "Third Shift Media (Pvt) Ltd": { width: 643, height: 388 },
-      "Media Factory (Pvt) Ltd": { width: 5630, height: 1700},
+      "Media Factory (Pvt) Ltd": { width: 5630, height: 1700 },
       "Midas Media (Pvt) Ltd": { width: 1861, height: 568 },
     };
 
@@ -1000,25 +1002,25 @@ export default function FinalPlan({
 
       const summarySheetName = 'Channel Summary (All-In)';
 
-        const formulaRows = [
-          ['Agency', agencyName],
-          ['Client', clientName],
-          ['Activation Period', `${fromDate} to ${toDate}`], // NEW ROW
-          ['Investment', {
-            formula: `INDEX('${summarySheetName}'!B:B, MATCH("Total", '${summarySheetName}'!A:A, 0))`
-          }],
-          ['SSCL', { formula: 'B5*2.5641%' }], // Changed from B4 to B5 (row shifted)
-          ['VAT', { formula: '(B5+B6)*18%' }], // Changed from B4+B5 to B5+B6
-          ['Total Investment with TAX', { formula: 'B5+B6+B7' }], // Changed from B4+B5+B6 to B5+B6+B7
-          ['Total GRP', {
-            formula: `INDEX('${summarySheetName}'!${totalGrpColLetter}:${totalGrpColLetter}, MATCH("Total", '${summarySheetName}'!A:A, 0))`
-          }],
-          ['Total NGRP', {
-            formula: `INDEX('${summarySheetName}'!${totalNgrpColLetter}:${totalNgrpColLetter}, MATCH("Total", '${summarySheetName}'!A:A, 0))`
-          }],
-          ['CPRP', { formula: 'IFERROR(B5/B9,0)' }], // Changed from B3/B7 to B4/B9
-          ['NCPRP', { formula: 'IFERROR(B5/B10,0)' }], // Changed from B3/B8 to B4/B10
-        ];
+      const formulaRows = [
+        ['Agency', agencyName],
+        ['Client', clientName],
+        ['Activation Period', `${fromDate} to ${toDate}`], // NEW ROW
+        ['Investment', {
+          formula: `INDEX('${summarySheetName}'!B:B, MATCH("Total", '${summarySheetName}'!A:A, 0))`
+        }],
+        ['SSCL', { formula: 'B5*2.5641%' }], // Changed from B4 to B5 (row shifted)
+        ['VAT', { formula: '(B5+B6)*18%' }], // Changed from B4+B5 to B5+B6
+        ['Total Investment with TAX', { formula: 'B5+B6+B7' }], // Changed from B4+B5+B6 to B5+B6+B7
+        ['Total GRP', {
+          formula: `INDEX('${summarySheetName}'!${totalGrpColLetter}:${totalGrpColLetter}, MATCH("Total", '${summarySheetName}'!A:A, 0))`
+        }],
+        ['Total NGRP', {
+          formula: `INDEX('${summarySheetName}'!${totalNgrpColLetter}:${totalNgrpColLetter}, MATCH("Total", '${summarySheetName}'!A:A, 0))`
+        }],
+        ['CPRP', { formula: 'IFERROR(B5/B9,0)' }], // Changed from B3/B7 to B4/B9
+        ['NCPRP', { formula: 'IFERROR(B5/B10,0)' }], // Changed from B3/B8 to B4/B10
+      ];
 
       formulaRows.forEach(row => {
         const r = kpiSheet.addRow(row);
@@ -1134,118 +1136,118 @@ export default function FinalPlan({
     }
     // ================== END REACH & FREQUENCY TABLE ==================
     // ================== PT / NPT PERCENTAGE TABLE (FORMULA MODE ONLY) ==================
-      if (useFormulas) {
-        // ---- position: 1 blank row after Reach & Frequency table ----
-        const ptTableStartRow = startRow + 4; // Reach & Frequency ends at startRow+2
-        const ptTableStartCol = 1;            // Column A
+    if (useFormulas) {
+      // ---- position: 1 blank row after Reach & Frequency table ----
+      const ptTableStartRow = startRow + 4; // Reach & Frequency ends at startRow+2
+      const ptTableStartCol = 1;            // Column A
 
-        // ---- Get the list of unique channel names to reference their sheets ----
-        // We use combinedChannelRows which you already calculated earlier in the function
-        const channelNamesList = combinedChannelRows.map(r => r.Channel);
+      // ---- Get the list of unique channel names to reference their sheets ----
+      // We use combinedChannelRows which you already calculated earlier in the function
+      const channelNamesList = combinedChannelRows.map(r => r.Channel);
 
-        // ---- styles (same as Reach & Frequency) ----
-        const headerFill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'C6EFCE' }
-        };
+      // ---- styles (same as Reach & Frequency) ----
+      const headerFill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'C6EFCE' }
+      };
 
-        const thinBorder = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
-        };
+      const thinBorder = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      };
 
-        // ================= HEADER =================
-        const ptHeaderRow = kpiSheet.getRow(ptTableStartRow);
-        ptHeaderRow.values = [
-          'PT/NPT percentage',
-          'BUDGET',
-          'GRP',
-          'SPOT'
-        ];
+      // ================= HEADER =================
+      const ptHeaderRow = kpiSheet.getRow(ptTableStartRow);
+      ptHeaderRow.values = [
+        'PT/NPT percentage',
+        'BUDGET',
+        'GRP',
+        'SPOT'
+      ];
 
-        ptHeaderRow.eachCell(cell => {
-          cell.fill = headerFill;
-          cell.font = { bold: true };
-          cell.alignment = { horizontal: 'center', vertical: 'middle' };
-          cell.border = thinBorder;
-        });
+      ptHeaderRow.eachCell(cell => {
+        cell.fill = headerFill;
+        cell.font = { bold: true };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = thinBorder;
+      });
 
-        // ================= PT ROW =================
-        const ptRow = kpiSheet.getRow(ptTableStartRow + 1);
-        ptRow.getCell(1).value = 'PT';
-        ptRow.getCell(1).font = { bold: true };
+      // ================= PT ROW =================
+      const ptRow = kpiSheet.getRow(ptTableStartRow + 1);
+      ptRow.getCell(1).value = 'PT';
+      ptRow.getCell(1).font = { bold: true };
 
-        // PT Budget %: Sum Column K (Budget) from all channel sheets where Slot (Col G) is A1-A5
-        const ptBudgetSumFormula = channelNamesList.map(ch =>
-          `SUMPRODUCT(--ISNUMBER(MATCH('${ch}'!G:G,{"A","A1","A2","A3","A4","A5"},0)),'${ch}'!K:K)`
-        ).join('+');
+      // PT Budget %: Sum Column K (Budget) from all channel sheets where Slot (Col G) is A1-A5
+      const ptBudgetSumFormula = channelNamesList.map(ch =>
+        `SUMPRODUCT(--ISNUMBER(MATCH('${ch}'!G:G,{"A","A1","A2","A3","A4","A5"},0)),'${ch}'!K:K)`
+      ).join('+');
 
-        ptRow.getCell(2).value = { formula: `(${ptBudgetSumFormula}) / B5` }; // B5 is Investment
-        ptRow.getCell(2).numFmt = '0.00%';
+      ptRow.getCell(2).value = { formula: `(${ptBudgetSumFormula}) / B5` }; // B5 is Investment
+      ptRow.getCell(2).numFmt = '0.00%';
 
-        // PT GRP %: Sum Column O (GRP) from all channel sheets where Slot (Col G) is A1-A5
-        const ptGRPSumFormula = channelNamesList.map(ch =>
-          `SUMPRODUCT(--ISNUMBER(MATCH('${ch}'!G:G,{"A","A1","A2","A3","A4","A5"},0)),'${ch}'!O:O)`
-        ).join('+');
+      // PT GRP %: Sum Column O (GRP) from all channel sheets where Slot (Col G) is A1-A5
+      const ptGRPSumFormula = channelNamesList.map(ch =>
+        `SUMPRODUCT(--ISNUMBER(MATCH('${ch}'!G:G,{"A","A1","A2","A3","A4","A5"},0)),'${ch}'!O:O)`
+      ).join('+');
 
-        ptRow.getCell(3).value = { formula: `(${ptGRPSumFormula}) / B9` }; // B9 is Total GRP
-        ptRow.getCell(3).numFmt = '0.00%';
+      ptRow.getCell(3).value = { formula: `(${ptGRPSumFormula}) / B9` }; // B9 is Total GRP
+      ptRow.getCell(3).numFmt = '0.00%';
 
-        // PT Spot %: Sum Column R (Spots) and divide by total exposure in summary
-        const ptSpotSumFormula = channelNamesList.map(ch =>
-          `SUMPRODUCT(--ISNUMBER(MATCH('${ch}'!G:G,{"A","A1","A2","A3","A4","A5"},0)),'${ch}'!R:R)`
-        ).join('+');
+      // PT Spot %: Sum Column R (Spots) and divide by total exposure in summary
+      const ptSpotSumFormula = channelNamesList.map(ch =>
+        `SUMPRODUCT(--ISNUMBER(MATCH('${ch}'!G:G,{"A","A1","A2","A3","A4","A5"},0)),'${ch}'!R:R)`
+      ).join('+');
 
-        ptRow.getCell(4).value = {
-          formula: `(${ptSpotSumFormula}) / INDEX('Channel Summary (All-In)'!A:Z, MATCH("Total",'Channel Summary (All-In)'!A:A,0), MATCH("Total Exposure",'Channel Summary (All-In)'!1:1,0))`
-        };
-        ptRow.getCell(4).numFmt = '0.00%';
+      ptRow.getCell(4).value = {
+        formula: `(${ptSpotSumFormula}) / INDEX('Channel Summary (All-In)'!A:Z, MATCH("Total",'Channel Summary (All-In)'!A:A,0), MATCH("Total Exposure",'Channel Summary (All-In)'!1:1,0))`
+      };
+      ptRow.getCell(4).numFmt = '0.00%';
 
-        ptRow.eachCell(cell => {
-          cell.border = thinBorder;
-          cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        });
+      ptRow.eachCell(cell => {
+        cell.border = thinBorder;
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
 
-        // ================= NPT ROW =================
-        const nptRow = kpiSheet.getRow(ptTableStartRow + 2);
-        nptRow.getCell(1).value = 'NPT';
-        nptRow.getCell(1).font = { bold: true };
+      // ================= NPT ROW =================
+      const nptRow = kpiSheet.getRow(ptTableStartRow + 2);
+      nptRow.getCell(1).value = 'NPT';
+      nptRow.getCell(1).font = { bold: true };
 
-        // NPT Budget %: Sum Column K where Slot (Col G) is "B"
-        const nptBudgetSumFormula = channelNamesList.map(ch =>
-          `SUMPRODUCT(--('${ch}'!G:G="B"),'${ch}'!K:K)`
-        ).join('+');
+      // NPT Budget %: Sum Column K where Slot (Col G) is "B"
+      const nptBudgetSumFormula = channelNamesList.map(ch =>
+        `SUMPRODUCT(--('${ch}'!G:G="B"),'${ch}'!K:K)`
+      ).join('+');
 
-        nptRow.getCell(2).value = { formula: `(${nptBudgetSumFormula}) / B5` };
-        nptRow.getCell(2).numFmt = '0.00%';
+      nptRow.getCell(2).value = { formula: `(${nptBudgetSumFormula}) / B5` };
+      nptRow.getCell(2).numFmt = '0.00%';
 
-        // NPT GRP %: Sum Column O where Slot (Col G) is "B"
-        const nptGRPSumFormula = channelNamesList.map(ch =>
-          `SUMPRODUCT(--('${ch}'!G:G="B"),'${ch}'!O:O)`
-        ).join('+');
+      // NPT GRP %: Sum Column O where Slot (Col G) is "B"
+      const nptGRPSumFormula = channelNamesList.map(ch =>
+        `SUMPRODUCT(--('${ch}'!G:G="B"),'${ch}'!O:O)`
+      ).join('+');
 
-        nptRow.getCell(3).value = { formula: `(${nptGRPSumFormula}) / B9` };
-        nptRow.getCell(3).numFmt = '0.00%';
+      nptRow.getCell(3).value = { formula: `(${nptGRPSumFormula}) / B9` };
+      nptRow.getCell(3).numFmt = '0.00%';
 
-        // NPT Spot %: Sum Column R where Slot (Col G) is "B"
-        const nptSpotSumFormula = channelNamesList.map(ch =>
-          `SUMPRODUCT(--('${ch}'!G:G="B"),'${ch}'!R:R)`
-        ).join('+');
+      // NPT Spot %: Sum Column R where Slot (Col G) is "B"
+      const nptSpotSumFormula = channelNamesList.map(ch =>
+        `SUMPRODUCT(--('${ch}'!G:G="B"),'${ch}'!R:R)`
+      ).join('+');
 
-        nptRow.getCell(4).value = {
-          formula: `(${nptSpotSumFormula}) / INDEX('Channel Summary (All-In)'!A:Z, MATCH("Total",'Channel Summary (All-In)'!A:A,0), MATCH("Total Exposure",'Channel Summary (All-In)'!1:1,0))`
-        };
-        nptRow.getCell(4).numFmt = '0.00%';
+      nptRow.getCell(4).value = {
+        formula: `(${nptSpotSumFormula}) / INDEX('Channel Summary (All-In)'!A:Z, MATCH("Total",'Channel Summary (All-In)'!A:A,0), MATCH("Total Exposure",'Channel Summary (All-In)'!1:1,0))`
+      };
+      nptRow.getCell(4).numFmt = '0.00%';
 
-        nptRow.eachCell(cell => {
-          cell.border = thinBorder;
-          cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        });
-      }
-      // ================== END PT / NPT PERCENTAGE TABLE ==================
+      nptRow.eachCell(cell => {
+        cell.border = thinBorder;
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
+    }
+    // ================== END PT / NPT PERCENTAGE TABLE ==================
 
     // --- Final sheet styling ---
     removeGridlines(kpiSheet);
@@ -2641,35 +2643,35 @@ export default function FinalPlan({
             rowData.push({ formula: `SUMIF('${safeSheetName}'!B:B, "*${commercialNames[k] || k}*", '${safeSheetName}'!R:R)` });
           });
 
-        rowData.push({
-          formula: `SUM('${safeSheetName}'!R${propertyStartRow}:R${propertyEndRow})`
-        }); // Num of value adds
-
-        // NEW: Total Exposure = Sum of all commercial spots + value adds
-        // This needs to sum from E column (first commercial spots) to the value adds column
-        const firstCommSpotCol = 5; // Column E (0-based index, E=5)
-        const valueAddsCol = firstCommSpotCol + allCommercialKeys.length; // Column after all commercial spots
-        rowData.push({
-          formula: `SUM(${colLetter(firstCommSpotCol)}${idx}:${colLetter(valueAddsCol)}${idx})`
-        }); // Total Exposure
-
-        // NEW: Commercial-wise GRP columns (one for each commercial)
-        allCommercialKeys.forEach(k => {
-          // Sum GRP (Column O = 15) for rows where column B matches the commercial name
           rowData.push({
-            formula: `SUMIFS('${safeSheetName}'!O:O, '${safeSheetName}'!B:B, "*${commercialNames[k] || k}*")`
-          });
-        });
+            formula: `SUM('${safeSheetName}'!R${propertyStartRow}:R${propertyEndRow})`
+          }); // Num of value adds
 
-        // GRP, NGRP, CPRP from Channel Sheet
-        rowData.push({ formula: `'${safeSheetName}'!O${totalRowInChannelSheet}` }); // Total GRP
-        rowData.push({ formula: `'${safeSheetName}'!P${totalRowInChannelSheet}` }); // Total NGRP
-        rowData.push({
-          formula: `IFERROR(B${idx}/${totalGrpColLetter}${idx}, 0)`
-        });
-        rowData.push({
-          formula: `IFERROR(B${idx}/${totalNgrpColLetter}${idx}, 0)`
-        });
+          // NEW: Total Exposure = Sum of all commercial spots + value adds
+          // This needs to sum from E column (first commercial spots) to the value adds column
+          const firstCommSpotCol = 5; // Column E (0-based index, E=5)
+          const valueAddsCol = firstCommSpotCol + allCommercialKeys.length; // Column after all commercial spots
+          rowData.push({
+            formula: `SUM(${colLetter(firstCommSpotCol)}${idx}:${colLetter(valueAddsCol)}${idx})`
+          }); // Total Exposure
+
+          // NEW: Commercial-wise GRP columns (one for each commercial)
+          allCommercialKeys.forEach(k => {
+            // Sum GRP (Column O = 15) for rows where column B matches the commercial name
+            rowData.push({
+              formula: `SUMIFS('${safeSheetName}'!O:O, '${safeSheetName}'!B:B, "*${commercialNames[k] || k}*")`
+            });
+          });
+
+          // GRP, NGRP, CPRP from Channel Sheet
+          rowData.push({ formula: `'${safeSheetName}'!O${totalRowInChannelSheet}` }); // Total GRP
+          rowData.push({ formula: `'${safeSheetName}'!P${totalRowInChannelSheet}` }); // Total NGRP
+          rowData.push({
+            formula: `IFERROR(B${idx}/${totalGrpColLetter}${idx}, 0)`
+          });
+          rowData.push({
+            formula: `IFERROR(B${idx}/${totalNgrpColLetter}${idx}, 0)`
+          });
 
           summarySheet.addRow(rowData);
 
@@ -2684,52 +2686,52 @@ export default function FinalPlan({
         }
       });
 
-            if (useFormulas) {
-              const lastDataRow = summarySheet.rowCount;
-              const totalIdx = lastDataRow + 1;
-              const commCount = allCommercialKeys.length;
+      if (useFormulas) {
+        const lastDataRow = summarySheet.rowCount;
+        const totalIdx = lastDataRow + 1;
+        const commCount = allCommercialKeys.length;
 
-              const totalRowData = [
-                'Total',
-                { formula: `SUM(B2:B${lastDataRow})` }, // Total Cost
-                { formula: `SUM(C2:C${lastDataRow})` }, // Rate Card Value
-                { formula: `IFERROR(C${totalIdx}/B${totalIdx}, 0)` }, // ROI %
-              ];
+        const totalRowData = [
+          'Total',
+          { formula: `SUM(B2:B${lastDataRow})` }, // Total Cost
+          { formula: `SUM(C2:C${lastDataRow})` }, // Rate Card Value
+          { formula: `IFERROR(C${totalIdx}/B${totalIdx}, 0)` }, // ROI %
+        ];
 
-              // Sum for all dynamic commercial columns + Value adds
-              for (let i = 0; i < commCount + 1; i++) {
-                const colLetter = String.fromCharCode(69 + i);
-                totalRowData.push({ formula: `SUM(${colLetter}2:${colLetter}${lastDataRow})` });
-              }
+        // Sum for all dynamic commercial columns + Value adds
+        for (let i = 0; i < commCount + 1; i++) {
+          const colLetter = String.fromCharCode(69 + i);
+          totalRowData.push({ formula: `SUM(${colLetter}2:${colLetter}${lastDataRow})` });
+        }
 
-              // NEW: Total Exposure total (sum of exposure column)
-              const exposureCol = String.fromCharCode(69 + commCount + 1);
-              totalRowData.push({ formula: `SUM(${exposureCol}2:${exposureCol}${lastDataRow})` });
+        // NEW: Total Exposure total (sum of exposure column)
+        const exposureCol = String.fromCharCode(69 + commCount + 1);
+        totalRowData.push({ formula: `SUM(${exposureCol}2:${exposureCol}${lastDataRow})` });
 
-              // NEW: Commercial-wise GRP totals
-              for (let i = 0; i < commCount; i++) {
-                const colLetter = String.fromCharCode(69 + commCount + 2 + i);
-                totalRowData.push({ formula: `SUM(${colLetter}2:${colLetter}${lastDataRow})` });
-              }
+        // NEW: Commercial-wise GRP totals
+        for (let i = 0; i < commCount; i++) {
+          const colLetter = String.fromCharCode(69 + commCount + 2 + i);
+          totalRowData.push({ formula: `SUM(${colLetter}2:${colLetter}${lastDataRow})` });
+        }
 
-              // GRP, NGRP Sums (these column indices have shifted due to new columns)
-              const grpColOffset = 2 + commCount; // 2 for exposure + comm GRP columns
-              const grpCol = String.fromCharCode(69 + commCount + 2 + commCount);
-              const ngrpCol = String.fromCharCode(69 + commCount + 3 + commCount);
+        // GRP, NGRP Sums (these column indices have shifted due to new columns)
+        const grpColOffset = 2 + commCount; // 2 for exposure + comm GRP columns
+        const grpCol = String.fromCharCode(69 + commCount + 2 + commCount);
+        const ngrpCol = String.fromCharCode(69 + commCount + 3 + commCount);
 
-              totalRowData.push({ formula: `SUM(${grpCol}2:${grpCol}${lastDataRow})` });
-              totalRowData.push({ formula: `SUM(${ngrpCol}2:${ngrpCol}${lastDataRow})` });
+        totalRowData.push({ formula: `SUM(${grpCol}2:${grpCol}${lastDataRow})` });
+        totalRowData.push({ formula: `SUM(${ngrpCol}2:${ngrpCol}${lastDataRow})` });
 
-              // Final CPRP / NCRP for totals
-              totalRowData.push({ formula: `IFERROR(B${totalIdx}/${grpCol}${totalIdx}, 0)` }); // CPRP
-              totalRowData.push({ formula: `IFERROR(B${totalIdx}/${ngrpCol}${totalIdx}, 0)` }); // NCRP
+        // Final CPRP / NCRP for totals
+        totalRowData.push({ formula: `IFERROR(B${totalIdx}/${grpCol}${totalIdx}, 0)` }); // CPRP
+        totalRowData.push({ formula: `IFERROR(B${totalIdx}/${ngrpCol}${totalIdx}, 0)` }); // NCRP
 
-              const finalTotalRow = summarySheet.addRow(totalRowData);
-              finalTotalRow.eachCell(cell => {
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FABF8F' } }; // Orange Fill
-                cell.font = { bold: true };
-              });
-            }
+        const finalTotalRow = summarySheet.addRow(totalRowData);
+        finalTotalRow.eachCell(cell => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FABF8F' } }; // Orange Fill
+          cell.font = { bold: true };
+        });
+      }
       // 5. Apply Percentages and Money Formatting
       summarySheet.eachRow((row, rowNum) => {
         if (rowNum === 1) return; // skip header
@@ -2871,13 +2873,32 @@ export default function FinalPlan({
   const [brandName, setBrandName] = useState("");
   const [refNo, setRefNo] = useState("");
   const [commercialNames, setCommercialNames] = useState({});
-  const [activity] = useState("TV Schedule");  // fixed
+  const [activity, setActivity] = useState("TV Schedule");
   const [campaign, setCampaign] = useState("");
   const [tvBudget, setTvBudget] = useState("");
   const [tvBudgetDraft, setTvBudgetDraft] = useState('');
   const [durationName, setDurationName] = useState("");
   const [commercialLanguages, setCommercialLanguages] = useState({});
   const [commercialError, setCommercialError] = useState('');
+
+  // ⭐ HYDRATE FROM SAVED METADATA
+  useEffect(() => {
+    if (initialMetadata) {
+      console.log("Hydrating FinalPlan with metadata:", initialMetadata);
+      if (initialMetadata.client_name) setClientName(initialMetadata.client_name);
+      if (initialMetadata.brand_name) setBrandName(initialMetadata.brand_name);
+      if (initialMetadata.campaign) setCampaign(initialMetadata.campaign);
+      if (initialMetadata.activity) setActivity(initialMetadata.activity);
+      if (initialMetadata.tv_budget) setTvBudget(initialMetadata.tv_budget);
+      if (initialMetadata.duration_label) setDurationName(initialMetadata.duration_label);
+      if (initialMetadata.commercial_names) setCommercialNames(initialMetadata.commercial_names);
+      if (initialMetadata.commercial_languages) setCommercialLanguages(initialMetadata.commercial_languages);
+
+      // Also restore dates if present
+      if (initialMetadata.activation_from) setFromDate(initialMetadata.activation_from);
+      if (initialMetadata.activation_to) setToDate(initialMetadata.activation_to);
+    }
+  }, [initialMetadata]);
 
 
   const savePlan = async () => {

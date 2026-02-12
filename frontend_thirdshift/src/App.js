@@ -26,7 +26,7 @@ import FinalPlan from './components/FinalPlan';
 import CommercialBenefitSetup from './components/CommercialBenefitSetup';
 import ScrollToTop from "./components/ScrollToTop";
 import CalculatorWidget from "./components/CalculatorWidget";
-import {  useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 import PlanHistory from './components/PlanHistory';
 
@@ -36,15 +36,15 @@ function App() {
 
   const location = useLocation();
 
-    // Pages where calculator should NOT appear
-    const noCalculatorRoutes = [
-      "/",                     // Front page
-      "/select-channels",      // Channel selection
-      "/program-updater"       // Program updater
-    ];
+  // Pages where calculator should NOT appear
+  const noCalculatorRoutes = [
+    "/",                     // Front page
+    "/select-channels",      // Channel selection
+    "/program-updater"       // Program updater
+  ];
 
-    // Check if current path is in the skip list
-    const hideCalculator = noCalculatorRoutes.includes(location.pathname);
+  // Check if current path is in the skip list
+  const hideCalculator = noCalculatorRoutes.includes(location.pathname);
 
   // Keep ALL states EXACTLY as before
   const [negotiatedRates, setNegotiatedRates] = useState({});
@@ -85,14 +85,15 @@ function App() {
   const [benefitState, setBenefitState] = useState(null);
   const [bonusSetupState, setBonusSetupState] = useState(null);
   const [selectedClient, setSelectedClient] = useState("Other");
+  const [savedPlanMetadata, setSavedPlanMetadata] = useState(null); // ⭐ NEW STATE
 
   const hostname = window.location.hostname;
-    const isLocal =
-      hostname.includes("localhost") || hostname.includes("127.");
+  const isLocal =
+    hostname.includes("localhost") || hostname.includes("127.");
 
-    const PLAN_API_BASE = isLocal
-      ? "http://localhost:5000"   // your local OPT backend
-      : "https://optwebapp-production.up.railway.app"; // correct production OPT backend
+  const PLAN_API_BASE = isLocal
+    ? "http://localhost:5000"   // your local OPT backend
+    : "https://optwebapp-production.up.railway.app"; // correct production OPT backend
 
   const handleOpenHistory = () => {
     navigate('/history');
@@ -114,48 +115,51 @@ function App() {
 
       const session = json.session_data || {};
 
-        setChannels(session.channels || []);
-        setSelectedTG(session.selectedTG || "tvr_all");
-        setSelectedProgramIds(session.selectedProgramIds || []);
-        setNegotiatedRates(session.negotiatedRates || {});
-        setChannelDiscounts(session.channelDiscounts || {});
-        setOptimizationInput(session.optimizationInput || null);
-        setAllocatorState(session.allocatorState || null);
-        setBenefitState(session.benefitState || null);
-        setBonusSharesInput(session.bonusSharesInput || null);
-        setBonusSetupState(session.bonusSetupState || null);
-        setSelectedBonusPrograms(session.selectedBonusPrograms || {});
-        setSelectedClient(session.selectedClient || "Other");
-        setAllocatorState(session.allocatorState || null);
-        // NEW: Check if allocatorState has commercial splits, if not, initialize them
-        if (session.allocatorState && !session.allocatorState.channelCommercialSplits) {
-          // Initialize with default from budgetProportions
-          const defaultSplits = {};
-          const channels = session.channels || [];
-          const budgetProportions = session.allocatorState?.budgetProportions || [];
+      // ⭐ Capture metadata for FinalPlan export details
+      setSavedPlanMetadata(json.metadata || null);
 
-          channels.forEach(ch => {
-            defaultSplits[ch] = budgetProportions.map(v => parseFloat(v) || 0);
-          });
+      setChannels(session.channels || []);
+      setSelectedTG(session.selectedTG || "tvr_all");
+      setSelectedProgramIds(session.selectedProgramIds || []);
+      setNegotiatedRates(session.negotiatedRates || {});
+      setChannelDiscounts(session.channelDiscounts || {});
+      setOptimizationInput(session.optimizationInput || null);
+      setAllocatorState(session.allocatorState || null);
+      setBenefitState(session.benefitState || null);
+      setBonusSharesInput(session.bonusSharesInput || null);
+      setBonusSetupState(session.bonusSetupState || null);
+      setSelectedBonusPrograms(session.selectedBonusPrograms || {});
+      setSelectedClient(session.selectedClient || "Other");
+      setAllocatorState(session.allocatorState || null);
+      // NEW: Check if allocatorState has commercial splits, if not, initialize them
+      if (session.allocatorState && !session.allocatorState.channelCommercialSplits) {
+        // Initialize with default from budgetProportions
+        const defaultSplits = {};
+        const channels = session.channels || [];
+        const budgetProportions = session.allocatorState?.budgetProportions || [];
 
-          session.allocatorState.channelCommercialSplits = defaultSplits;
-        }
+        channels.forEach(ch => {
+          defaultSplits[ch] = budgetProportions.map(v => parseFloat(v) || 0);
+        });
 
-        setBenefitState(session.benefitState || null);
-        // NEW: Same check for benefitState
-        if (session.benefitState && !session.benefitState.channelCommercialSplits) {
-          const defaultSplits = {};
-          const channels = session.channels || [];
-          const budgetProportions = session.benefitState?.budgetProportions || [];
+        session.allocatorState.channelCommercialSplits = defaultSplits;
+      }
 
-          channels.forEach(ch => {
-            defaultSplits[ch] = budgetProportions.map(v => parseFloat(v) || 0);
-          });
+      setBenefitState(session.benefitState || null);
+      // NEW: Same check for benefitState
+      if (session.benefitState && !session.benefitState.channelCommercialSplits) {
+        const defaultSplits = {};
+        const channels = session.channels || [];
+        const budgetProportions = session.benefitState?.budgetProportions || [];
 
-          session.benefitState.channelCommercialSplits = defaultSplits;
-        }
-        // Navigate user to Step 1
-        navigate('/select-channels');
+        channels.forEach(ch => {
+          defaultSplits[ch] = budgetProportions.map(v => parseFloat(v) || 0);
+        });
+
+        session.benefitState.channelCommercialSplits = defaultSplits;
+      }
+      // Navigate user to Step 1
+      navigate('/select-channels');
 
     } catch (err) {
       console.error('Error loading saved plan', err);
@@ -241,73 +245,73 @@ function App() {
             }
           />
           {/** HISTORY PAGE */}
-            <Route
-              path="/history"
-              element={
-                <PlanHistory
-                  onBack={() => navigate('/')}
-                  onLoadPlan={handleLoadSavedPlan}
-                />
-              }
-            />
           <Route
-          path="/select-channels"
-          element={
-            <ChannelSelector
-              initialSelectedChannels={channels}   // ⭐ RESTORE SELECTION WHEN COMING BACK
-              onBack={() => navigate('/')}
-              onProceed={(chs) => {
-                setChannels(chs);
-                navigate('/negotiated');
-              }}
-            />
-          }
-        />
+            path="/history"
+            element={
+              <PlanHistory
+                onBack={() => navigate('/')}
+                onLoadPlan={handleLoadSavedPlan}
+              />
+            }
+          />
+          <Route
+            path="/select-channels"
+            element={
+              <ChannelSelector
+                initialSelectedChannels={channels}   // ⭐ RESTORE SELECTION WHEN COMING BACK
+                onBack={() => navigate('/')}
+                onProceed={(chs) => {
+                  setChannels(chs);
+                  navigate('/negotiated');
+                }}
+              />
+            }
+          />
 
           {/** STEP 1 */}
-        <Route
-          path="/negotiated"
-          element={
-            <NegotiatedRates
-              channels={channels}
-              selectedChannels={channels}
+          <Route
+            path="/negotiated"
+            element={
+              <NegotiatedRates
+                channels={channels}
+                selectedChannels={channels}
 
-              /** ⬇⬇⬇ ADD THESE THREE LINES ⬇⬇⬇ */
-              initialChannelDiscounts={channelDiscounts}
-              initialNegotiatedRates={negotiatedRates}
-              initialTG={selectedTG}
-              initialClient={selectedClient}
-              selectedClient={selectedClient}
+                /** ⬇⬇⬇ ADD THESE THREE LINES ⬇⬇⬇ */
+                initialChannelDiscounts={channelDiscounts}
+                initialNegotiatedRates={negotiatedRates}
+                initialTG={selectedTG}
+                initialClient={selectedClient}
+                selectedClient={selectedClient}
 
-              onBack={() => navigate('/select-channels')}
+                onBack={() => navigate('/select-channels')}
 
-              onProceed={({ channelDiscounts: cd = {}, negotiatedRates: nr = {}, selectedTG: tg ,  selectedClient: sc }) => {
-                setChannelDiscounts(cd);
-                setNegotiatedRates(nr);
-                setSelectedTG(tg);
-                setSelectedClient(sc);
-                navigate('/program-selector');
-              }}
-            />
-          }
-        />
+                onProceed={({ channelDiscounts: cd = {}, negotiatedRates: nr = {}, selectedTG: tg, selectedClient: sc }) => {
+                  setChannelDiscounts(cd);
+                  setNegotiatedRates(nr);
+                  setSelectedTG(tg);
+                  setSelectedClient(sc);
+                  navigate('/program-selector');
+                }}
+              />
+            }
+          />
           {/** STEP 2 */}
-        <Route
-          path="/program-selector"
-          element={
-            <ProgramSelector
-              negotiatedRates={negotiatedRates}
-              selectedChannels={channels}
-              selectedTG={selectedTG}
+          <Route
+            path="/program-selector"
+            element={
+              <ProgramSelector
+                negotiatedRates={negotiatedRates}
+                selectedChannels={channels}
+                selectedTG={selectedTG}
 
-              /** ⬇⬇⬇ ADD THIS ⬇⬇⬇ */
-              initialSelectedProgramIds={selectedProgramIds}
+                /** ⬇⬇⬇ ADD THIS ⬇⬇⬇ */
+                initialSelectedProgramIds={selectedProgramIds}
 
-              onSubmit={handleProgramsSubmit}
-              onBack={() => navigate('/negotiated')}
-            />
-          }
-        />
+                onSubmit={handleProgramsSubmit}
+                onBack={() => navigate('/negotiated')}
+              />
+            }
+          />
 
           {/** STEP 3 */}
           <Route
@@ -365,13 +369,13 @@ function App() {
                     <OptimizationResults
                       result={basePlanResult}
                       displayOrder={[
-                        'Channel','Program','Day','Time','Slot','Cost','TVR',
-                        'NCost','NTVR','Total_Cost','GRP','Total_Rating','Spots'
+                        'Channel', 'Program', 'Day', 'Time', 'Slot', 'Cost', 'TVR',
+                        'NCost', 'NTVR', 'Total_Cost', 'GRP', 'Total_Rating', 'Spots'
                       ]}
                       summaryOrder={[
-                        'Channel','Total_Cost','% Cost','GRP','GRP %','Total_Rating','% Rating',
-                        'Prime Cost','Prime Cost %','Non-Prime Cost','Non-Prime Cost %',
-                        'Prime Rating','Non-Prime Rating'
+                        'Channel', 'Total_Cost', '% Cost', 'GRP', 'GRP %', 'Total_Rating', '% Rating',
+                        'Prime Cost', 'Prime Cost %', 'Non-Prime Cost', 'Non-Prime Cost %',
+                        'Prime Rating', 'Non-Prime Rating'
                       ]}
                       formatLKR={(n) =>
                         `Rs. ${Number(n || 0).toLocaleString("en-LK", {
@@ -392,10 +396,10 @@ function App() {
                           : "Proceed to Bonus Program Optimization"
                       }
                       onBackToInputs={() => {
-                          setShowResults(false);   // ⭐ hide results section
-                          navigate('/df-preview');  // ⭐ go back to form
-                        }}
-                      onExport={() => {}}
+                        setShowResults(false);   // ⭐ hide results section
+                        navigate('/df-preview');  // ⭐ go back to form
+                      }}
+                      onExport={() => { }}
                     />
                   </div>
                 )}
@@ -414,10 +418,10 @@ function App() {
                 optimizationInput={optimizationInput}
                 initialState={benefitState}
                 onSaveState={setBenefitState}
-                  onBack={() => {
-                    setShowResults(false);
-                    navigate('/base-plan');
-                  }}
+                onBack={() => {
+                  setShowResults(false);
+                  navigate('/base-plan');
+                }}
                 onProceedToBonus={handleProceedToBonusSelector}
                 onHome={() => navigate('/')}
                 onResultReady={handleBenefitResultReady}
@@ -475,18 +479,18 @@ function App() {
                   // If we have specific per-channel overrides, use them!
                   bonusSharesInput?.channel_commercial_pct_map
                     ? Object.entries(bonusSharesInput.channel_commercial_pct_map).reduce((acc, [ch, pcts]) => {
-                        const chMap = {};
-                        pcts.forEach((pct, i) => {
-                          chMap[`com_${i + 1}`] = Number(pct) || 0;
-                        });
-                        acc[ch] = chMap;
-                        return acc;
-                      }, {})
+                      const chMap = {};
+                      pcts.forEach((pct, i) => {
+                        chMap[`com_${i + 1}`] = Number(pct) || 0;
+                      });
+                      acc[ch] = chMap;
+                      return acc;
+                    }, {})
                     // Otherwise fallback to global proportions
                     : (bonusSharesInput?.budgetProportions || []).reduce((m, pct, i) => {
-                        m[`com_${i + 1}`] = Number(pct) || 0;
-                        return m;
-                      }, {})
+                      m[`com_${i + 1}`] = Number(pct) || 0;
+                      return m;
+                    }, {})
                 }
                 commercialDurationsByChannel={(bonusSharesInput?.durations || []).reduce((m, dur, i) => {
                   m[`com_${i + 1}`] = Number(dur) || 30;
@@ -523,9 +527,9 @@ function App() {
                   bonusSharesInput?.perChannelPercents ||
                   (Array.isArray(bonusSharesInput?.budgetProportions)
                     ? bonusSharesInput.budgetProportions.reduce((m, pct, i) => {
-                        m[`com_${i + 1}`] = Number(pct) || 0;
-                        return m;
-                      }, {})
+                      m[`com_${i + 1}`] = Number(pct) || 0;
+                      return m;
+                    }, {})
                     : {})
                 }
                 bonusChannelAllowPctByChannel={bonusSharesInput?.channelAllowPctByChannel || {}}
@@ -538,45 +542,46 @@ function App() {
             }
           />
 
-        {/** STEP 11 */}
-        <Route
-          path="/final-plan"
-          element={(() => {
+          {/** STEP 11 */}
+          <Route
+            path="/final-plan"
+            element={(() => {
 
-            // ⭐ FIX: Convert durations ARRAY → OBJECT (if needed)
-            const mappedOptimizationInput = optimizationInput
-              ? {
+              // ⭐ FIX: Convert durations ARRAY → OBJECT (if needed)
+              const mappedOptimizationInput = optimizationInput
+                ? {
                   ...optimizationInput,
                   durations: Array.isArray(optimizationInput.durations)
                     ? optimizationInput.durations.reduce((m, d, i) => {
-                        m[`COM_${i + 1}`] = Number(d) || 0;
-                        return m;
-                      }, {})
+                      m[`COM_${i + 1}`] = Number(d) || 0;
+                      return m;
+                    }, {})
                     : optimizationInput.durations
                 }
-              : null;
-            const sessionSnapshot = {
-              channels,
-              selectedTG,
-              selectedProgramIds,
-              negotiatedRates,
-              channelDiscounts,
-              optimizationInput,   // durations, budget, limits
-              allocatorState,      // rating allocator inputs
-              benefitState,         // benefit setup inputs
-              bonusSharesInput,     // bonus share inputs
-              bonusSetupState,      // bonus setup inputs
-              selectedBonusPrograms,
-              selectedClient,       // Cargills or other
+                : null;
+              const sessionSnapshot = {
+                channels,
+                selectedTG,
+                selectedProgramIds,
+                negotiatedRates,
+                channelDiscounts,
+                optimizationInput,   // durations, budget, limits
+                allocatorState,      // rating allocator inputs
+                benefitState,         // benefit setup inputs
+                bonusSharesInput,     // bonus share inputs
+                bonusSetupState,      // bonus setup inputs
+                selectedBonusPrograms,
+                selectedClient,       // Cargills or other
 
-            };
+              };
 
-            return (
-              <FinalPlan
-                mainResults={
-                  basePlanForFinal
-                    ? { ...basePlanForFinal, inclusiveTotals: basePlanInclusiveTotals }
-                    : {
+              return (
+                <FinalPlan
+                  initialMetadata={savedPlanMetadata} // ⭐ PASS METADATA HERE
+                  mainResults={
+                    basePlanForFinal
+                      ? { ...basePlanForFinal, inclusiveTotals: basePlanInclusiveTotals }
+                      : {
                         tables: {
                           by_program: basePlanResult?.df_result || [],
                           by_channel: basePlanResult?.channel_summary || [],
@@ -585,70 +590,70 @@ function App() {
                         totals: { total_rating: basePlanResult?.total_rating || 0 },
                         inclusiveTotals: basePlanInclusiveTotals,
                       }
-                }
-                benefitResults={
-                  benefitResult || {
-                    totals: { benefit_total_rating: 0 },
-                    tables: { by_program: [], by_channel: [] },
                   }
-                }
-                bonusResults={
-                  bonusResult || {
-                    totals: { bonus_total_rating: 0 },
-                    tables: { by_program: [], by_channel: [] },
+                  benefitResults={
+                    benefitResult || {
+                      totals: { benefit_total_rating: 0 },
+                      tables: { by_program: [], by_channel: [] },
+                    }
                   }
-                }
-                totalBudgetInclProperty={
-                  basePlanInclusiveTotals?.totalBudgetIncl ??
-                  basePlanForFinal?.totals?.total_cost_incl_property ??
-                  basePlanForFinal?.totals?.total_budget_incl_property ??
-                  (basePlanResult?.total_cost ?? 0)
-                }
-                propertyPrograms={propertyProgramsForFinal}
-                selectedTG={selectedTG}
-                optimizationInput={mappedOptimizationInput}   // ⭐ FIXED VALUE GOES HERE
-                sessionSnapshot={sessionSnapshot}
-                onBack={() => navigate('/bonus-results')}
-                onHome={() => navigate('/')}
-              />
-            );
-          })()}
-        />
+                  bonusResults={
+                    bonusResult || {
+                      totals: { bonus_total_rating: 0 },
+                      tables: { by_program: [], by_channel: [] },
+                    }
+                  }
+                  totalBudgetInclProperty={
+                    basePlanInclusiveTotals?.totalBudgetIncl ??
+                    basePlanForFinal?.totals?.total_cost_incl_property ??
+                    basePlanForFinal?.totals?.total_budget_incl_property ??
+                    (basePlanResult?.total_cost ?? 0)
+                  }
+                  propertyPrograms={propertyProgramsForFinal}
+                  selectedTG={selectedTG}
+                  optimizationInput={mappedOptimizationInput}   // ⭐ FIXED VALUE GOES HERE
+                  sessionSnapshot={sessionSnapshot}
+                  onBack={() => navigate('/bonus-results')}
+                  onHome={() => navigate('/')}
+                />
+              );
+            })()}
+          />
 
 
           {/** STEP 12 */}
-        <Route
-          path="/program-updater"
-          element={
-            //window.__AUTH__?.canUpdateData ? (
-            (window.__AUTH__?.canUpdateData || window.location.hostname === "localhost") ? (
-              <ProgramUpdater onBack={() => navigate('/')} />
-            ) : (
-              <div style={{ padding: "60px", textAlign: "center" }}>
-                <h2 style={{ color: "#c53030" }}>Access Restricted</h2>
-                <p style={{ marginTop: "12px", fontSize: "16px" }}>
-                  You do not have permission to access the Program Updater.
-                </p>
-                <p style={{ marginTop: "8px", color: "#4a5568" }}>
-                  Please contact the administrators for verification.
-                </p>
-                <button
-                  style={{
-                    marginTop: "24px",
-                    padding: "10px 20px",
-                    borderRadius: "6px",
-                    border: "none",
-                    background: "#edf2f7",
-                    cursor: "pointer",
-                  }}
-                  onClick={() => navigate("/")}
-                >
-                  Back to Home
-                </button>
-              </div>
-            )
-          }
-        />
+          <Route
+            path="/program-updater"
+            element={
+              //window.__AUTH__?.canUpdateData ? (
+              (window.__AUTH__?.canUpdateData || window.location.hostname === "localhost") ? (
+                <ProgramUpdater onBack={() => navigate('/')} />
+              ) : (
+                <div style={{ padding: "60px", textAlign: "center" }}>
+                  <h2 style={{ color: "#c53030" }}>Access Restricted</h2>
+                  <p style={{ marginTop: "12px", fontSize: "16px" }}>
+                    You do not have permission to access the Program Updater.
+                  </p>
+                  <p style={{ marginTop: "8px", color: "#4a5568" }}>
+                    Please contact the administrators for verification.
+                  </p>
+                  <button
+                    style={{
+                      marginTop: "24px",
+                      padding: "10px 20px",
+                      borderRadius: "6px",
+                      border: "none",
+                      background: "#edf2f7",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => navigate("/")}
+                  >
+                    Back to Home
+                  </button>
+                </div>
+              )
+            }
+          />
 
         </Routes>
 
