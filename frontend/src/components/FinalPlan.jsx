@@ -23,7 +23,6 @@ const auth = isLocal
     }
   : (window.__AUTH__ || {});
 
-
 export default function FinalPlan({
   // Accept BOTH naming styles so App.js doesn't have to change
   mainResults: _mainResults,
@@ -40,9 +39,11 @@ export default function FinalPlan({
     `${Number(v ?? 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`,
   selectedTG = "",
   optimizationInput,
-  sessionSnapshot = {},   // 🌟 NEW
+  sessionSnapshot = {},
+  initialMetadata = null,
   onHome,
 }) {
+  console.log("FinalPlan rendered. initialMetadata:", initialMetadata);
 
   // ---- Normalize inputs (support both prop name styles) ----
   const mainResults = _mainResults || basePlanResult || {};
@@ -52,12 +53,12 @@ export default function FinalPlan({
 
 
 
-      useEffect(() => {
-      console.log("🚀 FinalPlan props check");
-      console.log("mainResults", mainResults);
-      console.log("bonusResults", bonusResults);
-      console.log("benefitResults", benefitResults);
-    }, [mainResults, bonusResults, benefitResults]);
+  useEffect(() => {
+    console.log("🚀 FinalPlan props check");
+    console.log("mainResults", mainResults);
+    console.log("bonusResults", bonusResults);
+    console.log("benefitResults", benefitResults);
+  }, [mainResults, bonusResults, benefitResults]);
 
   // ---------- Helpers ----------
   const num = (v, d = 0) => {
@@ -67,76 +68,76 @@ export default function FinalPlan({
   const toStr = (v) => (v == null ? '' : String(v));
   const safeFx = (v, d = 2) => (Number.isFinite(+v) ? (+v).toFixed(d) : (0).toFixed(d));
 
-      // ---------- Formatting helpers ----------
-    const formatWithCommas = (value) => {
-      if (value === '' || value === null || value === undefined) return '';
-      return Number(value).toLocaleString('en-LK');
-    };
+  // ---------- Formatting helpers ----------
+  const formatWithCommas = (value) => {
+    if (value === '' || value === null || value === undefined) return '';
+    return Number(value).toLocaleString('en-LK');
+  };
 
-    const removeCommas = (value) => value.replace(/,/g, '');
+  const removeCommas = (value) => value.replace(/,/g, '');
 
 
-     // put near your other helpers
-    const normalizeCommercial = (raw, { zeroBasedNumeric = false } = {}) => {
-      const s = toStr(raw).trim();
-      if (!s) return 'COM_1';
+  // put near your other helpers
+  const normalizeCommercial = (raw, { zeroBasedNumeric = false } = {}) => {
+    const s = toStr(raw).trim();
+    if (!s) return 'COM_1';
 
-      // COM_# or variants -> keep the number as-is
-      const mCom = s.match(/^COM[_\s-]?(\d+)$/i);
-      if (mCom) return `COM_${parseInt(mCom[1], 10)}`;
+    // COM_# or variants -> keep the number as-is
+    const mCom = s.match(/^COM[_\s-]?(\d+)$/i);
+    if (mCom) return `COM_${parseInt(mCom[1], 10)}`;
 
-      // pure number -> choose 0-based vs 1-based semantics
-      if (/^\d+$/.test(s)) {
-        const n = parseInt(s, 10);
-        return `COM_${zeroBasedNumeric ? n + 1 : n}`;
-      }
+    // pure number -> choose 0-based vs 1-based semantics
+    if (/^\d+$/.test(s)) {
+      const n = parseInt(s, 10);
+      return `COM_${zeroBasedNumeric ? n + 1 : n}`;
+    }
 
-      // any other text with a number inside -> take that number as-is
-      const m = s.match(/(\d+)/);
-      if (m) return `COM_${parseInt(m[1], 10)}`;
+    // any other text with a number inside -> take that number as-is
+    const m = s.match(/(\d+)/);
+    if (m) return `COM_${parseInt(m[1], 10)}`;
 
-      // fallback (rare)
-      return s.toUpperCase();
-    };
-    const moneyCell = (v) =>
-      Number(v ?? 0).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // fallback (rare)
+    return s.toUpperCase();
+  };
+  const moneyCell = (v) =>
+    Number(v ?? 0).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    const monthName = (mm) => {
-      return new Date(2000, parseInt(mm)-1).toLocaleString("en-US", { month: "short" });
-    };
+  const monthName = (mm) => {
+    return new Date(2000, parseInt(mm) - 1).toLocaleString("en-US", { month: "short" });
+  };
 
-    // In FinalPlan.jsx - add this near the top with other helpers
-    const TG_MAPPING = {
-      "tvr_all": "All TG",
-      "tvr_abc_15_90": "SEC ABC | Age 15-90",
-      "tvr_abc_30_60": "SEC ABC | Age 30-60",
-      "tvr_abc_15_30": "SEC ABC | Age 15-30",
-      "tvr_abc_20_plus": "SEC ABC | Age 20+",
-      "tvr_ab_15_plus": "SEC AB | Age 15+",
-      "tvr_cd_15_plus": "SEC CD | Age 15+",
-      "tvr_ab_female_15_45": "SEC AB | Female Age 15-45",
-      "tvr_abc_15_60": "SEC ABC | Age 15-60",
-      "tvr_bcde_15_plus": "SEC BCDE | Age 15+",
-      "tvr_abcde_15_plus": "SEC ABCDE | Age 15+",
-      "tvr_abc_female_15_60": "SEC ABC | Female Age 15-60",
-      "tvr_abc_male_15_60": "SEC ABC | Male Age 15-60"
-    };
+  // In FinalPlan.jsx - add this near the top with other helpers
+  const TG_MAPPING = {
+    "tvr_all": "All TG",
+    "tvr_abc_15_90": "SEC ABC | Age 15-90",
+    "tvr_abc_30_60": "SEC ABC | Age 30-60",
+    "tvr_abc_15_30": "SEC ABC | Age 15-30",
+    "tvr_abc_20_plus": "SEC ABC | Age 20+",
+    "tvr_ab_15_plus": "SEC AB | Age 15+",
+    "tvr_cd_15_plus": "SEC CD | Age 15+",
+    "tvr_ab_female_15_45": "SEC AB | Female Age 15-45",
+    "tvr_abc_15_60": "SEC ABC | Age 15-60",
+    "tvr_bcde_15_plus": "SEC BCDE | Age 15+",
+    "tvr_abcde_15_plus": "SEC ABCDE | Age 15+",
+    "tvr_abc_female_15_60": "SEC ABC | Female Age 15-60",
+    "tvr_abc_male_15_60": "SEC ABC | Male Age 15-60"
+  };
 
-    const getTGLabel = (tgKey) => TG_MAPPING[tgKey] || tgKey || 'Not specified';
+  const getTGLabel = (tgKey) => TG_MAPPING[tgKey] || tgKey || 'Not specified';
 
   // ---------- Tables ----------
   // Main tables from optimization results
-  const mainByProgram  = useMemo(() => {
+  const mainByProgram = useMemo(() => {
     // Try multiple sources for main program data
     return mainResults?.tables?.by_program ||
-           mainResults?.df_result ||
-           [];
+      mainResults?.df_result ||
+      [];
   }, [mainResults]);
 
-  const mainByChannel  = useMemo(() => {
+  const mainByChannel = useMemo(() => {
     return mainResults?.tables?.by_channel ||
-           mainResults?.channel_summary ||
-           [];
+      mainResults?.channel_summary ||
+      [];
   }, [mainResults]);
 
   // Main commercials summary from optimization results
@@ -152,50 +153,50 @@ export default function FinalPlan({
   const benefitByProgram = useMemo(() => benefitResults?.tables?.by_program || [], [benefitResults]);
   const benefitByChannel = useMemo(() => benefitResults?.tables?.by_channel || [], [benefitResults]);
 
-    // Group benefit programs by commercial
-    const benefitCommercialData = useMemo(() => {
-      const commercialMap = {};
+  // Group benefit programs by commercial
+  const benefitCommercialData = useMemo(() => {
+    const commercialMap = {};
 
-      const benefitCommSummary =
-        benefitResults?.commercials_summary ||
-        benefitResults?.final?.commercials_summary ||
-        [];
+    const benefitCommSummary =
+      benefitResults?.commercials_summary ||
+      benefitResults?.final?.commercials_summary ||
+      [];
 
-      if (benefitCommSummary.length > 0) {
-        // ✅ Use commercials_summary if present
-        benefitCommSummary.forEach((commercial, index) => {
-          const baseIdx = Number.isFinite(+commercial?.commercial_index)
-            ? +commercial.commercial_index
-            : index;
-          const commercialKey = `COM_${baseIdx + 1}`;
-          commercialMap[commercialKey] = {
-            commercial_index: commercial.commercial_index,
-            total_cost: commercial.total_cost,
-            total_rating: commercial.total_rating,
-            cprp: commercial.cprp,
-            programs: commercial.details || [],
+    if (benefitCommSummary.length > 0) {
+      // ✅ Use commercials_summary if present
+      benefitCommSummary.forEach((commercial, index) => {
+        const baseIdx = Number.isFinite(+commercial?.commercial_index)
+          ? +commercial.commercial_index
+          : index;
+        const commercialKey = `COM_${baseIdx + 1}`;
+        commercialMap[commercialKey] = {
+          commercial_index: commercial.commercial_index,
+          total_cost: commercial.total_cost,
+          total_rating: commercial.total_rating,
+          cprp: commercial.cprp,
+          programs: commercial.details || [],
+        };
+      });
+    } else {
+      // fallback: group by_program
+      (benefitResults?.tables?.by_program || []).forEach((r) => {
+        const c = normalizeCommercial(
+          r.Commercial ?? r.commercial ?? r.comName ?? r['Com name'] ?? r['Com Name'] ?? r.ComName ?? 'COM_1',
+          { zeroBasedNumeric: false }
+        );
+        if (!commercialMap[c]) {
+          commercialMap[c] = {
+            programs: [],
+            total_rating: 0,
           };
-        });
-      } else {
-        // fallback: group by_program
-        (benefitResults?.tables?.by_program || []).forEach((r) => {
-          const c = normalizeCommercial(
-            r.Commercial ?? r.commercial ?? r.comName ?? r['Com name'] ?? r['Com Name'] ?? r.ComName ?? 'COM_1',
-            { zeroBasedNumeric: false }
-          );
-          if (!commercialMap[c]) {
-            commercialMap[c] = {
-              programs: [],
-              total_rating: 0,
-            };
-          }
-          commercialMap[c].programs.push(r);
-          commercialMap[c].total_rating += num(r.Total_Rating ?? r.Total_NTVR);
-        });
-      }
+        }
+        commercialMap[c].programs.push(r);
+        commercialMap[c].total_rating += num(r.Total_Rating ?? r.Total_NTVR);
+      });
+    }
 
-      return commercialMap;
-    }, [benefitResults]);
+    return commercialMap;
+  }, [benefitResults]);
 
 
   // ---------- Budget (unchanged) ----------
@@ -230,75 +231,75 @@ export default function FinalPlan({
     [budgetInclProperty, mainNGRP]
   );
 
-    // ---------- Property Program Details (flat, sorted by Channel) ----------
-    const flatPropertyPrograms = useMemo(() => {
-      const toNum = (v) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
-      const toInt = (v) => (isNaN(parseInt(v, 10)) ? 0 : parseInt(v, 10));
+  // ---------- Property Program Details (flat, sorted by Channel) ----------
+  const flatPropertyPrograms = useMemo(() => {
+    const toNum = (v) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
+    const toInt = (v) => (isNaN(parseInt(v, 10)) ? 0 : parseInt(v, 10));
 
-      const rows = [];
-      Object.entries(propertyPrograms || {}).forEach(([ch, arr]) => {
-        (arr || []).forEach((r) => {
-          const name     = r.programName ?? r['Name of the program'] ?? '';
-          const comName  = r.comName ?? r['Com name'] ?? r.ComName ?? r['Com Name'] ?? '';
-          const day      = r.day ?? r.Day ?? '';
-          const time     = r.time ?? r.Time ?? '';
-          const budget   = toNum(r.budget ?? r.Budget);
-          const duration = toNum(r.duration ?? r.Duration);
-          const tvr      = toNum(r.tvr ?? r.TVR);
-          const spots    = toInt(r.spots ?? r.Spots);
+    const rows = [];
+    Object.entries(propertyPrograms || {}).forEach(([ch, arr]) => {
+      (arr || []).forEach((r) => {
+        const name = r.programName ?? r['Name of the program'] ?? '';
+        const comName = r.comName ?? r['Com name'] ?? r.ComName ?? r['Com Name'] ?? '';
+        const day = r.day ?? r.Day ?? '';
+        const time = r.time ?? r.Time ?? '';
+        const budget = toNum(r.budget ?? r.Budget);
+        const duration = toNum(r.duration ?? r.Duration);
+        const tvr = toNum(r.tvr ?? r.TVR);
+        const spots = toInt(r.spots ?? r.Spots);
 
-          // Derive if missing
-          const ntvr  = (r.ntvr ?? r.NTVR) != null ? toNum(r.ntvr ?? r.NTVR) : (tvr / 30) * duration;
-          const ncost = (r.ncost ?? r.NCost) != null ? toNum(r.ncost ?? r.NCost) : (spots > 0 ? budget / spots : 0);
-          const ngrp  = (r.ngrp ?? r.NGRP) != null ? toNum(r.ngrp ?? r.NGRP) : (ntvr * spots);
+        // Derive if missing
+        const ntvr = (r.ntvr ?? r.NTVR) != null ? toNum(r.ntvr ?? r.NTVR) : (tvr / 30) * duration;
+        const ncost = (r.ncost ?? r.NCost) != null ? toNum(r.ncost ?? r.NCost) : (spots > 0 ? budget / spots : 0);
+        const ngrp = (r.ngrp ?? r.NGRP) != null ? toNum(r.ngrp ?? r.NGRP) : (ntvr * spots);
 
-          rows.push({
-            Channel: String(ch),
-            'Name of the program': name,
-            'Com name': comName,
-            Day: day,
-            Time: time,
-            Budget: budget,
-            NCost: ncost,
-            Duration: duration,
-            TVR: tvr,
-            NTVR: ntvr,
-            Spots: spots,
-            NGRP: ngrp,
-            Language: r.language ?? r.Language ?? "",
-            PTNPT: r.pt_npt ?? r.ptnpt ?? r['PT / NPT'] ?? "",
-              // ⭐ NEW FIELDS YOU ADDED IN PROPERTY EDITOR ⭐
-              RateCardCost: toNum(r.rateCardCost ?? r.RateCardCost ?? 0),
-              RateCardTotal: toNum(r.rateCardTotal ?? r.RateCardTotal ?? 0),
-              TotalBudget: toNum(r.totalBudget ?? r.TotalBudget ?? budget), // same as On Cost
-              TotalSaving: toNum(r.totalSaving ?? r.TotalSaving ?? 0),
-              CPRP: toNum(r.cprp ?? r.CPRP ?? (ngrp > 0 ? budget / ngrp : 0)),
-          });
+        rows.push({
+          Channel: String(ch),
+          'Name of the program': name,
+          'Com name': comName,
+          Day: day,
+          Time: time,
+          Budget: budget,
+          NCost: ncost,
+          Duration: duration,
+          TVR: tvr,
+          NTVR: ntvr,
+          Spots: spots,
+          NGRP: ngrp,
+          Language: r.language ?? r.Language ?? "",
+          PTNPT: r.pt_npt ?? r.ptnpt ?? r['PT / NPT'] ?? "",
+          // ⭐ NEW FIELDS YOU ADDED IN PROPERTY EDITOR ⭐
+          RateCardCost: toNum(r.rateCardCost ?? r.RateCardCost ?? 0),
+          RateCardTotal: toNum(r.rateCardTotal ?? r.RateCardTotal ?? 0),
+          TotalBudget: toNum(r.totalBudget ?? r.TotalBudget ?? budget), // same as On Cost
+          TotalSaving: toNum(r.totalSaving ?? r.TotalSaving ?? 0),
+          CPRP: toNum(r.cprp ?? r.CPRP ?? (ngrp > 0 ? budget / ngrp : 0)),
         });
       });
+    });
 
-      rows.sort((a, b) => a.Channel.localeCompare(b.Channel));
-      return rows;
-    }, [propertyPrograms]);
+    rows.sort((a, b) => a.Channel.localeCompare(b.Channel));
+    return rows;
+  }, [propertyPrograms]);
 
-    const propertyTotals = useMemo(() => {
-      const budget = (flatPropertyPrograms || []).reduce((a, r) => a + num(r.Budget), 0);
-      const ngrp   = (flatPropertyPrograms || []).reduce((a, r) => a + num(r.NGRP), 0);
-      const cprp   = ngrp > 0 ? budget / ngrp : 0;
-      return { budget, ngrp, cprp };
-    }, [flatPropertyPrograms]);
+  const propertyTotals = useMemo(() => {
+    const budget = (flatPropertyPrograms || []).reduce((a, r) => a + num(r.Budget), 0);
+    const ngrp = (flatPropertyPrograms || []).reduce((a, r) => a + num(r.NGRP), 0);
+    const cprp = ngrp > 0 ? budget / ngrp : 0;
+    return { budget, ngrp, cprp };
+  }, [flatPropertyPrograms]);
 
-    // Add benefit NGRP into Property NGRP
-    const benefitNGRPTotal = useMemo(() => {
-      return Object.values(benefitCommercialData || {}).reduce(
-        (sum, com) => sum + num(com.total_rating),
-        0
-      );
-    }, [benefitCommercialData]);
+  // Add benefit NGRP into Property NGRP
+  const benefitNGRPTotal = useMemo(() => {
+    return Object.values(benefitCommercialData || {}).reduce(
+      (sum, com) => sum + num(com.total_rating),
+      0
+    );
+  }, [benefitCommercialData]);
 
-    const propertyNGRP_InclBenefit = useMemo(() => {
-      return (propertyTotals?.ngrp || 0) + benefitNGRPTotal;
-    }, [propertyTotals, benefitNGRPTotal]);
+  const propertyNGRP_InclBenefit = useMemo(() => {
+    return (propertyTotals?.ngrp || 0) + benefitNGRPTotal;
+  }, [propertyTotals, benefitNGRPTotal]);
 
 
   // ---------- Bonus totals ----------
@@ -326,8 +327,8 @@ export default function FinalPlan({
     if (mainCommercialsSummary && mainCommercialsSummary.length > 0) {
       mainCommercialsSummary.forEach((commercial, index) => {
         const baseIdx = Number.isFinite(+commercial?.commercial_index)
-        ? +commercial.commercial_index
-        : index; // server is 0-based; make it 1-based for display
+          ? +commercial.commercial_index
+          : index; // server is 0-based; make it 1-based for display
         const commercialKey = `COM_${baseIdx + 1}`;
         commercialMap[commercialKey] = {
           commercial_index: commercial.commercial_index,
@@ -342,7 +343,7 @@ export default function FinalPlan({
       // Fallback: group mainByProgram by Commercial field
       const grouped = {};
       mainByProgram.forEach((r) => {
-        const c = normalizeCommercial(r.Commercial ?? r.comName ?? r['Com name'] ?? r['Com Name'] ?? r.ComName ?? 'COM_1',{ zeroBasedNumeric: true });
+        const c = normalizeCommercial(r.Commercial ?? r.comName ?? r['Com name'] ?? r['Com Name'] ?? r.ComName ?? 'COM_1', { zeroBasedNumeric: true });
         if (!grouped[c]) {
           grouped[c] = {
             programs: [],
@@ -374,7 +375,7 @@ export default function FinalPlan({
   const bonusCommercialData = useMemo(() => {
     const commercialMap = {};
     bonusByProgram.forEach((r) => {
-     const c = normalizeCommercial(r.Commercial ?? r.comName ?? r['Com name'] ?? r['Com Name'] ?? r.ComName ?? 'COM_1',{ zeroBasedNumeric: false });
+      const c = normalizeCommercial(r.Commercial ?? r.comName ?? r['Com name'] ?? r['Com Name'] ?? r.ComName ?? 'COM_1', { zeroBasedNumeric: false });
       if (!commercialMap[c]) {
         commercialMap[c] = {
           programs: [],
@@ -410,29 +411,29 @@ export default function FinalPlan({
   }, [mainCommercialData, benefitCommercialData, bonusCommercialData]);
 
   // After building mainCommercialData / benefitCommercialData / bonusCommercialData
-    useEffect(() => {
-      const inspect = (name, m) => {
-        const keys = Object.keys(m || {});
-        console.log(`[DBG] ${name} keys:`, keys);
-        if (keys[0]) {
-          const first = m[keys[0]];
-          console.log(`[DBG] ${name} sample[${keys[0]}]:`, {
-            programs_len: first?.programs?.length,
-            total_cost: first?.total_cost,
-            total_rating: first?.total_rating,
-          });
-          if (Array.isArray(first?.programs) && first.programs[0]) {
-            const r = first.programs[0];
-            console.log(`[DBG] ${name} sample row fields:`, Object.keys(r));
-          }
+  useEffect(() => {
+    const inspect = (name, m) => {
+      const keys = Object.keys(m || {});
+      console.log(`[DBG] ${name} keys:`, keys);
+      if (keys[0]) {
+        const first = m[keys[0]];
+        console.log(`[DBG] ${name} sample[${keys[0]}]:`, {
+          programs_len: first?.programs?.length,
+          total_cost: first?.total_cost,
+          total_rating: first?.total_rating,
+        });
+        if (Array.isArray(first?.programs) && first.programs[0]) {
+          const r = first.programs[0];
+          console.log(`[DBG] ${name} sample row fields:`, Object.keys(r));
         }
-      };
+      }
+    };
 
-      inspect('mainCommercialData', mainCommercialData);
-      inspect('benefitCommercialData', benefitCommercialData);
-      inspect('bonusCommercialData', bonusCommercialData);
-      console.log('[DBG] allCommercialKeys:', allCommercialKeys);
-    }, [mainCommercialData, benefitCommercialData, bonusCommercialData, allCommercialKeys]);
+    inspect('mainCommercialData', mainCommercialData);
+    inspect('benefitCommercialData', benefitCommercialData);
+    inspect('bonusCommercialData', bonusCommercialData);
+    console.log('[DBG] allCommercialKeys:', allCommercialKeys);
+  }, [mainCommercialData, benefitCommercialData, bonusCommercialData, allCommercialKeys]);
 
 
   // ---------- Channel summary incl. bonus ----------
@@ -450,8 +451,8 @@ export default function FinalPlan({
     const rows = (mainByChannel || []).map((r) => {
       const ch = toStr(r.Channel);
       const budget = num(r.Total_Cost); // unchanged
-      const ngrpm  = num(r.Total_Rating);
-      const ngrpb  = num(bonusNGRPByChannel[ch]);
+      const ngrpm = num(r.Total_Rating);
+      const ngrpb = num(bonusNGRPByChannel[ch]);
       return {
         Channel: ch,
         Slot: toStr(r.Slot),
@@ -469,8 +470,8 @@ export default function FinalPlan({
   const finalSummaryRows = useMemo(() => {
     // budget unchanged from main; NGRP = main + bonus by channel; CPRP = budget / ngrp_with_bonus
     const idxMainBudget = new Map((mainByChannel || []).map((r) => [toStr(r.Channel), num(r.Total_Cost)]));
-    const idxMainNgrp   = new Map((mainByChannel || []).map((r) => [toStr(r.Channel), num(r.Total_Rating)]));
-    const idxBonusNgrp  = new Map((bonusByChannel || []).map((r) => [toStr(r.Channel), num(r.Total_Rating)]));
+    const idxMainNgrp = new Map((mainByChannel || []).map((r) => [toStr(r.Channel), num(r.Total_Rating)]));
+    const idxBonusNgrp = new Map((bonusByChannel || []).map((r) => [toStr(r.Channel), num(r.Total_Rating)]));
     const allCh = new Set([
       ...Array.from(idxMainBudget.keys()),
       ...Array.from(idxMainNgrp.keys()),
@@ -478,232 +479,267 @@ export default function FinalPlan({
     ]);
     return Array.from(allCh).sort().map((ch) => {
       const budget = idxMainBudget.get(ch) ?? 0;
-      const ngrpm  = idxMainNgrp.get(ch) ?? 0;
-      const ngrpb  = idxBonusNgrp.get(ch) ?? 0;
-      const ngrpt  = ngrpm + ngrpb;
-      const cprp   = ngrpt > 0 ? budget / ngrpt : 0;
+      const ngrpm = idxMainNgrp.get(ch) ?? 0;
+      const ngrpb = idxBonusNgrp.get(ch) ?? 0;
+      const ngrpt = ngrpm + ngrpb;
+      const cprp = ngrpt > 0 ? budget / ngrpt : 0;
       return { Channel: ch, Total_Budget: budget, NGRP_With_Bonus: ngrpt, CPRP: cprp };
     });
   }, [mainByChannel, bonusByChannel]);
 
-      // Spot-only NGRP from main optimization tables (excludes Property & Bonus)
-    const mainSpotNGRP = useMemo(() => {
-      const ch = (mainByChannel || []).reduce((a, r) => a + num(r.Total_Rating), 0);
-      if (ch > 0) return ch;
-      return (mainByProgram || []).reduce((a, r) => a + num(r.Total_Rating), 0);
-    }, [mainByChannel, mainByProgram]);
+  // Spot-only NGRP from main optimization tables (excludes Property & Bonus)
+  const mainSpotNGRP = useMemo(() => {
+    const ch = (mainByChannel || []).reduce((a, r) => a + num(r.Total_Rating), 0);
+    if (ch > 0) return ch;
+    return (mainByProgram || []).reduce((a, r) => a + num(r.Total_Rating), 0);
+  }, [mainByChannel, mainByProgram]);
 
-    // Total NGRP including Property + Bonus
-    const totalNGRP_InclPropertyBonus = useMemo(
-      () => mainSpotNGRP + propertyNGRP_InclBenefit + (bonusNGRP || 0),
-      [mainSpotNGRP, propertyNGRP_InclBenefit, bonusNGRP]
-    );
-
-    // === NEW: GRP calculations ===
-
-    // Spot-only GRP (TVR * Spots from main optimization)
-    const mainSpotGRP = useMemo(() => {
-      return (mainByProgram || []).reduce((a, r) => {
-        const tvr = num(r.TVR ?? r.NTVR ?? 0);
-        const spots = num(r.Spots ?? 0);
-        return a + tvr * spots;
-      }, 0);
-    }, [mainByProgram]);
-
-
-// Property GRP = Manual Property GRP + Benefit GRP
-const propertyGRPTotal = useMemo(() => {
-  const manualGRP = (flatPropertyPrograms || []).reduce((a, r) => {
-    const tvr = num(r.TVR ?? 0);
-    const spots = num(r.Spots ?? 0);
-    return a + tvr * spots;
-  }, 0);
-
-  const benefitGRP = Object.values(benefitCommercialData || {}).reduce(
-    (sum, com) => {
-      const programs = com.programs || [];
-      return (
-        sum +
-        programs.reduce((x, p) => {
-          const tvr = num(p.TVR ?? p.NTVR ?? 0);
-          const spots = num(p.Spots ?? 0);
-          return x + tvr * spots;
-        }, 0)
-      );
-    },
-    0
+  // Total NGRP including Property + Bonus
+  const totalNGRP_InclPropertyBonus = useMemo(
+    () => mainSpotNGRP + propertyNGRP_InclBenefit + (bonusNGRP || 0),
+    [mainSpotNGRP, propertyNGRP_InclBenefit, bonusNGRP]
   );
 
-  return manualGRP + benefitGRP;
-}, [flatPropertyPrograms, benefitCommercialData]);
+  // === NEW: GRP calculations ===
+
+  // Spot-only GRP (TVR * Spots from main optimization)
+  const mainSpotGRP = useMemo(() => {
+    return (mainByProgram || []).reduce((a, r) => {
+      const tvr = num(r.TVR ?? r.NTVR ?? 0);
+      const spots = num(r.Spots ?? 0);
+      return a + tvr * spots;
+    }, 0);
+  }, [mainByProgram]);
 
 
-    // Bonus GRP
-    const bonusGRP = useMemo(() => {
-      return (bonusByProgram || []).reduce((a, r) => {
-        const tvr = num(r.TVR ?? r.NTVR ?? 0);
-        const spots = num(r.Spots ?? 0);
-        return a + tvr * spots;
-      }, 0);
-    }, [bonusByProgram]);
+  // Property GRP = Manual Property GRP + Benefit GRP
+  const propertyGRPTotal = useMemo(() => {
+    const manualGRP = (flatPropertyPrograms || []).reduce((a, r) => {
+      const tvr = num(r.TVR ?? 0);
+      const spots = num(r.Spots ?? 0);
+      return a + tvr * spots;
+    }, 0);
 
-    // Total GRP (spot + property + bonus)
-    const totalGRP_InclPropertyBonus = useMemo(
-      () => mainSpotGRP + propertyGRPTotal + bonusGRP,
-      [mainSpotGRP, propertyGRPTotal, bonusGRP]
+    const benefitGRP = Object.values(benefitCommercialData || {}).reduce(
+      (sum, com) => {
+        const programs = com.programs || [];
+        return (
+          sum +
+          programs.reduce((x, p) => {
+            const tvr = num(p.TVR ?? p.NTVR ?? 0);
+            const spots = num(p.Spots ?? 0);
+            return x + tvr * spots;
+          }, 0)
+        );
+      },
+      0
     );
 
+    return manualGRP + benefitGRP;
+  }, [flatPropertyPrograms, benefitCommercialData]);
 
 
-    // CPRP using (Budget incl. Property) / (NGRP incl. Property + Bonus)
-    const cprp_InclPropertyBonus = useMemo(
-      () => (totalNGRP_InclPropertyBonus > 0 ? budgetInclProperty / totalNGRP_InclPropertyBonus : 0),
-      [budgetInclProperty, totalNGRP_InclPropertyBonus]
-    );
+  // Bonus GRP
+  const bonusGRP = useMemo(() => {
+    return (bonusByProgram || []).reduce((a, r) => {
+      const tvr = num(r.TVR ?? r.NTVR ?? 0);
+      const spots = num(r.Spots ?? 0);
+      return a + tvr * spots;
+    }, 0);
+  }, [bonusByProgram]);
+
+  // Total GRP (spot + property + bonus)
+  const totalGRP_InclPropertyBonus = useMemo(
+    () => mainSpotGRP + propertyGRPTotal + bonusGRP,
+    [mainSpotGRP, propertyGRPTotal, bonusGRP]
+  );
 
 
-        // ---------- Per-channel Property & Combined summary ----------
-    const propertyByChannel = useMemo(() => {
-      const budgetByCh = {};
-      const ngrpByCh = {};
 
-      // Manual property programs
-      (flatPropertyPrograms || []).forEach((r) => {
+  // CPRP using (Budget incl. Property) / (NGRP incl. Property + Bonus)
+  const cprp_InclPropertyBonus = useMemo(
+    () => (totalNGRP_InclPropertyBonus > 0 ? budgetInclProperty / totalNGRP_InclPropertyBonus : 0),
+    [budgetInclProperty, totalNGRP_InclPropertyBonus]
+  );
+
+
+  // ---------- Per-channel Property & Combined summary ----------
+  const propertyByChannel = useMemo(() => {
+    const budgetByCh = {};
+    const ngrpByCh = {};
+
+    // Manual property programs
+    (flatPropertyPrograms || []).forEach((r) => {
+      const ch = toStr(r.Channel);
+      budgetByCh[ch] = (budgetByCh[ch] || 0) + num(r.Budget);
+      ngrpByCh[ch] = (ngrpByCh[ch] || 0) + num(r.NGRP);
+    });
+
+    // ✅ Add benefit programs on top
+    Object.values(benefitCommercialData || {}).forEach((com) => {
+      (com.programs || []).forEach((r) => {
         const ch = toStr(r.Channel);
-        budgetByCh[ch] = (budgetByCh[ch] || 0) + num(r.Budget);
-        ngrpByCh[ch]   = (ngrpByCh[ch]   || 0) + num(r.NGRP);
+        const cost = num(r.Total_Cost ?? r.Cost ?? r.NCost ?? 0);
+        const ngrp = num(r.Total_Rating ?? r.NGRP ?? r.Total_NTVR ?? 0);
+
+        budgetByCh[ch] = (budgetByCh[ch] || 0) + cost;
+        ngrpByCh[ch] = (ngrpByCh[ch] || 0) + ngrp;
       });
+    });
 
-      // ✅ Add benefit programs on top
-      Object.values(benefitCommercialData || {}).forEach((com) => {
-        (com.programs || []).forEach((r) => {
-          const ch = toStr(r.Channel);
-          const cost = num(r.Total_Cost ?? r.Cost ?? r.NCost ?? 0);
-          const ngrp = num(r.Total_Rating ?? r.NGRP ?? r.Total_NTVR ?? 0);
+    console.log("[DBG] propertyByChannel incl. benefit", { budgetByCh, ngrpByCh });
 
-          budgetByCh[ch] = (budgetByCh[ch] || 0) + cost;
-          ngrpByCh[ch]   = (ngrpByCh[ch]   || 0) + ngrp;
-        });
-      });
+    return { budgetByCh, ngrpByCh };
+  }, [flatPropertyPrograms, benefitCommercialData]);
 
-      console.log("[DBG] propertyByChannel incl. benefit", { budgetByCh, ngrpByCh });
+  const mainCostByCh = useMemo(() => {
+    const m = new Map();
+    (mainByChannel || []).forEach((r) => m.set(toStr(r.Channel), num(r.Total_Cost)));
+    return m;
+  }, [mainByChannel]);
 
-      return { budgetByCh, ngrpByCh };
-    }, [flatPropertyPrograms, benefitCommercialData]);
+  const mainNGRPByCh = useMemo(() => {
+    const m = new Map();
+    (mainByChannel || []).forEach((r) => m.set(toStr(r.Channel), num(r.Total_Rating)));
+    return m;
+  }, [mainByChannel]);
 
-    const mainCostByCh = useMemo(() => {
-      const m = new Map();
-      (mainByChannel || []).forEach((r) => m.set(toStr(r.Channel), num(r.Total_Cost)));
-      return m;
-    }, [mainByChannel]);
+  const combinedChannelRows = useMemo(() => {
+    const allCh = new Set([
+      ...Array.from(mainCostByCh.keys()),
+      ...Object.keys(propertyByChannel.budgetByCh || {}),
+      ...Object.keys(bonusNGRPByChannel || {}),
+    ]);
 
-    const mainNGRPByCh = useMemo(() => {
-      const m = new Map();
-      (mainByChannel || []).forEach((r) => m.set(toStr(r.Channel), num(r.Total_Rating)));
-      return m;
-    }, [mainByChannel]);
+    return Array.from(allCh).sort().map((ch) => {
+      const costSpot = mainCostByCh.get(ch) ?? 0;                                // Cost (LKR) Excl. property
+      const propVal = propertyByChannel.budgetByCh?.[ch] ?? 0;                  // Property value (LKR)
+      const totalCost = costSpot + propVal;                                       // Total Cost (incl. property)
 
-    const combinedChannelRows = useMemo(() => {
-      const allCh = new Set([
-        ...Array.from(mainCostByCh.keys()),
-        ...Object.keys(propertyByChannel.budgetByCh || {}),
-        ...Object.keys(bonusNGRPByChannel || {}),
-      ]);
+      const ngrpSpot = mainNGRPByCh.get(ch) ?? 0;                                // NGRP (Spot Buying)
+      const ngrpProp = propertyByChannel.ngrpByCh?.[ch] ?? 0;                    // NGRP (Property)
+      const ngrpBonus = bonusNGRPByChannel?.[ch] ?? 0;                            // Bonus NGRP
+      const ngrpTotal = ngrpSpot + ngrpProp + ngrpBonus;                          // Total NGRP
 
-      return Array.from(allCh).sort().map((ch) => {
-        const costSpot    = mainCostByCh.get(ch) ?? 0;                                // Cost (LKR) Excl. property
-        const propVal     = propertyByChannel.budgetByCh?.[ch] ?? 0;                  // Property value (LKR)
-        const totalCost   = costSpot + propVal;                                       // Total Cost (incl. property)
+      const cprp = ngrpTotal > 0 ? totalCost / ngrpTotal : 0;                // CPRP (LKR)
 
-        const ngrpSpot    = mainNGRPByCh.get(ch) ?? 0;                                // NGRP (Spot Buying)
-        const ngrpProp    = propertyByChannel.ngrpByCh?.[ch] ?? 0;                    // NGRP (Property)
-        const ngrpBonus   = bonusNGRPByChannel?.[ch] ?? 0;                            // Bonus NGRP
-        const ngrpTotal   = ngrpSpot + ngrpProp + ngrpBonus;                          // Total NGRP
+      // --- NEW GRP calculations per channel ---
+      const grpSpot = (mainByProgram || [])
+        .filter(r => toStr(r.Channel) === ch)
+        .reduce((a, r) => a + num(r.TVR ?? 0) * num(r.Spots ?? 0), 0);
 
-        const cprp        = ngrpTotal > 0 ? totalCost / ngrpTotal : 0;                // CPRP (LKR)
+      // Manual Property GRP
+      const grpProperty_manual = (flatPropertyPrograms || [])
+        .filter(r => toStr(r.Channel) === ch)
+        .reduce((a, r) => a + num(r.TVR ?? 0) * num(r.Spots ?? 0), 0);
 
-        // --- NEW GRP calculations per channel ---
-        const grpSpot = (mainByProgram || [])
-          .filter(r => toStr(r.Channel) === ch)
-          .reduce((a, r) => a + num(r.TVR ?? 0) * num(r.Spots ?? 0), 0);
+      // Benefit GRP for this channel
+      const grpProperty_benefit = Object.values(benefitCommercialData || {})
+        .flatMap(com => com.programs || [])
+        .filter(p => toStr(p.Channel) === ch)
+        .reduce((a, p) => a + num(p.TVR ?? p.NTVR ?? 0) * num(p.Spots ?? 0), 0);
 
-        // Manual Property GRP
-        const grpProperty_manual = (flatPropertyPrograms || [])
-          .filter(r => toStr(r.Channel) === ch)
-          .reduce((a, r) => a + num(r.TVR ?? 0) * num(r.Spots ?? 0), 0);
+      // Combined Property GRP (manual + benefit)
+      const grpProperty = grpProperty_manual + grpProperty_benefit;
 
-        // Benefit GRP for this channel
-        const grpProperty_benefit = Object.values(benefitCommercialData || {})
-          .flatMap(com => com.programs || [])
-          .filter(p => toStr(p.Channel) === ch)
-          .reduce((a, p) => a + num(p.TVR ?? p.NTVR ?? 0) * num(p.Spots ?? 0), 0);
+      const grpBonus = (bonusByProgram || [])
+        .filter(r => toStr(r.Channel) === ch)
+        .reduce((a, r) => a + num(r.TVR ?? 0) * num(r.Spots ?? 0), 0);
 
-        // Combined Property GRP (manual + benefit)
-        const grpProperty = grpProperty_manual + grpProperty_benefit;
+      const grpTotal = grpSpot + grpProperty + grpBonus;
 
-        const grpBonus = (bonusByProgram || [])
-          .filter(r => toStr(r.Channel) === ch)
-          .reduce((a, r) => a + num(r.TVR ?? 0) * num(r.Spots ?? 0), 0);
+      // return object
+      return {
+        Channel: ch,
+        Cost_LKR: costSpot,
+        Property_LKR: propVal,
+        TotalCost_LKR: totalCost,
+        NGRP_Spot: ngrpSpot,
+        NGRP_Property: ngrpProp,
+        NGRP_Bonus: ngrpBonus,
+        NGRP_Total: ngrpTotal,
+        GRP_Spot: grpSpot,
+        GRP_Property: grpProperty,
+        GRP_Bonus: grpBonus,
+        GRP_Total: grpTotal,
+        CPRP_LKR: cprp,
+      };
+    });
+  }, [mainCostByCh, mainNGRPByCh, propertyByChannel, bonusNGRPByChannel]);
 
-        const grpTotal = grpSpot + grpProperty + grpBonus;
+  // --- TEMP: console print of Final Plan rows (MAIN + BONUS, excluding property from BONUS only) ---
+  useEffect(() => {
+    // Build a key for property exclusion (no normalization)
+    const keyOf = (r) => [
+      toStr(r.Channel),
+      toStr(r.Program ?? r['Name of the program'] ?? ''),
+      toStr(r.Day ?? r.Date ?? ''),
+      toStr(r.Time ?? r.Start_Time ?? r.StartTime ?? ''),
+    ].join('||').toLowerCase();
 
-        // return object
-        return {
-          Channel: ch,
-          Cost_LKR: costSpot,
-          Property_LKR: propVal,
-          TotalCost_LKR: totalCost,
-          NGRP_Spot: ngrpSpot,
-          NGRP_Property: ngrpProp,
-          NGRP_Bonus: ngrpBonus,
-          NGRP_Total: ngrpTotal,
-          GRP_Spot: grpSpot,
-          GRP_Property: grpProperty,
-          GRP_Bonus: grpBonus,
-          GRP_Total: grpTotal,
-          CPRP_LKR: cprp,
-        };
-      });
-    }, [mainCostByCh, mainNGRPByCh, propertyByChannel, bonusNGRPByChannel]);
-
-    // --- TEMP: console print of Final Plan rows (MAIN + BONUS, excluding property from BONUS only) ---
-    useEffect(() => {
-      // Build a key for property exclusion (no normalization)
-      const keyOf = (r) => [
+    // Property rows -> keys we will use to exclude only from BONUS
+    const propertyKeys = new Set(
+      (flatPropertyPrograms || []).map((r) => [
         toStr(r.Channel),
-        toStr(r.Program ?? r['Name of the program'] ?? ''),
-        toStr(r.Day ?? r.Date ?? ''),
-        toStr(r.Time ?? r.Start_Time ?? r.StartTime ?? ''),
-      ].join('||').toLowerCase();
+        toStr(r['Name of the program'] ?? r.Program ?? ''),
+        toStr(r.Day ?? ''),
+        toStr(r.Time ?? ''),
+      ].join('||').toLowerCase())
+    );
 
-      // Property rows -> keys we will use to exclude only from BONUS
-      const propertyKeys = new Set(
-        (flatPropertyPrograms || []).map((r) => [
-          toStr(r.Channel),
-          toStr(r['Name of the program'] ?? r.Program ?? ''),
-          toStr(r.Day ?? ''),
-          toStr(r.Time ?? ''),
-        ].join('||').toLowerCase())
+    // Per-identity counters to guarantee uniqueness even if identical rows appear
+    const counters = new Map();
+    const nextUniq = (k) => {
+      const n = (counters.get(k) ?? 0) + 1;
+      counters.set(k, n);
+      return n;
+    };
+
+    // ---------- MAIN rows (keep ALL; do NOT exclude by property) ----------
+    const mainRows = (mainByProgram || []).map((r) => {
+      // main results usually 0-based -> normalizeCommercial(..., { zeroBasedNumeric: true })
+      const commercial = normalizeCommercial(
+        r.Commercial ?? r.comName ?? r['Com name'] ?? r['Com Name'] ?? r.ComName ?? 'COM_1',
+        { zeroBasedNumeric: true }
       );
 
-      // Per-identity counters to guarantee uniqueness even if identical rows appear
-      const counters = new Map();
-      const nextUniq = (k) => {
-        const n = (counters.get(k) ?? 0) + 1;
-        counters.set(k, n);
-        return n;
-      };
+      const identityKey = [
+        'main',
+        commercial,
+        keyOf(r),
+        num(r.Spots ?? 0),
+      ].join('|');
 
-      // ---------- MAIN rows (keep ALL; do NOT exclude by property) ----------
-      const mainRows = (mainByProgram || []).map((r) => {
-        // main results usually 0-based -> normalizeCommercial(..., { zeroBasedNumeric: true })
+      const uniq = nextUniq(identityKey);
+
+      const id =
+        r.id ?? r._id ?? r.ID ?? r.Id ??
+        r.row_id ?? r.RowId ?? r.rowId ??
+        `${identityKey}#${uniq}`;
+
+      return {
+        id,
+        commercial,
+        channel: toStr(r.Channel),
+        day: toStr(r.Day ?? r.Date ?? ''),
+        time: toStr(r.Time ?? r.Start_Time ?? r.StartTime ?? ''),
+        spots: num(r.Spots ?? 0),
+        source: 'main',
+      };
+    });
+
+    // ---------- BONUS rows (exclude property overlaps) ----------
+    const bonusRows = (bonusByProgram || [])
+      .filter((r) => !propertyKeys.has(keyOf(r)))
+      .map((r) => {
+        // bonus often 1-based in UI/files -> normalizeCommercial(..., { zeroBasedNumeric: false })
         const commercial = normalizeCommercial(
           r.Commercial ?? r.comName ?? r['Com name'] ?? r['Com Name'] ?? r.ComName ?? 'COM_1',
-          { zeroBasedNumeric: true }
+          { zeroBasedNumeric: false }
         );
 
         const identityKey = [
-          'main',
+          'bonus',
           commercial,
           keyOf(r),
           num(r.Spots ?? 0),
@@ -723,58 +759,23 @@ const propertyGRPTotal = useMemo(() => {
           day: toStr(r.Day ?? r.Date ?? ''),
           time: toStr(r.Time ?? r.Start_Time ?? r.StartTime ?? ''),
           spots: num(r.Spots ?? 0),
-          source: 'main',
+          source: 'bonus',
         };
       });
 
-      // ---------- BONUS rows (exclude property overlaps) ----------
-      const bonusRows = (bonusByProgram || [])
-        .filter((r) => !propertyKeys.has(keyOf(r)))
-        .map((r) => {
-          // bonus often 1-based in UI/files -> normalizeCommercial(..., { zeroBasedNumeric: false })
-          const commercial = normalizeCommercial(
-            r.Commercial ?? r.comName ?? r['Com name'] ?? r['Com Name'] ?? r.ComName ?? 'COM_1',
-            { zeroBasedNumeric: false }
-          );
+    const out = [...mainRows, ...bonusRows];
 
-          const identityKey = [
-            'bonus',
-            commercial,
-            keyOf(r),
-            num(r.Spots ?? 0),
-          ].join('|');
-
-          const uniq = nextUniq(identityKey);
-
-          const id =
-            r.id ?? r._id ?? r.ID ?? r.Id ??
-            r.row_id ?? r.RowId ?? r.rowId ??
-            `${identityKey}#${uniq}`;
-
-          return {
-            id,
-            commercial,
-            channel: toStr(r.Channel),
-            day: toStr(r.Day ?? r.Date ?? ''),
-            time: toStr(r.Time ?? r.Start_Time ?? r.StartTime ?? ''),
-            spots: num(r.Spots ?? 0),
-            source: 'bonus',
-          };
-        });
-
-      const out = [...mainRows, ...bonusRows];
-
-      console.log('Final Plan rows (MAIN + BONUS, property excluded from BONUS only):', out);
-      console.table(out, ['id', 'commercial', 'channel', 'day', 'time', 'spots', 'source']);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [
-      // fixed-size deps: re-run when counts change (e.g., bonus arrives)
-      (mainByProgram || []).length,
-      (bonusByProgram || []).length,
-      (flatPropertyPrograms || []).length,
-    ]);
-
+    console.log('Final Plan rows (MAIN + BONUS, property excluded from BONUS only):', out);
+    console.table(out, ['id', 'commercial', 'channel', 'day', 'time', 'spots', 'source']);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    // fixed-size deps: re-run when counts change (e.g., bonus arrives)
+    (mainByProgram || []).length,
+    (bonusByProgram || []).length,
+    (flatPropertyPrograms || []).length,
+  ]);
   // ---------- Export ----------
+
   const handleExport = async (useFormulas = false) => {
 
     const removeGridlines = (ws) => {
@@ -879,12 +880,12 @@ const propertyGRPTotal = useMemo(() => {
 
     const agencyLogoDimensions = {
       "Third Shift Media (Pvt) Ltd": { width: 643, height: 388 },
-      "Media Factory (Pvt) Ltd": {width: 5630, height: 1700},
+      "Media Factory (Pvt) Ltd": { width: 5630, height: 1700 },
       "Midas Media (Pvt) Ltd": { width: 1861, height: 568 },
     };
 
 
-     const workbook = new ExcelJS.Workbook();
+    const workbook = new ExcelJS.Workbook();
 
     // ---------- LOAD AGENCY LOGO ----------
     const logoPath = agencyLogoMap[agencyName];
@@ -1000,25 +1001,25 @@ const propertyGRPTotal = useMemo(() => {
 
       const summarySheetName = 'Channel Summary (All-In)';
 
-        const formulaRows = [
-          ['Agency', agencyName],
-          ['Client', clientName],
-          ['Activation Period', `${fromDate} to ${toDate}`], // NEW ROW
-          ['Investment', {
-            formula: `INDEX('${summarySheetName}'!B:B, MATCH("Total", '${summarySheetName}'!A:A, 0))`
-          }],
-          ['SSCL', { formula: 'B5*2.5641%' }], // Changed from B4 to B5 (row shifted)
-          ['VAT', { formula: '(B5+B6)*18%' }], // Changed from B4+B5 to B5+B6
-          ['Total Investment with TAX', { formula: 'B5+B6+B7' }], // Changed from B4+B5+B6 to B5+B6+B7
-          ['Total GRP', {
-            formula: `INDEX('${summarySheetName}'!${totalGrpColLetter}:${totalGrpColLetter}, MATCH("Total", '${summarySheetName}'!A:A, 0))`
-          }],
-          ['Total NGRP', {
-            formula: `INDEX('${summarySheetName}'!${totalNgrpColLetter}:${totalNgrpColLetter}, MATCH("Total", '${summarySheetName}'!A:A, 0))`
-          }],
-          ['CPRP', { formula: 'IFERROR(B5/B9,0)' }], // Changed from B3/B7 to B4/B9
-          ['NCPRP', { formula: 'IFERROR(B5/B10,0)' }], // Changed from B3/B8 to B4/B10
-        ];
+      const formulaRows = [
+        ['Agency', agencyName],
+        ['Client', clientName],
+        ['Activation Period', `${fromDate} to ${toDate}`], // NEW ROW
+        ['Investment', {
+          formula: `INDEX('${summarySheetName}'!B:B, MATCH("Total", '${summarySheetName}'!A:A, 0))`
+        }],
+        ['SSCL', { formula: 'B5*2.5641%' }], // Changed from B4 to B5 (row shifted)
+        ['VAT', { formula: '(B5+B6)*18%' }], // Changed from B4+B5 to B5+B6
+        ['Total Investment with TAX', { formula: 'B5+B6+B7' }], // Changed from B4+B5+B6 to B5+B6+B7
+        ['Total GRP', {
+          formula: `INDEX('${summarySheetName}'!${totalGrpColLetter}:${totalGrpColLetter}, MATCH("Total", '${summarySheetName}'!A:A, 0))`
+        }],
+        ['Total NGRP', {
+          formula: `INDEX('${summarySheetName}'!${totalNgrpColLetter}:${totalNgrpColLetter}, MATCH("Total", '${summarySheetName}'!A:A, 0))`
+        }],
+        ['CPRP', { formula: 'IFERROR(B5/B9,0)' }], // Changed from B3/B7 to B4/B9
+        ['NCPRP', { formula: 'IFERROR(B5/B10,0)' }], // Changed from B3/B8 to B4/B10
+      ];
 
       formulaRows.forEach(row => {
         const r = kpiSheet.addRow(row);
@@ -1134,118 +1135,118 @@ const propertyGRPTotal = useMemo(() => {
     }
     // ================== END REACH & FREQUENCY TABLE ==================
     // ================== PT / NPT PERCENTAGE TABLE (FORMULA MODE ONLY) ==================
-      if (useFormulas) {
-        // ---- position: 1 blank row after Reach & Frequency table ----
-        const ptTableStartRow = startRow + 4; // Reach & Frequency ends at startRow+2
-        const ptTableStartCol = 1;            // Column A
+    if (useFormulas) {
+      // ---- position: 1 blank row after Reach & Frequency table ----
+      const ptTableStartRow = startRow + 4; // Reach & Frequency ends at startRow+2
+      const ptTableStartCol = 1;            // Column A
 
-        // ---- Get the list of unique channel names to reference their sheets ----
-        // We use combinedChannelRows which you already calculated earlier in the function
-        const channelNamesList = combinedChannelRows.map(r => r.Channel);
+      // ---- Get the list of unique channel names to reference their sheets ----
+      // We use combinedChannelRows which you already calculated earlier in the function
+      const channelNamesList = combinedChannelRows.map(r => r.Channel);
 
-        // ---- styles (same as Reach & Frequency) ----
-        const headerFill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'C6EFCE' }
-        };
+      // ---- styles (same as Reach & Frequency) ----
+      const headerFill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'C6EFCE' }
+      };
 
-        const thinBorder = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
-        };
+      const thinBorder = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      };
 
-        // ================= HEADER =================
-        const ptHeaderRow = kpiSheet.getRow(ptTableStartRow);
-        ptHeaderRow.values = [
-          'PT/NPT percentage',
-          'BUDGET',
-          'GRP',
-          'SPOT'
-        ];
+      // ================= HEADER =================
+      const ptHeaderRow = kpiSheet.getRow(ptTableStartRow);
+      ptHeaderRow.values = [
+        'PT/NPT percentage',
+        'BUDGET',
+        'GRP',
+        'SPOT'
+      ];
 
-        ptHeaderRow.eachCell(cell => {
-          cell.fill = headerFill;
-          cell.font = { bold: true };
-          cell.alignment = { horizontal: 'center', vertical: 'middle' };
-          cell.border = thinBorder;
-        });
+      ptHeaderRow.eachCell(cell => {
+        cell.fill = headerFill;
+        cell.font = { bold: true };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = thinBorder;
+      });
 
-        // ================= PT ROW =================
-        const ptRow = kpiSheet.getRow(ptTableStartRow + 1);
-        ptRow.getCell(1).value = 'PT';
-        ptRow.getCell(1).font = { bold: true };
+      // ================= PT ROW =================
+      const ptRow = kpiSheet.getRow(ptTableStartRow + 1);
+      ptRow.getCell(1).value = 'PT';
+      ptRow.getCell(1).font = { bold: true };
 
-        // PT Budget %: Sum Column K (Budget) from all channel sheets where Slot (Col G) is A1-A5
-        const ptBudgetSumFormula = channelNamesList.map(ch =>
-          `SUMPRODUCT(--ISNUMBER(MATCH('${ch}'!G:G,{"A","A1","A2","A3","A4","A5"},0)),'${ch}'!K:K)`
-        ).join('+');
+      // PT Budget %: Sum Column K (Budget) from all channel sheets where Slot (Col G) is A1-A5
+      const ptBudgetSumFormula = channelNamesList.map(ch =>
+        `SUMPRODUCT(--ISNUMBER(MATCH('${ch}'!G:G,{"A","A1","A2","A3","A4","A5"},0)),'${ch}'!K:K)`
+      ).join('+');
 
-        ptRow.getCell(2).value = { formula: `(${ptBudgetSumFormula}) / B5` }; // B5 is Investment
-        ptRow.getCell(2).numFmt = '0.00%';
+      ptRow.getCell(2).value = { formula: `(${ptBudgetSumFormula}) / B5` }; // B5 is Investment
+      ptRow.getCell(2).numFmt = '0.00%';
 
-        // PT GRP %: Sum Column O (GRP) from all channel sheets where Slot (Col G) is A1-A5
-        const ptGRPSumFormula = channelNamesList.map(ch =>
-          `SUMPRODUCT(--ISNUMBER(MATCH('${ch}'!G:G,{"A","A1","A2","A3","A4","A5"},0)),'${ch}'!O:O)`
-        ).join('+');
+      // PT GRP %: Sum Column O (GRP) from all channel sheets where Slot (Col G) is A1-A5
+      const ptGRPSumFormula = channelNamesList.map(ch =>
+        `SUMPRODUCT(--ISNUMBER(MATCH('${ch}'!G:G,{"A","A1","A2","A3","A4","A5"},0)),'${ch}'!O:O)`
+      ).join('+');
 
-        ptRow.getCell(3).value = { formula: `(${ptGRPSumFormula}) / B9` }; // B9 is Total GRP
-        ptRow.getCell(3).numFmt = '0.00%';
+      ptRow.getCell(3).value = { formula: `(${ptGRPSumFormula}) / B9` }; // B9 is Total GRP
+      ptRow.getCell(3).numFmt = '0.00%';
 
-        // PT Spot %: Sum Column R (Spots) and divide by total exposure in summary
-        const ptSpotSumFormula = channelNamesList.map(ch =>
-          `SUMPRODUCT(--ISNUMBER(MATCH('${ch}'!G:G,{"A","A1","A2","A3","A4","A5"},0)),'${ch}'!R:R)`
-        ).join('+');
+      // PT Spot %: Sum Column R (Spots) and divide by total exposure in summary
+      const ptSpotSumFormula = channelNamesList.map(ch =>
+        `SUMPRODUCT(--ISNUMBER(MATCH('${ch}'!G:G,{"A","A1","A2","A3","A4","A5"},0)),'${ch}'!R:R)`
+      ).join('+');
 
-        ptRow.getCell(4).value = {
-          formula: `(${ptSpotSumFormula}) / INDEX('Channel Summary (All-In)'!A:Z, MATCH("Total",'Channel Summary (All-In)'!A:A,0), MATCH("Total Exposure",'Channel Summary (All-In)'!1:1,0))`
-        };
-        ptRow.getCell(4).numFmt = '0.00%';
+      ptRow.getCell(4).value = {
+        formula: `(${ptSpotSumFormula}) / INDEX('Channel Summary (All-In)'!A:Z, MATCH("Total",'Channel Summary (All-In)'!A:A,0), MATCH("Total Exposure",'Channel Summary (All-In)'!1:1,0))`
+      };
+      ptRow.getCell(4).numFmt = '0.00%';
 
-        ptRow.eachCell(cell => {
-          cell.border = thinBorder;
-          cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        });
+      ptRow.eachCell(cell => {
+        cell.border = thinBorder;
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
 
-        // ================= NPT ROW =================
-        const nptRow = kpiSheet.getRow(ptTableStartRow + 2);
-        nptRow.getCell(1).value = 'NPT';
-        nptRow.getCell(1).font = { bold: true };
+      // ================= NPT ROW =================
+      const nptRow = kpiSheet.getRow(ptTableStartRow + 2);
+      nptRow.getCell(1).value = 'NPT';
+      nptRow.getCell(1).font = { bold: true };
 
-        // NPT Budget %: Sum Column K where Slot (Col G) is "B"
-        const nptBudgetSumFormula = channelNamesList.map(ch =>
-          `SUMPRODUCT(--('${ch}'!G:G="B"),'${ch}'!K:K)`
-        ).join('+');
+      // NPT Budget %: Sum Column K where Slot (Col G) is "B"
+      const nptBudgetSumFormula = channelNamesList.map(ch =>
+        `SUMPRODUCT(--('${ch}'!G:G="B"),'${ch}'!K:K)`
+      ).join('+');
 
-        nptRow.getCell(2).value = { formula: `(${nptBudgetSumFormula}) / B5` };
-        nptRow.getCell(2).numFmt = '0.00%';
+      nptRow.getCell(2).value = { formula: `(${nptBudgetSumFormula}) / B5` };
+      nptRow.getCell(2).numFmt = '0.00%';
 
-        // NPT GRP %: Sum Column O where Slot (Col G) is "B"
-        const nptGRPSumFormula = channelNamesList.map(ch =>
-          `SUMPRODUCT(--('${ch}'!G:G="B"),'${ch}'!O:O)`
-        ).join('+');
+      // NPT GRP %: Sum Column O where Slot (Col G) is "B"
+      const nptGRPSumFormula = channelNamesList.map(ch =>
+        `SUMPRODUCT(--('${ch}'!G:G="B"),'${ch}'!O:O)`
+      ).join('+');
 
-        nptRow.getCell(3).value = { formula: `(${nptGRPSumFormula}) / B9` };
-        nptRow.getCell(3).numFmt = '0.00%';
+      nptRow.getCell(3).value = { formula: `(${nptGRPSumFormula}) / B9` };
+      nptRow.getCell(3).numFmt = '0.00%';
 
-        // NPT Spot %: Sum Column R where Slot (Col G) is "B"
-        const nptSpotSumFormula = channelNamesList.map(ch =>
-          `SUMPRODUCT(--('${ch}'!G:G="B"),'${ch}'!R:R)`
-        ).join('+');
+      // NPT Spot %: Sum Column R where Slot (Col G) is "B"
+      const nptSpotSumFormula = channelNamesList.map(ch =>
+        `SUMPRODUCT(--('${ch}'!G:G="B"),'${ch}'!R:R)`
+      ).join('+');
 
-        nptRow.getCell(4).value = {
-          formula: `(${nptSpotSumFormula}) / INDEX('Channel Summary (All-In)'!A:Z, MATCH("Total",'Channel Summary (All-In)'!A:A,0), MATCH("Total Exposure",'Channel Summary (All-In)'!1:1,0))`
-        };
-        nptRow.getCell(4).numFmt = '0.00%';
+      nptRow.getCell(4).value = {
+        formula: `(${nptSpotSumFormula}) / INDEX('Channel Summary (All-In)'!A:Z, MATCH("Total",'Channel Summary (All-In)'!A:A,0), MATCH("Total Exposure",'Channel Summary (All-In)'!1:1,0))`
+      };
+      nptRow.getCell(4).numFmt = '0.00%';
 
-        nptRow.eachCell(cell => {
-          cell.border = thinBorder;
-          cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        });
-      }
-      // ================== END PT / NPT PERCENTAGE TABLE ==================
+      nptRow.eachCell(cell => {
+        cell.border = thinBorder;
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
+    }
+    // ================== END PT / NPT PERCENTAGE TABLE ==================
 
     // --- Final sheet styling ---
     removeGridlines(kpiSheet);
@@ -1664,8 +1665,8 @@ const propertyGRPTotal = useMemo(() => {
               // Col M: TVR (Static Value)
               Number(tvr),
 
-              // Col N: NTVR (Static Value)
               //Number(ntvr),
+              // Col N: NTVR (Static Value)
               { formula: `M${idx}/30*C${idx}` },
 
               // Col O: GRP = TVR(M) * Spots(R)
@@ -2641,35 +2642,35 @@ const propertyGRPTotal = useMemo(() => {
             rowData.push({ formula: `SUMIF('${safeSheetName}'!B:B, "*${commercialNames[k] || k}*", '${safeSheetName}'!R:R)` });
           });
 
-        rowData.push({
-          formula: `SUM('${safeSheetName}'!R${propertyStartRow}:R${propertyEndRow})`
-        }); // Num of value adds
-
-        // NEW: Total Exposure = Sum of all commercial spots + value adds
-        // This needs to sum from E column (first commercial spots) to the value adds column
-        const firstCommSpotCol = 5; // Column E (0-based index, E=5)
-        const valueAddsCol = firstCommSpotCol + allCommercialKeys.length; // Column after all commercial spots
-        rowData.push({
-          formula: `SUM(${colLetter(firstCommSpotCol)}${idx}:${colLetter(valueAddsCol)}${idx})`
-        }); // Total Exposure
-
-        // NEW: Commercial-wise GRP columns (one for each commercial)
-        allCommercialKeys.forEach(k => {
-          // Sum GRP (Column O = 15) for rows where column B matches the commercial name
           rowData.push({
-            formula: `SUMIFS('${safeSheetName}'!O:O, '${safeSheetName}'!B:B, "*${commercialNames[k] || k}*")`
-          });
-        });
+            formula: `SUM('${safeSheetName}'!R${propertyStartRow}:R${propertyEndRow})`
+          }); // Num of value adds
 
-        // GRP, NGRP, CPRP from Channel Sheet
-        rowData.push({ formula: `'${safeSheetName}'!O${totalRowInChannelSheet}` }); // Total GRP
-        rowData.push({ formula: `'${safeSheetName}'!P${totalRowInChannelSheet}` }); // Total NGRP
-        rowData.push({
-          formula: `IFERROR(B${idx}/${totalGrpColLetter}${idx}, 0)`
-        });
-        rowData.push({
-          formula: `IFERROR(B${idx}/${totalNgrpColLetter}${idx}, 0)`
-        });
+          // NEW: Total Exposure = Sum of all commercial spots + value adds
+          // This needs to sum from E column (first commercial spots) to the value adds column
+          const firstCommSpotCol = 5; // Column E (0-based index, E=5)
+          const valueAddsCol = firstCommSpotCol + allCommercialKeys.length; // Column after all commercial spots
+          rowData.push({
+            formula: `SUM(${colLetter(firstCommSpotCol)}${idx}:${colLetter(valueAddsCol)}${idx})`
+          }); // Total Exposure
+
+          // NEW: Commercial-wise GRP columns (one for each commercial)
+          allCommercialKeys.forEach(k => {
+            // Sum GRP (Column O = 15) for rows where column B matches the commercial name
+            rowData.push({
+              formula: `SUMIFS('${safeSheetName}'!O:O, '${safeSheetName}'!B:B, "*${commercialNames[k] || k}*")`
+            });
+          });
+
+          // GRP, NGRP, CPRP from Channel Sheet
+          rowData.push({ formula: `'${safeSheetName}'!O${totalRowInChannelSheet}` }); // Total GRP
+          rowData.push({ formula: `'${safeSheetName}'!P${totalRowInChannelSheet}` }); // Total NGRP
+          rowData.push({
+            formula: `IFERROR(B${idx}/${totalGrpColLetter}${idx}, 0)`
+          });
+          rowData.push({
+            formula: `IFERROR(B${idx}/${totalNgrpColLetter}${idx}, 0)`
+          });
 
           summarySheet.addRow(rowData);
 
@@ -2684,52 +2685,52 @@ const propertyGRPTotal = useMemo(() => {
         }
       });
 
-            if (useFormulas) {
-              const lastDataRow = summarySheet.rowCount;
-              const totalIdx = lastDataRow + 1;
-              const commCount = allCommercialKeys.length;
+      if (useFormulas) {
+        const lastDataRow = summarySheet.rowCount;
+        const totalIdx = lastDataRow + 1;
+        const commCount = allCommercialKeys.length;
 
-              const totalRowData = [
-                'Total',
-                { formula: `SUM(B2:B${lastDataRow})` }, // Total Cost
-                { formula: `SUM(C2:C${lastDataRow})` }, // Rate Card Value
-                { formula: `IFERROR(C${totalIdx}/B${totalIdx}, 0)` }, // ROI %
-              ];
+        const totalRowData = [
+          'Total',
+          { formula: `SUM(B2:B${lastDataRow})` }, // Total Cost
+          { formula: `SUM(C2:C${lastDataRow})` }, // Rate Card Value
+          { formula: `IFERROR(C${totalIdx}/B${totalIdx}, 0)` }, // ROI %
+        ];
 
-              // Sum for all dynamic commercial columns + Value adds
-              for (let i = 0; i < commCount + 1; i++) {
-                const colLetter = String.fromCharCode(69 + i);
-                totalRowData.push({ formula: `SUM(${colLetter}2:${colLetter}${lastDataRow})` });
-              }
+        // Sum for all dynamic commercial columns + Value adds
+        for (let i = 0; i < commCount + 1; i++) {
+          const colLetter = String.fromCharCode(69 + i);
+          totalRowData.push({ formula: `SUM(${colLetter}2:${colLetter}${lastDataRow})` });
+        }
 
-              // NEW: Total Exposure total (sum of exposure column)
-              const exposureCol = String.fromCharCode(69 + commCount + 1);
-              totalRowData.push({ formula: `SUM(${exposureCol}2:${exposureCol}${lastDataRow})` });
+        // NEW: Total Exposure total (sum of exposure column)
+        const exposureCol = String.fromCharCode(69 + commCount + 1);
+        totalRowData.push({ formula: `SUM(${exposureCol}2:${exposureCol}${lastDataRow})` });
 
-              // NEW: Commercial-wise GRP totals
-              for (let i = 0; i < commCount; i++) {
-                const colLetter = String.fromCharCode(69 + commCount + 2 + i);
-                totalRowData.push({ formula: `SUM(${colLetter}2:${colLetter}${lastDataRow})` });
-              }
+        // NEW: Commercial-wise GRP totals
+        for (let i = 0; i < commCount; i++) {
+          const colLetter = String.fromCharCode(69 + commCount + 2 + i);
+          totalRowData.push({ formula: `SUM(${colLetter}2:${colLetter}${lastDataRow})` });
+        }
 
-              // GRP, NGRP Sums (these column indices have shifted due to new columns)
-              const grpColOffset = 2 + commCount; // 2 for exposure + comm GRP columns
-              const grpCol = String.fromCharCode(69 + commCount + 2 + commCount);
-              const ngrpCol = String.fromCharCode(69 + commCount + 3 + commCount);
+        // GRP, NGRP Sums (these column indices have shifted due to new columns)
+        const grpColOffset = 2 + commCount; // 2 for exposure + comm GRP columns
+        const grpCol = String.fromCharCode(69 + commCount + 2 + commCount);
+        const ngrpCol = String.fromCharCode(69 + commCount + 3 + commCount);
 
-              totalRowData.push({ formula: `SUM(${grpCol}2:${grpCol}${lastDataRow})` });
-              totalRowData.push({ formula: `SUM(${ngrpCol}2:${ngrpCol}${lastDataRow})` });
+        totalRowData.push({ formula: `SUM(${grpCol}2:${grpCol}${lastDataRow})` });
+        totalRowData.push({ formula: `SUM(${ngrpCol}2:${ngrpCol}${lastDataRow})` });
 
-              // Final CPRP / NCRP for totals
-              totalRowData.push({ formula: `IFERROR(B${totalIdx}/${grpCol}${totalIdx}, 0)` }); // CPRP
-              totalRowData.push({ formula: `IFERROR(B${totalIdx}/${ngrpCol}${totalIdx}, 0)` }); // NCRP
+        // Final CPRP / NCRP for totals
+        totalRowData.push({ formula: `IFERROR(B${totalIdx}/${grpCol}${totalIdx}, 0)` }); // CPRP
+        totalRowData.push({ formula: `IFERROR(B${totalIdx}/${ngrpCol}${totalIdx}, 0)` }); // NCRP
 
-              const finalTotalRow = summarySheet.addRow(totalRowData);
-              finalTotalRow.eachCell(cell => {
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FABF8F' } }; // Orange Fill
-                cell.font = { bold: true };
-              });
-            }
+        const finalTotalRow = summarySheet.addRow(totalRowData);
+        finalTotalRow.eachCell(cell => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FABF8F' } }; // Orange Fill
+          cell.font = { bold: true };
+        });
+      }
       // 5. Apply Percentages and Money Formatting
       summarySheet.eachRow((row, rowNum) => {
         if (rowNum === 1) return; // skip header
@@ -2867,17 +2868,36 @@ const propertyGRPTotal = useMemo(() => {
 
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [clientName, setClientName] = useState("");
-  const [agencyName, setAgencyName] = useState('Media Factory (Pvt) Ltd');
+  const [agencyName, setAgencyName] = useState('Third Shift Media (Pvt) Ltd');
   const [brandName, setBrandName] = useState("");
   const [refNo, setRefNo] = useState("");
   const [commercialNames, setCommercialNames] = useState({});
-  const [activity] = useState("TV Schedule");  // fixed
+  const [activity, setActivity] = useState("TV Schedule");
   const [campaign, setCampaign] = useState("");
   const [tvBudget, setTvBudget] = useState("");
   const [tvBudgetDraft, setTvBudgetDraft] = useState('');
   const [durationName, setDurationName] = useState("");
   const [commercialLanguages, setCommercialLanguages] = useState({});
   const [commercialError, setCommercialError] = useState('');
+
+  // ⭐ HYDRATE FROM SAVED METADATA
+  useEffect(() => {
+    if (initialMetadata) {
+      console.log("Hydrating FinalPlan with metadata:", initialMetadata);
+      if (initialMetadata.client_name) setClientName(initialMetadata.client_name);
+      if (initialMetadata.brand_name) setBrandName(initialMetadata.brand_name);
+      if (initialMetadata.campaign) setCampaign(initialMetadata.campaign);
+      if (initialMetadata.activity) setActivity(initialMetadata.activity);
+      if (initialMetadata.tv_budget) setTvBudget(initialMetadata.tv_budget);
+      if (initialMetadata.duration_label) setDurationName(initialMetadata.duration_label);
+      if (initialMetadata.commercial_names) setCommercialNames(initialMetadata.commercial_names);
+      if (initialMetadata.commercial_languages) setCommercialLanguages(initialMetadata.commercial_languages);
+
+      // Also restore dates if present
+      if (initialMetadata.activation_from) setFromDate(initialMetadata.activation_from);
+      if (initialMetadata.activation_to) setToDate(initialMetadata.activation_to);
+    }
+  }, [initialMetadata]);
 
 
   const savePlan = async () => {

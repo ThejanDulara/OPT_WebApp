@@ -84,89 +84,90 @@ function ChannelRatingAllocator({
     return errs;
   }, [channels, channelSplits, primePct, nonPrimePct]);
 
-    const numCom = safeOpt.numCommercials ?? 1;
+  const numCom = safeOpt.numCommercials ?? 1;
 
-    const [budgetProportions, setBudgetProportions] = useState(
-      safeOpt.budgetProportions ||
-        Array(numCom).fill((100 / numCom).toFixed(2))
-    );
+  const [budgetProportions, setBudgetProportions] = useState(
+    safeOpt.budgetProportions ||
+    Array(numCom).fill((100 / numCom).toFixed(2))
+  );
 
-      // Per-channel Commercial splits (default from global commercial proportions)
-      const [channelCommercialSplits, setChannelCommercialSplits] = useState(() => {
-        const seed = {};
-        (channels || []).forEach(ch => {
-          seed[ch] = (budgetProportions || []).map(v => toNumber(v));
-        });
-        return seed;
-      });
+  // Per-channel Commercial splits (default from global commercial proportions)
+  const [channelCommercialSplits, setChannelCommercialSplits] = useState(() => {
+    const seed = {};
+    (channels || []).forEach(ch => {
+      seed[ch] = (budgetProportions || []).map(v => toNumber(v));
+    });
+    return seed;
+  });
 
-      const perChannelCommercialErrors = useMemo(() => {
-        const errs = {};
-        const n = safeOpt.numCommercials ?? 1;
-        if (n <= 1) return errs;
+  const perChannelCommercialErrors = useMemo(() => {
+    const errs = {};
+    const n = safeOpt.numCommercials ?? 1;
+    if (n <= 1) return errs;
 
-        (channels || []).forEach(ch => {
-          const arr = channelCommercialSplits[ch] || [];
-          const sum = Array.from({ length: n }).reduce((a, _, i) => a + toNumber(arr[i]), 0);
-          if (Math.abs(sum - 100) > 0.01) errs[ch] = true;
-        });
-        return errs;
-      }, [channels, channelCommercialSplits, safeOpt.numCommercials, toNumber]);
+    (channels || []).forEach(ch => {
+      const arr = channelCommercialSplits[ch] || [];
+      const sum = Array.from({ length: n }).reduce((a, _, i) => a + toNumber(arr[i]), 0);
+      if (Math.abs(sum - 100) > 0.01) errs[ch] = true;
+    });
+    return errs;
+  }, [channels, channelCommercialSplits, safeOpt.numCommercials, toNumber]);
 
-      const applyGlobalCommercialsToAllChannels = () => {
-        const next = {};
-        (channels || []).forEach(ch => {
-          next[ch] = (budgetProportions || []).map(v => toNumber(v));
-        });
-        setChannelCommercialSplits(next);
-        toast.info('Applied global commercial split to all channels');
-      };
+  const applyGlobalCommercialsToAllChannels = () => {
+    const next = {};
+    (channels || []).forEach(ch => {
+      next[ch] = (budgetProportions || []).map(v => toNumber(v));
+    });
+    setChannelCommercialSplits(next);
+    toast.info('Applied global commercial split to all channels');
+  };
 
-      const handleChannelCommercialSplitChange = (ch, idx, value) => {
-        setChannelCommercialSplits(prev => {
-          const n = safeOpt.numCommercials ?? 1;
-          const arr = Array.isArray(prev[ch]) ? [...prev[ch]] : Array(n).fill(0);
-          arr[idx] = toNumber(value);
-          return { ...prev, [ch]: arr };
-        });
-      };
+  const handleChannelCommercialSplitChange = (ch, idx, value) => {
+    setChannelCommercialSplits(prev => {
+      const n = safeOpt.numCommercials ?? 1;
+      const arr = Array.isArray(prev[ch]) ? [...prev[ch]] : Array(n).fill(0);
+      arr[idx] = toNumber(value);
+      return { ...prev, [ch]: arr };
+    });
+  };
 
   // channelMoney now supports onCost + comBenefit
-    const channelMoney = useMemo(() => {
-      const map = {};
-      (channels || []).forEach(ch => {
-        const pct = toNumber(budgetShares[ch]);
-        const chAmount = (totalBudget * pct) / 100;
-        const propTotal = hasProperty[ch] ? Math.max(0, toNumber(propertyAmounts[ch])) : 0;
+  const channelMoney = useMemo(() => {
+    const map = {};
+    (channels || []).forEach(ch => {
+      const pct = toNumber(budgetShares[ch]);
+      const chAmount = (totalBudget * pct) / 100;
+      const propTotal = hasProperty[ch] ? Math.max(0, toNumber(propertyAmounts[ch])) : 0;
 
-        const { onCostPct, comBenefitPct } = propertyPercents[ch] || { onCostPct: 20, comBenefitPct: 80 };
-        const onCost = (propTotal * onCostPct) / 100;
-        const comBenefit = (propTotal * comBenefitPct) / 100;
+      const { onCostPct, comBenefitPct } = propertyPercents[ch] || { onCostPct: 20, comBenefitPct: 80 };
+      const onCost = (propTotal * onCostPct) / 100;
+      const comBenefit = (propTotal * comBenefitPct) / 100;
 
-        const available = Math.max(0, chAmount - propTotal);
-        map[ch] = { pct, chAmount, prop: propTotal, onCost, comBenefit, available };
-      });
-      return map;
-    }, [channels, budgetShares, totalBudget, hasProperty, propertyAmounts, propertyPercents]);
+      const available = Math.max(0, chAmount - propTotal);
+      map[ch] = { pct, chAmount, prop: propTotal, onCost, comBenefit, available };
+    });
+    return map;
+  }, [channels, budgetShares, totalBudget, hasProperty, propertyAmounts, propertyPercents]);
 
-    useEffect(() => {
-      if (!initialState) return;
+  useEffect(() => {
+    if (!initialState) return;
 
-      setBudgetShares(initialState.budgetShares || {});
-      setMaxSpots(initialState.maxSpots || 10);
-      setTimeLimit(initialState.timeLimit || 120);
-      setPrimePct(initialState.primePct || 80);
-      setNonPrimePct(initialState.nonPrimePct || 20);
+    setBudgetShares(initialState.budgetShares || {});
+    setMaxSpots(initialState.maxSpots || 10);
+    setTimeLimit(initialState.timeLimit || 120);
+    setPrimePct(initialState.primePct || 80);
+    setNonPrimePct(initialState.nonPrimePct || 20);
 
-      setChannelSplits(initialState.channelSplits || {});
-      setHasProperty(initialState.hasProperty || {});
-      setPropertyAmounts(initialState.propertyAmounts || {});
-      setPropertyPrograms(initialState.propertyPrograms || {});
-      setPropertyPercents(initialState.propertyPercents || {});
-      setBudgetProportions(initialState.budgetProportions || []);
-      setChannelCommercialSplits(initialState.channelCommercialSplits || {});
-      setChannelWeekendMaxSpots(initialState.channelWeekendMaxSpots || {});
-    }, [initialState]);
+    setChannelSplits(initialState.channelSplits || {});
+    setHasProperty(initialState.hasProperty || {});
+    setPropertyAmounts(initialState.propertyAmounts || {});
+    setPropertyPrograms(initialState.propertyPrograms || {});
+    setPropertyPercents(initialState.propertyPercents || {});
+    setBudgetProportions(initialState.budgetProportions || []);
+    setChannelCommercialSplits(initialState.channelCommercialSplits || {});
+    setChannelMaxSpots(initialState.channelMaxSpots || {}); // ⭐ RESTORE THIS
+    setChannelWeekendMaxSpots(initialState.channelWeekendMaxSpots || {});
+  }, [initialState]);
 
   // Pass up channelMoney
   useEffect(() => {
@@ -198,7 +199,8 @@ function ChannelRatingAllocator({
       const diff = target - sum;
       const ok = Math.abs(diff) <= 0.5;
 
-      if (!ok) {issues.push({ channel: ch, target, sum, diff });
+      if (!ok) {
+        issues.push({ channel: ch, target, sum, diff });
       }
     });
     return { ok: issues.length === 0, issues };
@@ -293,7 +295,7 @@ function ChannelRatingAllocator({
   ];
 
   const handleSubmit = () => {
-        // 🔒 Validation based on input mode
+    // 🔒 Validation based on input mode
     if (usePercentageMode) {
       if (Math.abs(enteredPctTotal - 100) > 0.01) {
         alert('Total channel percentage must equal 100%');
@@ -542,7 +544,7 @@ function ChannelRatingAllocator({
           cprpIncl:
             toNumber(data.total_rating) + toNumber(propertyNGRPTotal) > 0
               ? (toNumber(data.total_cost) + toNumber(totalProperty)) /
-                (toNumber(data.total_rating) + toNumber(propertyNGRPTotal))
+              (toNumber(data.total_rating) + toNumber(propertyNGRPTotal))
               : 0
         };
 
@@ -788,7 +790,7 @@ function ChannelRatingAllocator({
 
       <ChannelBudgetSetup
         channels={channels}
-         optimizationInput={safeOpt}
+        optimizationInput={safeOpt}
         // state
         usePercentageMode={usePercentageMode}
         setUsePercentageMode={setUsePercentageMode}
