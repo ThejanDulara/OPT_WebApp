@@ -935,6 +935,7 @@ def optimize_by_benefit_share():
         budget_bound = float(data.get('budget_bound', 0))
         num_commercials = int(data.get('num_commercials', 1))
         channel_max_spots = data.get("channel_max_spots") or {}
+        channel_weekend_max_spots = data.get("channel_weekend_max_spots") or {}
         min_spots = int(data.get('min_spots', 0))
         max_spots = int(data.get('max_spots', 10))
         prime_pct_global = float(data.get('prime_pct', 80))
@@ -973,7 +974,7 @@ def optimize_by_benefit_share():
         if df_full.empty or not budget_shares:
             return jsonify({"error": "Missing data or empty selection"}), 400
 
-        required_cols = {'NCost', 'NTVR', 'Channel', 'Slot'}
+        required_cols = {'NCost', 'NTVR', 'Channel', 'Slot' 'IsWeekend'}
         missing = required_cols - set(df_full.columns)
         if missing:
             return jsonify({"error": f"Missing columns in df_full: {sorted(missing)}"}), 400
@@ -990,15 +991,28 @@ def optimize_by_benefit_share():
 
         for i in df_full.index:
             ch = df_full.loc[i, "Channel"]
+            is_we = int(df_full.loc[i, "IsWeekend"]) == 1
 
+            # Channel cap
             ch_cap = channel_max_spots.get(ch)
-
             try:
                 ch_cap = int(ch_cap)
             except:
                 ch_cap = None
 
-            upper_bound = ch_cap if ch_cap is not None else max_spots
+            # Weekend cap
+            we_cap = channel_weekend_max_spots.get(ch)
+            try:
+                we_cap = int(we_cap)
+            except:
+                we_cap = None
+
+            # Resolve upper bound
+            upper_bound = max_spots
+            if ch_cap is not None:
+                upper_bound = ch_cap
+            if is_we and we_cap is not None:
+                upper_bound = min(upper_bound, we_cap)
 
             x[i] = LpVariable(
                 f"x_ben_{i}",
