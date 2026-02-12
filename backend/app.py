@@ -491,7 +491,7 @@ def update_programs():
         cursor.execute(
             """
             INSERT INTO programs (
-                channel, day, time, program, cost, slot,
+                channel, day, is_weekend, time, program, cost, slot,
                 tvr_all,
                 tvr_abc_15_90,
                 tvr_abc_30_60,
@@ -509,7 +509,7 @@ def update_programs():
                 cargills_rate
             )
             VALUES (
-                %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
                 %s, %s, %s,
@@ -519,6 +519,7 @@ def update_programs():
             (
                 channel,
                 p.get('day'),
+                p.get('is_weekend', 0),
                 p.get('time'),
                 p.get('program'),
                 p.get('cost'),
