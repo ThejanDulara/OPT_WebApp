@@ -128,6 +128,7 @@ def generate_df():
             id,
             channel,
             day,
+            is_weekend, 
             time,
             program,
             cost,
@@ -153,6 +154,7 @@ def generate_df():
         'id':           'Id',
         'channel':      'Channel',
         'day':          'Day',
+        'is_weekend': 'IsWeekend',
         'time':         'Time',
         'program':      'Program',
         'cost':         'Cost',
@@ -167,6 +169,7 @@ def generate_df():
     df['TVR']          = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
     df['NetCost']      = pd.to_numeric(df['NetCost'], errors='coerce')
     df['CargillsRate'] = pd.to_numeric(df['CargillsRate'], errors='coerce')
+    df['IsWeekend'] = ( pd.to_numeric(df['IsWeekend'], errors='coerce').fillna(0).astype(int))
 
     # ---------- 3. Effective Rate Calculation ----------
     def effective_cost(row):
@@ -265,6 +268,7 @@ def generate_bonus_df():
             id,
             channel,
             day,
+            is_weekend, 
             time,
             program,
             cost,
@@ -286,6 +290,7 @@ def generate_bonus_df():
         'id': 'Id',
         'channel': 'Channel',
         'day': 'Day',
+        'is_weekend': 'IsWeekend',
         'time': 'Time',
         'program': 'Program',
         'cost': 'Cost',
@@ -296,6 +301,7 @@ def generate_bonus_df():
     # Ensure numeric types
     df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce').fillna(0.0)
     df['TVR']  = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
+    df['IsWeekend'] = (pd.to_numeric(df['IsWeekend'], errors='coerce').fillna(0).astype(int))
 
     # For bonus: Rate = Raw Cost (no negotiation, no discount)
     df['Negotiated_Rate'] = df['Cost']  # Exact copy — no changes
@@ -612,6 +618,8 @@ def optimize_by_budget_share():
 
     channel_max_spots = data.get("channel_max_spots") or {}
 
+    channel_weekend_max_spots = data.get("channel_weekend_max_spots") or {}
+
     # NEW: per-channel commercial share overrides
     # Expected shape: { "Channel 1": [pct_com1, pct_com2, ...], ... }
     channel_commercial_pct_map = data.get('channel_commercial_pct_map') or {}
@@ -620,7 +628,7 @@ def optimize_by_budget_share():
         return jsonify({"error": "Missing data"}), 400
 
     # Safety: ensure required columns exist
-    required_cols = {'NCost', 'NTVR', 'Channel', 'Slot'}
+    required_cols = {'NCost', 'NTVR', 'Channel', 'Slot' , 'IsWeekend'}
     missing = required_cols - set(df_full.columns)
     if missing:
         return jsonify({"error": f"Missing columns in df_full: {sorted(missing)}"}), 400
@@ -684,6 +692,23 @@ def optimize_by_budget_share():
 
     # Channel-specific budget + PT/NPT + (NEW) per-channel commercial splits
     for ch, pct in budget_shares.items():
+
+        we_cap = channel_weekend_max_spots.get(ch)
+
+        try:
+            we_cap = int(we_cap)
+        except:
+            we_cap = None
+
+        if we_cap is not None:
+            we_indices = df_full[
+                (df_full['Channel'] == ch) &
+                (df_full['IsWeekend'] == 1)
+            ].index
+
+            for i in we_indices:
+                prob += x[i] <= we_cap
+
         ch_indices = df_full[df_full['Channel'] == ch].index
         if len(ch_indices) == 0:
             continue
