@@ -1350,8 +1350,14 @@ def optimize_bonus():
         #x = {i: LpVariable(f"x_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer')
             # for i in df_ch.index}
         # Channel-specific per-program cap
-        we_cap = channel_weekend_max_spots.get(channel)
+        ch_cap = channel_max_spots.get(channel, max_spots)
+        try:
+            ch_cap = int(ch_cap)
+        except:
+            ch_cap = max_spots
 
+        # Weekend-specific cap
+        we_cap = channel_weekend_max_spots.get(channel)
         try:
             we_cap = int(we_cap)
         except:
