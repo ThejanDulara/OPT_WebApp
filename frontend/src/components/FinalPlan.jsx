@@ -1442,7 +1442,7 @@ const propertyGRPTotal = useMemo(() => {
       worksheet.getColumn(3).width = 50;  // value column
 
       worksheet.addImage(logoImageId, {
-        tl: { col: 5, row: 0 },
+        tl: { col: 6, row: 0 },
         ext: {
           width: logoWidth,
           height: logoHeight
