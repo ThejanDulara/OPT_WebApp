@@ -1240,7 +1240,7 @@ def optimize_by_benefit_share():
                 nonprime_cost = b
             else:
                 prime_cost = get_sum(df_ch[df_ch['Slot'].isin(['A', 'A1', 'A2', 'A3', 'A4', 'A5', 'P'])], 'Total_Cost')
-                nonprime_cost = get_sum(df_ch[df_ch['Slot'] == 'B'], 'Total_Rating')
+                nonprime_cost = get_sum(df_ch[df_ch['Slot'] == 'B'], 'Total_Cost')
 
             # Ratings Breakdown
             prime_rating = get_sum(df_ch[df_ch['Slot'] != 'B'], 'Total_Rating')
