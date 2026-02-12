@@ -1324,8 +1324,19 @@ def optimize_bonus():
 
     channel_max_spots = data.get("channel_max_spots") or {}
 
+    channel_weekend_max_spots = data.get("channel_weekend_max_spots") or {}
+
     if df_full.empty:
         return jsonify({"success": False, "message": "⚠️ df_full/programRows is empty"}), 400
+
+    # 🔍 REQUIRED COLUMNS VALIDATION (ADD HERE)
+    required_cols = {'NCost', 'NTVR', 'Channel', 'Commercial', 'IsWeekend'}
+    missing = required_cols - set(df_full.columns)
+    if missing:
+        return jsonify({
+            "success": False,
+            "message": f"Missing columns: {sorted(missing)}"
+        }), 400
 
     results = []
     for channel in df_full['Channel'].unique():
@@ -1339,22 +1350,29 @@ def optimize_bonus():
         #x = {i: LpVariable(f"x_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer')
             # for i in df_ch.index}
         # Channel-specific per-program cap
-        ch_cap = channel_max_spots.get(channel, max_spots)
+        we_cap = channel_weekend_max_spots.get(channel)
 
         try:
-            ch_cap = int(ch_cap)
+            we_cap = int(we_cap)
         except:
-            ch_cap = max_spots
+            we_cap = None
 
-        x = {
-            i: LpVariable(
+        x = {}
+
+        for i in df_ch.index:
+            is_we = int(df_ch.loc[i, "IsWeekend"]) == 1
+
+            ub = ch_cap
+            if is_we and we_cap is not None:
+                ub = min(ch_cap, we_cap)
+
+            x[i] = LpVariable(
                 f"x_{i}",
                 lowBound=min_spots,
-                upBound=ch_cap,  # ✅ use channel-specific cap
+                upBound=ub,
                 cat='Integer'
             )
-            for i in df_ch.index
-        }
+
         # maximise NTVR for this channel
         prob += lpSum(df_ch.loc[i, 'NTVR'] * x[i] for i in df_ch.index)
 
