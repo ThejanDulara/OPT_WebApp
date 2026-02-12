@@ -974,7 +974,7 @@ def optimize_by_benefit_share():
         if df_full.empty or not budget_shares:
             return jsonify({"error": "Missing data or empty selection"}), 400
 
-        required_cols = {'NCost', 'NTVR', 'Channel', 'Slot' 'IsWeekend'}
+        required_cols = {'NCost', 'NTVR', 'Channel', 'Slot' , 'IsWeekend'}
         missing = required_cols - set(df_full.columns)
         if missing:
             return jsonify({"error": f"Missing columns in df_full: {sorted(missing)}"}), 400
