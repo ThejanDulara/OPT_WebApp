@@ -128,6 +128,7 @@ def generate_df():
             id,
             channel,
             day,
+            is_weekend, 
             time,
             program,
             cost,
@@ -153,6 +154,7 @@ def generate_df():
         'id':           'Id',
         'channel':      'Channel',
         'day':          'Day',
+        'is_weekend': 'IsWeekend',
         'time':         'Time',
         'program':      'Program',
         'cost':         'Cost',
@@ -167,6 +169,7 @@ def generate_df():
     df['TVR']          = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
     df['NetCost']      = pd.to_numeric(df['NetCost'], errors='coerce')
     df['CargillsRate'] = pd.to_numeric(df['CargillsRate'], errors='coerce')
+    df['IsWeekend'] = ( pd.to_numeric(df['IsWeekend'], errors='coerce').fillna(0).astype(int))
 
     # ---------- 3. Effective Rate Calculation ----------
     def effective_cost(row):
@@ -265,6 +268,7 @@ def generate_bonus_df():
             id,
             channel,
             day,
+            is_weekend, 
             time,
             program,
             cost,
@@ -286,6 +290,7 @@ def generate_bonus_df():
         'id': 'Id',
         'channel': 'Channel',
         'day': 'Day',
+        'is_weekend': 'IsWeekend',
         'time': 'Time',
         'program': 'Program',
         'cost': 'Cost',
@@ -296,6 +301,7 @@ def generate_bonus_df():
     # Ensure numeric types
     df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce').fillna(0.0)
     df['TVR']  = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
+    df['IsWeekend'] = (pd.to_numeric(df['IsWeekend'], errors='coerce').fillna(0).astype(int))
 
     # For bonus: Rate = Raw Cost (no negotiation, no discount)
     df['Negotiated_Rate'] = df['Cost']  # Exact copy — no changes
@@ -491,7 +497,7 @@ def update_programs():
         cursor.execute(
             """
             INSERT INTO programs (
-                channel, day, time, program, cost, slot,
+                channel, day, is_weekend, time, program, cost, slot,
                 tvr_all,
                 tvr_abc_15_90,
                 tvr_abc_30_60,
@@ -509,7 +515,7 @@ def update_programs():
                 cargills_rate
             )
             VALUES (
-                %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
                 %s, %s, %s,
@@ -519,6 +525,7 @@ def update_programs():
             (
                 channel,
                 p.get('day'),
+                p.get('is_weekend', 0),
                 p.get('time'),
                 p.get('program'),
                 p.get('cost'),
@@ -609,6 +616,10 @@ def optimize_by_budget_share():
     # Optional: global commercial shares (used as defaults)
     budget_proportions = data.get("budget_proportions", []) or []
 
+    channel_max_spots = data.get("channel_max_spots") or {}
+
+    channel_weekend_max_spots = data.get("channel_weekend_max_spots") or {}
+
     # NEW: per-channel commercial share overrides
     # Expected shape: { "Channel 1": [pct_com1, pct_com2, ...], ... }
     channel_commercial_pct_map = data.get('channel_commercial_pct_map') or {}
@@ -617,7 +628,7 @@ def optimize_by_budget_share():
         return jsonify({"error": "Missing data"}), 400
 
     # Safety: ensure required columns exist
-    required_cols = {'NCost', 'NTVR', 'Channel', 'Slot'}
+    required_cols = {'NCost', 'NTVR', 'Channel', 'Slot' , 'IsWeekend'}
     missing = required_cols - set(df_full.columns)
     if missing:
         return jsonify({"error": f"Missing columns in df_full: {sorted(missing)}"}), 400
@@ -628,8 +639,28 @@ def optimize_by_budget_share():
         return jsonify({"error": "Commercial splits provided, but 'Commercial' column missing"}), 400
 
     prob = LpProblem("Maximize_TVR_With_Channel_and_Slot_Budget_Shares", LpMaximize)
-    x = {i: LpVariable(f"x2_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
+    #x = {i: LpVariable(f"x2_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
+    x = {}
 
+    for i in df_full.index:
+        ch = df_full.loc[i, "Channel"]
+
+        # if override exists → use it
+        ch_cap = channel_max_spots.get(ch)
+
+        try:
+            ch_cap = int(ch_cap)
+        except:
+            ch_cap = None
+
+        upper_bound = ch_cap if ch_cap is not None else max_spots
+
+        x[i] = LpVariable(
+            f"x2_{i}",
+            lowBound=min_spots,
+            upBound=upper_bound,
+            cat='Integer'
+        )
     # Objective: maximize NTVR * spots
     prob += lpSum(df_full.loc[i, 'NTVR'] * x[i] for i in df_full.index)
 
@@ -661,6 +692,23 @@ def optimize_by_budget_share():
 
     # Channel-specific budget + PT/NPT + (NEW) per-channel commercial splits
     for ch, pct in budget_shares.items():
+
+        we_cap = channel_weekend_max_spots.get(ch)
+
+        try:
+            we_cap = int(we_cap)
+        except:
+            we_cap = None
+
+        if we_cap is not None:
+            we_indices = df_full[
+                (df_full['Channel'] == ch) &
+                (df_full['IsWeekend'] == 1)
+            ].index
+
+            for i in we_indices:
+                prob += x[i] <= we_cap
+
         ch_indices = df_full[df_full['Channel'] == ch].index
         if len(ch_indices) == 0:
             continue
@@ -886,6 +934,8 @@ def optimize_by_benefit_share():
         total_budget = float(data.get('budget', 0))
         budget_bound = float(data.get('budget_bound', 0))
         num_commercials = int(data.get('num_commercials', 1))
+        channel_max_spots = data.get("channel_max_spots") or {}
+        channel_weekend_max_spots = data.get("channel_weekend_max_spots") or {}
         min_spots = int(data.get('min_spots', 0))
         max_spots = int(data.get('max_spots', 10))
         prime_pct_global = float(data.get('prime_pct', 80))
@@ -924,7 +974,7 @@ def optimize_by_benefit_share():
         if df_full.empty or not budget_shares:
             return jsonify({"error": "Missing data or empty selection"}), 400
 
-        required_cols = {'NCost', 'NTVR', 'Channel', 'Slot'}
+        required_cols = {'NCost', 'NTVR', 'Channel', 'Slot' , 'IsWeekend'}
         missing = required_cols - set(df_full.columns)
         if missing:
             return jsonify({"error": f"Missing columns in df_full: {sorted(missing)}"}), 400
@@ -936,7 +986,40 @@ def optimize_by_benefit_share():
         prob = LpProblem("Maximize_TVR_CommercialBenefit", LpMaximize)
 
         # Variables: Integer spots per row
-        x = {i: LpVariable(f"x_ben_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
+        #x = {i: LpVariable(f"x_ben_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
+        x = {}
+
+        for i in df_full.index:
+            ch = df_full.loc[i, "Channel"]
+            is_we = int(df_full.loc[i, "IsWeekend"]) == 1
+
+            # Channel cap
+            ch_cap = channel_max_spots.get(ch)
+            try:
+                ch_cap = int(ch_cap)
+            except:
+                ch_cap = None
+
+            # Weekend cap
+            we_cap = channel_weekend_max_spots.get(ch)
+            try:
+                we_cap = int(we_cap)
+            except:
+                we_cap = None
+
+            # Resolve upper bound
+            upper_bound = max_spots
+            if ch_cap is not None:
+                upper_bound = ch_cap
+            if is_we and we_cap is not None:
+                upper_bound = min(upper_bound, we_cap)
+
+            x[i] = LpVariable(
+                f"x_ben_{i}",
+                lowBound=min_spots,
+                upBound=upper_bound,
+                cat='Integer'
+            )
 
         # Objective: Maximize Total NTVR (Rating)
         prob += lpSum(df_full.loc[i, 'NTVR'] * x[i] for i in df_full.index)
@@ -1157,7 +1240,7 @@ def optimize_by_benefit_share():
                 nonprime_cost = b
             else:
                 prime_cost = get_sum(df_ch[df_ch['Slot'].isin(['A', 'A1', 'A2', 'A3', 'A4', 'A5', 'P'])], 'Total_Cost')
-                nonprime_cost = get_sum(df_ch[df_ch['Slot'] == 'B'], 'Total_Rating')
+                nonprime_cost = get_sum(df_ch[df_ch['Slot'] == 'B'], 'Total_Cost')
 
             # Ratings Breakdown
             prime_rating = get_sum(df_ch[df_ch['Slot'] != 'B'], 'Total_Rating')
@@ -1220,7 +1303,6 @@ def optimize_by_benefit_share():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-
 @app.route('/optimize-bonus', methods=['POST'])
 def optimize_bonus():
     data = request.get_json()
@@ -1240,8 +1322,21 @@ def optimize_bonus():
     max_spots = data.get('max_spots') or data.get('maxSpots', 20)
     time_limit = data.get('time_limit') or data.get('timeLimitSec', 120)
 
+    channel_max_spots = data.get("channel_max_spots") or {}
+
+    channel_weekend_max_spots = data.get("channel_weekend_max_spots") or {}
+
     if df_full.empty:
         return jsonify({"success": False, "message": "⚠️ df_full/programRows is empty"}), 400
+
+    # 🔍 REQUIRED COLUMNS VALIDATION (ADD HERE)
+    required_cols = {'NCost', 'NTVR', 'Channel', 'Commercial', 'IsWeekend'}
+    missing = required_cols - set(df_full.columns)
+    if missing:
+        return jsonify({
+            "success": False,
+            "message": f"Missing columns: {sorted(missing)}"
+        }), 400
 
     results = []
     for channel in df_full['Channel'].unique():
@@ -1252,8 +1347,37 @@ def optimize_bonus():
 
         # set up an LP for this channel
         prob = LpProblem(f"Maximize_NTVR_{channel}", LpMaximize)
-        x = {i: LpVariable(f"x_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer')
-             for i in df_ch.index}
+        #x = {i: LpVariable(f"x_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer')
+            # for i in df_ch.index}
+        # Channel-specific per-program cap
+        ch_cap = channel_max_spots.get(channel, max_spots)
+        try:
+            ch_cap = int(ch_cap)
+        except:
+            ch_cap = max_spots
+
+        # Weekend-specific cap
+        we_cap = channel_weekend_max_spots.get(channel)
+        try:
+            we_cap = int(we_cap)
+        except:
+            we_cap = None
+
+        x = {}
+
+        for i in df_ch.index:
+            is_we = int(df_ch.loc[i, "IsWeekend"]) == 1
+
+            ub = ch_cap
+            if is_we and we_cap is not None:
+                ub = min(ch_cap, we_cap)
+
+            x[i] = LpVariable(
+                f"x_{i}",
+                lowBound=min_spots,
+                upBound=ub,
+                cat='Integer'
+            )
 
         # maximise NTVR for this channel
         prob += lpSum(df_ch.loc[i, 'NTVR'] * x[i] for i in df_ch.index)
@@ -1351,8 +1475,6 @@ def optimize_bonus():
             ]
         }
     })
-
-
 
 @app.route('/save-plan', methods=['POST'])
 def save_plan():
