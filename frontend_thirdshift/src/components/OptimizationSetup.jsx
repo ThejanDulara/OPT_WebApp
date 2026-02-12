@@ -302,15 +302,7 @@ function OptimizationSetup({ onSubmit, onBack, initialValues }) {
         {/* Spot Limits */}
         <div style={enhancedStyles.sectionContainer}>
           <h3 style={enhancedStyles.sectionTitle}>Spot Limits</h3>
-          <div style={enhancedStyles.formGroup}>
-            <label style={enhancedStyles.label}>Minimum Spots per Program:</label>
-            <input
-              type="number"
-              value={minSpots}
-              onChange={e => setMinSpots(e.target.value)}
-              style={enhancedStyles.input}
-            />
-          </div>
+
           <div style={enhancedStyles.formGroup}>
             <label style={enhancedStyles.label}>Maximum Spots per Program:</label>
             <input
