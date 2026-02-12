@@ -11,6 +11,8 @@ export default function BonusDfPreview({
   bonusCommercialPercentsByChannel = {},
   commercialDurationsByChannel = {},
   maxSpots = 20,
+  channelMaxSpots = {},
+  channelWeekendMaxSpots = {},
   // 🔽 new optional knobs (safe defaults)
   channelAllowPctByChannel = {},     // e.g. { DERANA: 0.10, SIRASA: 0.10 }
   defaultChannelAllowPct = 0.10,     // ±10% if not provided per channel
@@ -137,6 +139,7 @@ export default function BonusDfPreview({
             Channel: ch,
             Program: raw.Program ?? raw.PROGRAM ?? '',
             Day: raw.Day ?? raw.Date ?? '',
+            IsWeekend: raw.IsWeekend ?? raw.is_weekend ?? raw.isWeekend ?? 0,
             Time: raw.Time ?? raw.Start_Time ?? raw.StartTime ?? '',
             Slot: 'B',
             Commercial: ck,
@@ -249,6 +252,8 @@ export default function BonusDfPreview({
         defaultChannelAllowPct,
         timeLimitSec,
         maxSpots,
+        channel_max_spots: channelMaxSpots,
+        channel_weekend_max_spots: channelWeekendMaxSpots,
         commercialTolerancePct,
       };
 

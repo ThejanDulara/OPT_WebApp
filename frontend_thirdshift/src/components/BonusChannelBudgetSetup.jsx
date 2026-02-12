@@ -61,6 +61,22 @@ export default function BonusChannelBudgetSetup({
     10
   );
 
+    const [channelMaxSpots, setChannelMaxSpots] = useState(
+      initialState?.channelMaxSpots ??
+      channels.reduce((acc, ch) => {
+        acc[ch] = optimizationInput?.maxSpots ?? 10;  // default = global
+        return acc;
+      }, {})
+    );
+
+    const [channelWeekendMaxSpots, setChannelWeekendMaxSpots] = useState(
+      initialState?.channelWeekendMaxSpots ??
+      channels.reduce((acc, ch) => {
+        acc[ch] = initialState?.channelMaxSpots?.[ch] ?? optimizationInput?.maxSpots ?? 10;
+        return acc;
+      }, {})
+    );
+
   // Time limit
   const [timeLimit, setTimeLimit] = useState(
     initialState?.timeLimit ??
@@ -228,7 +244,9 @@ export default function BonusChannelBudgetSetup({
       maxSpots,
       timeLimit,
       bonusPctByChannel,
-      channelBounds
+      channelBounds,
+      channelMaxSpots,
+      channelWeekendMaxSpots
     });
 
     // assemble payload for next pages
@@ -238,6 +256,8 @@ export default function BonusChannelBudgetSetup({
       budgetProportions: budgetProportions.map(num),
       maxSpots: parseInt(maxSpots, 10),
       timeLimit: parseInt(timeLimit, 10),
+      channel_max_spots: channelMaxSpots,
+      channel_weekend_max_spots: channelWeekendMaxSpots,
 
       // bonus specifics
       bonusPctByChannel,
@@ -479,6 +499,40 @@ export default function BonusChannelBudgetSetup({
                     style={{ ...styles.input, width: 140 }}
                   />
                 </div>
+
+                <div style={styles.row}>
+                  <span style={styles.label}>Max Spots per Program:</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={channelMaxSpots[ch] ?? maxSpots}
+                    onChange={(e) =>
+                      setChannelMaxSpots(prev => ({
+                        ...prev,
+                        [ch]: parseInt(e.target.value)
+                      }))
+                    }
+                    style={{ ...styles.input, width: 120 }}
+                  />
+                </div>
+
+                <div style={styles.row}>
+                  <span style={styles.label}>Max Spots (WE Program):</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={channelWeekendMaxSpots[ch] ?? channelMaxSpots[ch] ?? maxSpots}
+                    onChange={(e) =>
+                      setChannelWeekendMaxSpots(prev => ({
+                        ...prev,
+                        [ch]: parseInt(e.target.value)
+                      }))
+                    }
+                    style={{ ...styles.input, width: 120 }}
+                  />
+                  <span style={styles.smallNote}>Weekend only</span>
+                </div>
+
               </div>
             );
           })}

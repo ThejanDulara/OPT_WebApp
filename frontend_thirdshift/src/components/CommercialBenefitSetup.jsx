@@ -40,6 +40,15 @@ export default function CommercialBenefitSetup({
       return seed;
     });
 
+
+    const [channelMaxSpots, setChannelMaxSpots] = useState(
+      safeInit.channelMaxSpots ?? {}
+    );
+
+    const [channelWeekendMaxSpots, setChannelWeekendMaxSpots] = useState(
+      safeInit.channelWeekendMaxSpots ?? {}
+    );
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [stopRequested, setStopRequested] = useState(false);
 
@@ -271,6 +280,8 @@ export default function CommercialBenefitSetup({
       num_commercials: optimizationInput?.numCommercials || 1,
       min_spots: optimizationInput?.minSpots || 0,
       max_spots: maxSpots,
+      channel_max_spots: channelMaxSpots,
+      channel_weekend_max_spots: channelWeekendMaxSpots,
       time_limit: timeLimit,
       prime_pct: primePct,
       nonprime_pct: nonPrimePct,
@@ -288,7 +299,9 @@ export default function CommercialBenefitSetup({
         timeLimit,
         budgetProportions,
         channelSplits,
-        channelCommercialSplits
+        channelCommercialSplits,
+        channelMaxSpots,
+        channelWeekendMaxSpots
       });
     }
 
@@ -393,6 +406,59 @@ export default function CommercialBenefitSetup({
 
               <div style={styles.amountBox}><strong>Channel Budget:</strong> {formatLKR(chAmount)}</div>
               <div style={styles.amountBox}><strong>Commercial Benefit:</strong> {formatLKR(comBenefit)}</div>
+
+                <div style={styles.splitWrap}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <span style={{ ...styles.label, minWidth: 140 }}>
+                      Max Spots (Channel):
+                    </span>
+
+                    <input
+                      type="number"
+                      min="1"
+                      value={channelMaxSpots?.[ch] ?? maxSpots}
+                      onChange={e =>
+                        setChannelMaxSpots(prev => ({
+                          ...prev,
+                          [ch]: parseInt(e.target.value)
+                        }))
+                      }
+                      style={{ ...styles.numberInput, width: 70 }}
+                    />
+
+                    <span style={{ fontSize: 12, color:'#64748b' }}>
+                    </span>
+                  </div>
+
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:6 }}>
+                      <span style={{ ...styles.label, minWidth: 140 }}>
+                        Max Spots (WE Program):
+                      </span>
+
+                      <input
+                        type="number"
+                        min="1"
+                        value={
+                          channelWeekendMaxSpots?.[ch] ??
+                          channelMaxSpots?.[ch] ??
+                          maxSpots
+                        }
+                        onChange={e =>
+                          setChannelWeekendMaxSpots(prev => ({
+                            ...prev,
+                            [ch]: parseInt(e.target.value)
+                          }))
+                        }
+                        style={{ ...styles.numberInput, width: 70 }}
+                      />
+
+                      <span style={{ fontSize: 12, color:'#64748b' }}>
+                        Weekend only
+                      </span>
+                    </div>
+
+
+                </div>
 
               <div style={styles.splitWrap}>
                 {!isHiru ? (

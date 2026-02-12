@@ -25,6 +25,8 @@ function ChannelRatingAllocator({
   const [timeLimit, setTimeLimit] = useState(safeOpt.timeLimit ?? 120);
   const [primePct, setPrimePct] = useState(80);
   const [nonPrimePct, setNonPrimePct] = useState(20);
+  const [channelMaxSpots, setChannelMaxSpots] = useState({});
+  const [channelWeekendMaxSpots, setChannelWeekendMaxSpots] = useState({});
   const [result, setResult] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [stopRequested, setStopRequested] = useState(false);
@@ -163,6 +165,7 @@ function ChannelRatingAllocator({
       setPropertyPercents(initialState.propertyPercents || {});
       setBudgetProportions(initialState.budgetProportions || []);
       setChannelCommercialSplits(initialState.channelCommercialSplits || {});
+      setChannelWeekendMaxSpots(initialState.channelWeekendMaxSpots || {});
     }, [initialState]);
 
   // Pass up channelMoney
@@ -460,6 +463,8 @@ function ChannelRatingAllocator({
       num_commercials: safeOpt.numCommercials,
       min_spots: safeOpt.minSpots,
       max_spots: maxSpots,
+      channel_max_spots: channelMaxSpots,
+      channel_weekend_max_spots: channelWeekendMaxSpots,
       time_limit: timeLimit,
       prime_pct: primePct,
       nonprime_pct: nonPrimePct,
@@ -482,7 +487,9 @@ function ChannelRatingAllocator({
         propertyPrograms,
         propertyPercents,
         budgetProportions,
-        channelCommercialSplits
+        channelCommercialSplits,
+        channelMaxSpots,
+        channelWeekendMaxSpots
       });
     }
 
@@ -829,6 +836,10 @@ function ChannelRatingAllocator({
         handleChannelCommercialSplitChange={handleChannelCommercialSplitChange}
         perChannelCommercialErrors={perChannelCommercialErrors}
         applyGlobalCommercialsToAllChannels={applyGlobalCommercialsToAllChannels}
+        channelMaxSpots={channelMaxSpots}
+        setChannelMaxSpots={setChannelMaxSpots}
+        channelWeekendMaxSpots={channelWeekendMaxSpots}
+        setChannelWeekendMaxSpots={setChannelWeekendMaxSpots}
 
       />
     </div>

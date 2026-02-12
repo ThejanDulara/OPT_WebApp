@@ -34,8 +34,11 @@ export default function ChannelBudgetSetup({
   // NEW: per-channel commercial splits
   channelCommercialSplits, handleChannelCommercialSplitChange,
   perChannelCommercialErrors,
-  applyGlobalCommercialsToAllChannels
-
+  applyGlobalCommercialsToAllChannels,
+  channelMaxSpots,
+  setChannelMaxSpots,
+  channelWeekendMaxSpots,
+  setChannelWeekendMaxSpots
 })
 
 {
@@ -306,7 +309,7 @@ export default function ChannelBudgetSetup({
       channelMoneyMap[ch] = { chAmount, prop: propTotal, onCost, comBenefit, available };
     });
 
-    const payload = { channelMoney: channelMoneyMap };
+    const payload = { channelMoney: channelMoneyMap,channel_max_spots: channelMaxSpots , channel_weekend_max_spots: channelWeekendMaxSpots};
     console.log('Final payload being sent:', payload);
     onSubmit && onSubmit(payload);
   };
@@ -518,6 +521,55 @@ export default function ChannelBudgetSetup({
                       </div>
                     )}
                   </div>
+
+                    <div style={enhancedStyles.splitContainer}>
+                      <div style={enhancedStyles.inputRow}>
+                        <span style={{ ...styles.label, minWidth: '120px' }}>
+                          Max Spots (Channel):
+                        </span>
+
+                        <input
+                          type="number"
+                          min="1"
+                          value={channelMaxSpots?.[ch] ?? maxSpots}
+                          onChange={e =>
+                            setChannelMaxSpots(prev => ({
+                              ...prev,
+                              [ch]: parseInt(e.target.value)
+                            }))
+                          }
+                          style={{ ...styles.numberInput, width: '80px' }}
+                        />
+
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>
+                        </span>
+                      </div>
+                      <div style={enhancedStyles.inputRow}>
+                      <span style={{ ...styles.label, minWidth: '120px' }}>
+                        Max Spots (WE Program):
+                      </span>
+
+                      <input
+                        type="number"
+                        min="1"
+                        value={channelWeekendMaxSpots?.[ch] ?? channelMaxSpots?.[ch] ?? maxSpots}
+                        onChange={e =>
+                          setChannelWeekendMaxSpots(prev => ({
+                            ...prev,
+                            [ch]: parseInt(e.target.value)
+                          }))
+                        }
+                        style={{ ...styles.numberInput, width: '80px' }}
+                      />
+
+                      <span style={{ fontSize: '12px', color: '#64748b' }}>
+                        Weekend only
+                      </span>
+                    </div>
+
+                    </div>
+
+
 
                   {Number(optimizationInput?.numCommercials) > 1 && (
                       <div style={enhancedStyles.splitContainer}>

@@ -195,6 +195,7 @@ function ProgramUpdater({ onBack }) {
       return `${formatTime12Hour(start)} – ${formatTime12Hour(end)}`;
     };
 
+
     const parseTime12To24 = (time12) => {
       if (!time12) return '';
 
@@ -238,6 +239,9 @@ function ProgramUpdater({ onBack }) {
         end: '',
       };
     };
+
+
+
 
   const isSpecialChannel = SPECIAL_CHANNELS.includes(selectedChannel);
   const isDeranaTV = selectedChannel === "DERANA TV";
@@ -356,6 +360,7 @@ function ProgramUpdater({ onBack }) {
               <tr>
                 <th style={styles.tableHeader}>#</th>
                 <th style={{ ...styles.tableHeader, ...styles.columnWidths[0] }}>Day</th>
+                <th style={styles.tableHeader}>Is WE</th>
                 <th style={{ ...styles.tableHeader, ...styles.columnWidths[1] }}>Time</th>
                 <th style={{ ...styles.tableHeader, ...styles.columnWidths[2] }}>Program</th>
                 <th style={{ ...styles.tableHeader, ...styles.columnWidths[3] }}>Rate Card (30 Sec)</th>
@@ -392,6 +397,24 @@ function ProgramUpdater({ onBack }) {
                   <td style={styles.tableCell}>
                     <input type="text" value={p.day || ''} onChange={(e) => handleProgramChange(p.originalIndex, 'day', e.target.value)} style={styles.inputCell}/>
                   </td>
+
+                    <td style={styles.centerAlignedCell}>
+                      <input
+                        type="number"
+                        min={0}
+                        max={1}
+                        step={1}
+                        value={p.is_weekend ?? 0}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? 0 : Number(e.target.value);
+                          if (val === 0 || val === 1) {
+                            handleProgramChange(p.originalIndex, 'is_weekend', val);
+                          }
+                        }}
+                        style={{ ...styles.inputCell, textAlign: 'center', width: '60px' }}
+                      />
+                    </td>
+
                     <td style={styles.tableCell}>
                       {(() => {
                         const { start, end } = splitTimeRange(p.time);
@@ -423,6 +446,7 @@ function ProgramUpdater({ onBack }) {
                         );
                       })()}
                     </td>
+
                   <td style={styles.tableCell}>
                     <input type="text" value={p.program} onChange={(e) => handleProgramChange(p.originalIndex, 'program', e.target.value)} style={styles.inputCell}/>
                   </td>

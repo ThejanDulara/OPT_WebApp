@@ -468,6 +468,8 @@ function App() {
                 channels={channels}
                 selectedBonusPrograms={selectedBonusPrograms}
                 bonusBudgetsByChannel={bonusSharesInput?.bonusBudget || {}}
+                channelMaxSpots={bonusSharesInput?.channel_max_spots || {}}
+                channelWeekendMaxSpots={bonusSharesInput?.channel_weekend_max_spots || {}}
                 // NEW CORRECTED CODE IN App.js
                 bonusCommercialPercentsByChannel={
                   // If we have specific per-channel overrides, use them!
