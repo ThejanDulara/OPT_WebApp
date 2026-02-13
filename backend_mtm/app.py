@@ -76,14 +76,15 @@ def get_programs():
 def generate_df():
     data = request.get_json()
 
-    program_ids       = data.get('program_ids', [])
-    tg                = data.get("target_group", "tvr_all")
-    num_commercials   = data.get('num_commercials')
-    durations         = data.get('durations')
+    program_ids = data.get('program_ids', [])
+    tg = data.get("target_group", "tvr_all")
+    num_commercials = data.get('num_commercials')
+    durations = data.get('durations')
 
-    negotiated_rates  = data.get('negotiated_rates', {})   # { programId: value }
+    negotiated_rates = data.get('negotiated_rates', {})  # { programId: value }
     channel_discounts = data.get('channel_discounts', {})  # { channel: pct }
-    selected_client   = data.get('selected_client', "Other")  # NEW
+    selected_client = data.get('selected_client', "Other")  # NEW
+    manual_override = data.get('manual_override', {})  # { programId: boolean } - NEW
 
     # ----- Allowed TG Values -----
     ALLOWED_TGS = [
@@ -109,7 +110,7 @@ def generate_df():
         return jsonify({"error": "Missing required data"}), 400
 
     # ----- Special Logic Constants -----
-    CARGILLS_CLIENT  = "Cargills"
+    CARGILLS_CLIENT = "Cargills"
     CARGILLS_CHANNEL = "DERANA TV"
     SPECIAL_CHANNELS = {
         "SHAKTHI TV",
@@ -151,41 +152,45 @@ def generate_df():
     df = pd.DataFrame(rows)
 
     df.rename(columns={
-        'id':           'Id',
-        'channel':      'Channel',
-        'day':          'Day',
+        'id': 'Id',
+        'channel': 'Channel',
+        'day': 'Day',
         'is_weekend': 'IsWeekend',
-        'time':         'Time',
-        'program':      'Program',
-        'cost':         'Cost',
-        'tvr':          'TVR',
-        'slot':         'Slot',
-        'net_cost':     'NetCost',
-        'cargills_rate':'CargillsRate',
+        'time': 'Time',
+        'program': 'Program',
+        'cost': 'Cost',
+        'tvr': 'TVR',
+        'slot': 'Slot',
+        'net_cost': 'NetCost',
+        'cargills_rate': 'CargillsRate',
     }, inplace=True)
 
     # Ensure numeric
-    df['Cost']         = pd.to_numeric(df['Cost'], errors='coerce').fillna(0.0)
-    df['TVR']          = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
-    df['NetCost']      = pd.to_numeric(df['NetCost'], errors='coerce')
+    df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce').fillna(0.0)
+    df['TVR'] = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
+    df['NetCost'] = pd.to_numeric(df['NetCost'], errors='coerce')
     df['CargillsRate'] = pd.to_numeric(df['CargillsRate'], errors='coerce')
-    df['IsWeekend'] = ( pd.to_numeric(df['IsWeekend'], errors='coerce').fillna(0).astype(int))
+    df['IsWeekend'] = (pd.to_numeric(df['IsWeekend'], errors='coerce').fillna(0).astype(int))
 
     # ---------- 3. Effective Rate Calculation ----------
     def effective_cost(row):
         pid = row['Id']
-        ch  = row['Channel']
+        str_pid = str(pid)  # Ensure string for JSON key lookup
+        ch = row['Channel']
         base_cost = float(row['Cost'])
 
-        # 1) Explicit override from front-end ALWAYS takes priority
-        if pid in negotiated_rates and negotiated_rates[pid] is not None:
-            return float(negotiated_rates[pid])
+        # 1) If Manually Overridden: use the frontend value
+        # We check manual_override map first.
+        if manual_override.get(str_pid):
+            val = negotiated_rates.get(str_pid)
+            if val is not None:
+                return float(val)
 
         # 2) NEW: Cargills special rate for DERANA TV
         if (
-            selected_client == CARGILLS_CLIENT
-            and ch == CARGILLS_CHANNEL
-            and pd.notna(row['CargillsRate'])
+                selected_client == CARGILLS_CLIENT
+                and ch == CARGILLS_CHANNEL
+                and pd.notna(row['CargillsRate'])
         ):
             return float(row['CargillsRate'])
 
@@ -194,6 +199,15 @@ def generate_df():
             if pd.notna(row['NetCost']):
                 return float(row['NetCost'])
             return base_cost  # fallback if net_cost is null
+
+        # 4) Fallback to frontend negotiated_rates if available (e.g. calculated there)
+        #    BUT only if we haven't hit the special logic above?
+        #    Actually frontend sends everything.
+        #    However, to be safe and respect backend logic for "freshness" if not overridden:
+        #    if NOT overridden, we should prefer backend calculation logic (discount)
+        #    unless frontend logic is the source of truth?
+        #    User requirement: "if user overide ... use that ... no need to reset"
+        #    Implies if NOT overridden, use standard logic.
 
         # 4) Normal channel → apply discount
         disc_pct = float(channel_discounts.get(ch, 30.0))
@@ -208,7 +222,7 @@ def generate_df():
         temp['Commercial'] = c
         duration = float(durations[c])
 
-        temp['NTVR']  = (temp['TVR'] / 30.0) * duration
+        temp['NTVR'] = (temp['TVR'] / 30.0) * duration
         temp['NCost'] = (temp['Negotiated_Rate'] / 30.0) * duration
 
         df_list.append(temp)
@@ -225,8 +239,6 @@ def generate_df():
         )
 
     return jsonify({"df_full": json.loads(df_full.to_json(orient='records'))})
-
-
 
 
 @app.route('/generate-bonus-df', methods=['POST'])
