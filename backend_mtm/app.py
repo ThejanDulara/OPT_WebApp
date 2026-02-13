@@ -2,8 +2,8 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import mysql.connector
 import pandas as pd
-#import pulp
-from pulp import LpProblem, LpMaximize, LpVariable, lpSum, PULP_CBC_CMD,LpInteger
+# import pulp
+from pulp import LpProblem, LpMaximize, LpVariable, lpSum, PULP_CBC_CMD, LpInteger
 from pulp import LpStatus
 import os
 import json
@@ -27,6 +27,7 @@ def get_db_connection():
         database=os.environ.get("DB_NAME", "optimization"),
         autocommit=True
     )
+
 
 # === Routes ===
 
@@ -312,7 +313,7 @@ def generate_bonus_df():
 
     # Ensure numeric types
     df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce').fillna(0.0)
-    df['TVR']  = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
+    df['TVR'] = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
     df['IsWeekend'] = (pd.to_numeric(df['IsWeekend'], errors='coerce').fillna(0).astype(int))
 
     # For bonus: Rate = Raw Cost (no negotiation, no discount)
@@ -327,8 +328,8 @@ def generate_bonus_df():
         temp['Duration'] = dur
 
         # Scale TVR and Cost by duration (from 30-sec base)
-        temp['NTVR']  = (temp['TVR'] / 30.0) * dur
-        temp['NCost'] = (temp['Cost'] / 30.0) * dur   # Uses raw Cost → no discount
+        temp['NTVR'] = (temp['TVR'] / 30.0) * dur
+        temp['NCost'] = (temp['Cost'] / 30.0) * dur  # Uses raw Cost → no discount
         temp['Slot'] = 'B'
 
         df_list.append(temp)
@@ -422,7 +423,7 @@ def run_optimization():
             "total_cost": round(total_cost_c, 2),
             "total_rating": round(total_rating_c, 2),
             "cprp": round(cprp_c, 2) if cprp_c else None,
-            #"details": df_c.to_dict(orient='records')
+            # "details": df_c.to_dict(orient='records')
             "details": details_safe
         })
 
@@ -566,6 +567,7 @@ def update_programs():
     conn.close()
     return jsonify({'message': 'Programs updated'})
 
+
 @app.route('/export-all-programs', methods=['GET'])
 def export_all_programs():
     conn = get_db_connection()
@@ -587,6 +589,7 @@ def export_all_programs():
         download_name="all_programs.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
 
 @app.route('/delete-program', methods=['POST'])
 def delete_program():
@@ -640,7 +643,7 @@ def optimize_by_budget_share():
         return jsonify({"error": "Missing data"}), 400
 
     # Safety: ensure required columns exist
-    required_cols = {'NCost', 'NTVR', 'Channel', 'Slot' , 'IsWeekend'}
+    required_cols = {'NCost', 'NTVR', 'Channel', 'Slot', 'IsWeekend'}
     missing = required_cols - set(df_full.columns)
     if missing:
         return jsonify({"error": f"Missing columns in df_full: {sorted(missing)}"}), 400
@@ -651,7 +654,7 @@ def optimize_by_budget_share():
         return jsonify({"error": "Commercial splits provided, but 'Commercial' column missing"}), 400
 
     prob = LpProblem("Maximize_TVR_With_Channel_and_Slot_Budget_Shares", LpMaximize)
-    #x = {i: LpVariable(f"x2_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
+    # x = {i: LpVariable(f"x2_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
     x = {}
 
     for i in df_full.index:
@@ -689,7 +692,8 @@ def optimize_by_budget_share():
     #   - Else (fallback): keep the existing global overall-plan commercial constraints (±5%).
     # ------------------------------------------------------------
 
-    has_channel_commercial_overrides = isinstance(channel_commercial_pct_map, dict) and len(channel_commercial_pct_map) > 0
+    has_channel_commercial_overrides = isinstance(channel_commercial_pct_map, dict) and len(
+        channel_commercial_pct_map) > 0
 
     if (num_commercials > 1) and (not has_channel_commercial_overrides) and budget_proportions:
         # Existing behavior: overall-plan constraints (±5% tolerance)
@@ -716,7 +720,7 @@ def optimize_by_budget_share():
             we_indices = df_full[
                 (df_full['Channel'] == ch) &
                 (df_full['IsWeekend'] == 1)
-            ].index
+                ].index
 
             for i in we_indices:
                 prob += x[i] <= we_cap
@@ -986,7 +990,7 @@ def optimize_by_benefit_share():
         if df_full.empty or not budget_shares:
             return jsonify({"error": "Missing data or empty selection"}), 400
 
-        required_cols = {'NCost', 'NTVR', 'Channel', 'Slot' , 'IsWeekend'}
+        required_cols = {'NCost', 'NTVR', 'Channel', 'Slot', 'IsWeekend'}
         missing = required_cols - set(df_full.columns)
         if missing:
             return jsonify({"error": f"Missing columns in df_full: {sorted(missing)}"}), 400
@@ -998,7 +1002,7 @@ def optimize_by_benefit_share():
         prob = LpProblem("Maximize_TVR_CommercialBenefit", LpMaximize)
 
         # Variables: Integer spots per row
-        #x = {i: LpVariable(f"x_ben_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
+        # x = {i: LpVariable(f"x_ben_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
         x = {}
 
         for i in df_full.index:
@@ -1359,8 +1363,8 @@ def optimize_bonus():
 
         # set up an LP for this channel
         prob = LpProblem(f"Maximize_NTVR_{channel}", LpMaximize)
-        #x = {i: LpVariable(f"x_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer')
-            # for i in df_ch.index}
+        # x = {i: LpVariable(f"x_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer')
+        # for i in df_ch.index}
         # Channel-specific per-program cap
         ch_cap = channel_max_spots.get(channel, max_spots)
         try:
@@ -1488,6 +1492,7 @@ def optimize_bonus():
         }
     })
 
+
 @app.route('/save-plan', methods=['POST'])
 def save_plan():
     """
@@ -1523,7 +1528,7 @@ def save_plan():
     client_name = metadata.get("client_name")
     brand_name = metadata.get("brand_name")
     activation_from = metadata.get("activation_from")  # 'YYYY-MM-DD'
-    activation_to = metadata.get("activation_to")      # 'YYYY-MM-DD'
+    activation_to = metadata.get("activation_to")  # 'YYYY-MM-DD'
     campaign = metadata.get("campaign")
     tv_budget = metadata.get("tv_budget")
 
@@ -1696,6 +1701,7 @@ def get_plan(plan_id):
         "session_data": parsed.get("session_data") or {}
     }), 200
 
+
 @app.route('/delete-plan/<int:plan_id>', methods=['DELETE'])
 def delete_plan(plan_id):
     payload = request.get_json(silent=True) or {}
@@ -1736,9 +1742,145 @@ def delete_plan(plan_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-#4
+# --- PLAN SUMMARIES (NEW) ---
+
+@app.route('/save-plan-summary', methods=['POST'])
+def save_plan_summary():
+    data = request.get_json()
+    user_id = str(data.get('user_id', ''))
+    user_first_name = data.get('user_first_name')
+    user_last_name = data.get('user_last_name')
+    client = data.get('client')
+    brand = data.get('brand')
+    activation_period = data.get('activation_period')
+    medium = data.get('medium', 'TV')
+    channel_summaries = data.get('channel_summaries', [])
+
+    if not channel_summaries:
+        return jsonify({"success": False, "error": "No channel summaries provided"}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        values = []
+        for ch_data in channel_summaries:
+            values.append((
+                user_id,
+                user_first_name,
+                user_last_name,
+                activation_period,
+                client,
+                brand,
+                medium,
+                ch_data.get('channel'),
+                ch_data.get('budget')
+            ))
+
+        stmt = """
+            INSERT INTO plan_summaries 
+            (user_id, user_first_name, user_last_name, activation_period, client, brand, medium, channel, budget)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        cursor.executemany(stmt, values)
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "Summaries saved"}), 200
+    except Exception as e:
+        conn.close()
+        print("Error saving plan summary:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/plan-summaries', methods=['GET'])
+def get_plan_summaries():
+    user_id = request.args.get("user_id")
+    # 'true' from JS boolean or '1'
+    is_admin = request.args.get("is_admin") in ["1", "true", "True"]
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        if is_admin:
+            cursor.execute("SELECT * FROM plan_summaries ORDER BY created_at DESC")
+        else:
+            cursor.execute("SELECT * FROM plan_summaries WHERE user_id = %s ORDER BY created_at DESC", (str(user_id),))
+
+        rows = cursor.fetchall()
+
+        # Convert decimals to float for JSON
+        for row in rows:
+            if 'budget' in row and row['budget'] is not None:
+                row['budget'] = float(row['budget'])
+            if 'created_at' in row and row['created_at'] is not None:
+                row['created_at'] = str(row['created_at'])
+
+        conn.close()
+        return jsonify({"success": True, "summaries": rows}), 200
+    except Exception as e:
+        conn.close()
+        print("Error fetching plan summaries:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/plan-summaries/<int:id>', methods=['PUT'])
+def update_plan_summary(id):
+    data = request.get_json()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # User allowed to update all values as requested
+        # We'll update the fields provided in the payload
+        # Fields: client, brand, medium, channel, budget, activation_period
+
+        # Construct update dynamically or fixed? User said "update all values".
+
+        sql = """
+            UPDATE plan_summaries 
+            SET client=%s, brand=%s, activation_period=%s, medium=%s, channel=%s, budget=%s
+            WHERE id=%s
+        """
+        # We expect all these fields to be present or we use existing?
+        # For simplicity, we expect the frontend to send the full object state.
+
+        cursor.execute(sql, (
+            data.get('client'),
+            data.get('brand'),
+            data.get('activation_period'),
+            data.get('medium', 'TV'),
+            data.get('channel'),
+            data.get('budget'),
+            id
+        ))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "Updated successfully"}), 200
+    except Exception as e:
+        conn.close()
+        print("Error updating plan summary:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/plan-summaries/<int:id>', methods=['DELETE'])
+def delete_plan_summary(id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM plan_summaries WHERE id = %s", (id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "Deleted successfully"}), 200
+    except Exception as e:
+        conn.close()
+        print("Error deleting plan summary:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# 4
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=True, host='0.0.0.0', port=port)
 
-#check for updating
+# check for updating
