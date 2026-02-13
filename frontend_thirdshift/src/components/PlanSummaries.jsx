@@ -131,7 +131,6 @@ export default function PlanSummaries({ onBack }) {
 
         const data = sortedSummaries.map(row => {
             const rowData = {
-                ID: row.id,
                 'Client': row.client,
                 'Brand': row.brand,
                 'Activation Period': row.activation_period,
@@ -142,7 +141,6 @@ export default function PlanSummaries({ onBack }) {
             };
 
             // Always add user info
-            rowData['User ID'] = row.user_id;
             rowData['User Name'] = `${row.user_first_name || ''} ${row.user_last_name || ''}`.trim();
 
             return rowData;
@@ -155,7 +153,6 @@ export default function PlanSummaries({ onBack }) {
         // Auto-size columns
         const maxWidth = 50;
         const wscols = [
-            { wch: 10 }, // ID
             { wch: 20 }, // Client
             { wch: 20 }, // Brand
             { wch: 25 }, // Activation Period
@@ -163,7 +160,6 @@ export default function PlanSummaries({ onBack }) {
             { wch: 20 }, // Channel
             { wch: 18 }, // Budget
             { wch: 25 }, // Created At
-            { wch: 12 }, // User ID
             { wch: 25 }, // User Name
         ];
         worksheet['!cols'] = wscols;
