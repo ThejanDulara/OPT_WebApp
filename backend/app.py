@@ -1738,6 +1738,142 @@ def delete_plan(plan_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+# --- PLAN SUMMARIES (NEW) ---
+
+@app.route('/save-plan-summary', methods=['POST'])
+def save_plan_summary():
+    data = request.get_json()
+    user_id = str(data.get('user_id', ''))
+    user_first_name = data.get('user_first_name')
+    user_last_name = data.get('user_last_name')
+    client = data.get('client')
+    brand = data.get('brand')
+    activation_period = data.get('activation_period')
+    medium = data.get('medium', 'TV')
+    channel_summaries = data.get('channel_summaries', [])
+
+    if not channel_summaries:
+        return jsonify({"success": False, "error": "No channel summaries provided"}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        values = []
+        for ch_data in channel_summaries:
+            values.append((
+                user_id, 
+                user_first_name, 
+                user_last_name, 
+                activation_period, 
+                client, 
+                brand, 
+                medium, 
+                ch_data.get('channel'), 
+                ch_data.get('budget')
+            ))
+
+        stmt = """
+            INSERT INTO plan_summaries 
+            (user_id, user_first_name, user_last_name, activation_period, client, brand, medium, channel, budget)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        cursor.executemany(stmt, values)
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "Summaries saved"}), 200
+    except Exception as e:
+        conn.close()
+        print("Error saving plan summary:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/plan-summaries', methods=['GET'])
+def get_plan_summaries():
+    user_id = request.args.get("user_id")
+    # 'true' from JS boolean or '1'
+    is_admin = request.args.get("is_admin") in ["1", "true", "True"]
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        if is_admin:
+            cursor.execute("SELECT * FROM plan_summaries ORDER BY created_at DESC")
+        else:
+            cursor.execute("SELECT * FROM plan_summaries WHERE user_id = %s ORDER BY created_at DESC", (str(user_id),))
+        
+        rows = cursor.fetchall()
+        
+        # Convert decimals to float for JSON
+        for row in rows:
+            if 'budget' in row and row['budget'] is not None:
+                row['budget'] = float(row['budget'])
+            if 'created_at' in row and row['created_at'] is not None:
+                row['created_at'] = str(row['created_at'])
+
+        conn.close()
+        return jsonify({"success": True, "summaries": rows}), 200
+    except Exception as e:
+        conn.close()
+        print("Error fetching plan summaries:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/plan-summaries/<int:id>', methods=['PUT'])
+def update_plan_summary(id):
+    data = request.get_json()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # User allowed to update all values as requested
+        # We'll update the fields provided in the payload
+        # Fields: client, brand, medium, channel, budget, activation_period
+        
+        # Construct update dynamically or fixed? User said "update all values".
+        
+        sql = """
+            UPDATE plan_summaries 
+            SET client=%s, brand=%s, activation_period=%s, medium=%s, channel=%s, budget=%s
+            WHERE id=%s
+        """
+        # We expect all these fields to be present or we use existing? 
+        # For simplicity, we expect the frontend to send the full object state.
+        
+        cursor.execute(sql, (
+            data.get('client'),
+            data.get('brand'),
+            data.get('activation_period'),
+            data.get('medium', 'TV'),
+            data.get('channel'),
+            data.get('budget'),
+            id
+        ))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "Updated successfully"}), 200
+    except Exception as e:
+        conn.close()
+        print("Error updating plan summary:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/plan-summaries/<int:id>', methods=['DELETE'])
+def delete_plan_summary(id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM plan_summaries WHERE id = %s", (id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "Deleted successfully"}), 200
+    except Exception as e:
+        conn.close()
+        print("Error deleting plan summary:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 #4
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
