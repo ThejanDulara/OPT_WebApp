@@ -1,5 +1,5 @@
 // src/components/FinalPlan.jsx
-import React, { useMemo , useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import ExcelJS from 'exceljs';
@@ -16,12 +16,13 @@ const API_BASE_READ = isLocal
 // ✅ LOCAL DEV AUTH (matches backend contract)
 const auth = isLocal
   ? {
-      user_id: 1,
-      userId: 1,
-      user_first_name: "Thejan",
-      user_last_name: "Dulara",
-    }
+    user_id: 1,
+    userId: 1,
+    user_first_name: "Thejan",
+    user_last_name: "Dulara",
+  }
   : (window.__AUTH__ || {});
+
 
 export default function FinalPlan({
   // Accept BOTH naming styles so App.js doesn't have to change
@@ -2868,7 +2869,7 @@ export default function FinalPlan({
 
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [clientName, setClientName] = useState("");
-  const [agencyName, setAgencyName] = useState('Third Shift Media (Pvt) Ltd');
+  const [agencyName, setAgencyName] = useState('Media Factory (Pvt) Ltd');
   const [brandName, setBrandName] = useState("");
   const [refNo, setRefNo] = useState("");
   const [commercialNames, setCommercialNames] = useState({});
@@ -2898,6 +2899,48 @@ export default function FinalPlan({
       if (initialMetadata.activation_to) setToDate(initialMetadata.activation_to);
     }
   }, [initialMetadata]);
+
+
+  const savePlanSummary = async () => {
+    try {
+      const auth = (typeof window !== 'undefined' && window.__AUTH__) || {};
+      const actualUserId = auth.userId || auth.user_id || 1;
+      const actualFirstName = isLocal ? "Dev" : (auth.firstName || "");
+      const actualLastName = isLocal ? "Thejan" : (auth.lastName || "");
+
+      const summaryPayload = {
+        user_id: actualUserId,
+        user_first_name: actualFirstName,
+        user_last_name: actualLastName,
+        client: clientName,
+        brand: brandName,
+        activation_period: `${fromDate} to ${toDate}`,
+        medium: 'TV',
+        channel_summaries: combinedChannelRows.map(row => ({
+          channel: row.Channel,
+          budget: Number(row.TotalCost_LKR || 0).toFixed(2)
+        }))
+      };
+
+      console.log("Saving Plan Summary Payload:", summaryPayload);
+
+      const res = await fetch(`${API_BASE_SAVE}/save-plan-summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(summaryPayload),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        console.error("Save plan summary failed", json);
+        alert("Warning: Failed to save plan summary to new table: " + (json.error || "Unknown error"));
+      } else {
+        console.log("Plan summary saved successfully");
+      }
+    } catch (err) {
+      console.error("Error saving plan summary:", err);
+    }
+  };
 
 
   const savePlan = async () => {
@@ -3707,6 +3750,7 @@ export default function FinalPlan({
                   setCommercialError('');
                   const ok = await savePlan();
                   if (ok) {
+                    await savePlanSummary(); // Save to new table
                     setShowExportDialog(false);
                     await handleExport(true);
                   }

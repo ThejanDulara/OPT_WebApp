@@ -1,6 +1,6 @@
 import React from 'react';
 
-function FrontPage({ onStart, onManagePrograms, onOpenHistory }) {
+function FrontPage({ onStart, onManagePrograms, onOpenHistory, onOpenSummaries }) {
   return (
     <section style={pageWrapper}>
       {/* Left gradient panel with image */}
@@ -47,31 +47,39 @@ function FrontPage({ onStart, onManagePrograms, onOpenHistory }) {
           <h1 style={companyName}>MTM Group</h1>
           <p style={tagline}>Where Intelligence Shapes Smarter Media Planning.</p>
 
-            <button onClick={onStart} style={primaryButton}>
-              Start Optimization
-            </button>
+          <button onClick={onStart} style={primaryButton}>
+            Start Optimization
+          </button>
 
-            <button
-              onClick={() => {
-                if (!window.__AUTH__?.canUpdateData) {
-                  alert(
-                    "You do not have access to manage program data.\n\nPlease contact the administrators for verification."
-                  );
-                  return;
-                }
-                onManagePrograms();
-              }}
-              style={secondaryButton}
-            >
-              Manage Program Data
-            </button>
+          <button
+            onClick={() => {
+              if (
+                !window.__AUTH__?.canUpdateData &&
+                window.location.hostname !== "localhost"
+              ) {
+                alert(
+                  "You do not have access to manage program data.\n\nPlease contact the administrators for verification."
+                );
+                return;
+              }
+              onManagePrograms();
+            }}
+            style={secondaryButton}
+          >
+            Manage Program Data
+          </button>
 
-            <button onClick={onOpenHistory} style={secondaryButton}>
-              View Saved Plans
-            </button>
+
+          <button onClick={onOpenHistory} style={secondaryButton}>
+            View Saved Plans
+          </button>
+
+          <button onClick={onOpenSummaries} style={secondaryButton}>
+            View Plan Summaries
+          </button>
         </div>
       </div>
-    </section>
+    </section >
   );
 }
 
