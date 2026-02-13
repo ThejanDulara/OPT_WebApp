@@ -3709,26 +3709,6 @@ export default function FinalPlan({
                   const ok = await savePlan();
                   if (ok) {
                     setShowExportDialog(false);
-                    await handleExport(false);
-                  }
-                }}
-              >
-                Save & Export
-              </button>
-
-              <button
-                style={{ ...s.primaryButton, backgroundColor: '#2d3748', marginLeft: '10px' }}
-                onClick={async () => {
-                  const v = validateCommercialNames();
-                  if (!v.ok) {
-                    setCommercialError(v.message);
-                    return;
-                  }
-
-                  setCommercialError('');
-                  const ok = await savePlan();
-                  if (ok) {
-                    setShowExportDialog(false);
                     await handleExport(true);
                   }
                 }}
