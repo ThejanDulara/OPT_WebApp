@@ -29,6 +29,7 @@ import CalculatorWidget from "./components/CalculatorWidget";
 import { useLocation } from "react-router-dom";
 
 import PlanHistory from './components/PlanHistory';
+import PlanSummaries from './components/PlanSummaries';
 
 
 function App() {
@@ -243,6 +244,7 @@ function App() {
                 onStart={() => navigate('/select-channels')}
                 onManagePrograms={() => navigate('/program-updater')}
                 onOpenHistory={handleOpenHistory}
+                onOpenSummaries={() => navigate('/plan-summaries')}
               />
             }
           />
@@ -253,6 +255,14 @@ function App() {
               <PlanHistory
                 onBack={() => navigate('/')}
                 onLoadPlan={handleLoadSavedPlan}
+              />
+            }
+          />
+          <Route
+            path="/plan-summaries"
+            element={
+              <PlanSummaries
+                onBack={() => navigate('/')}
               />
             }
           />

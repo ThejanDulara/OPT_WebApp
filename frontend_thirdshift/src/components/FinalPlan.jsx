@@ -2901,6 +2901,48 @@ export default function FinalPlan({
   }, [initialMetadata]);
 
 
+  const savePlanSummary = async () => {
+    try {
+      const auth = (typeof window !== 'undefined' && window.__AUTH__) || {};
+      const actualUserId = auth.userId || auth.user_id || 1;
+      const actualFirstName = isLocal ? "Dev" : (auth.firstName || "");
+      const actualLastName = isLocal ? "Thejan" : (auth.lastName || "");
+
+      const summaryPayload = {
+        user_id: actualUserId,
+        user_first_name: actualFirstName,
+        user_last_name: actualLastName,
+        client: clientName,
+        brand: brandName,
+        activation_period: `${fromDate} to ${toDate}`,
+        medium: 'TV',
+        channel_summaries: combinedChannelRows.map(row => ({
+          channel: row.Channel,
+          budget: Number(row.TotalCost_LKR || 0).toFixed(2)
+        }))
+      };
+
+      console.log("Saving Plan Summary Payload:", summaryPayload);
+
+      const res = await fetch(`${API_BASE_SAVE}/save-plan-summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(summaryPayload),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        console.error("Save plan summary failed", json);
+        alert("Warning: Failed to save plan summary to new table: " + (json.error || "Unknown error"));
+      } else {
+        console.log("Plan summary saved successfully");
+      }
+    } catch (err) {
+      console.error("Error saving plan summary:", err);
+    }
+  };
+
+
   const savePlan = async () => {
     try {
       const auth = (typeof window !== 'undefined' && window.__AUTH__) || {};
@@ -3708,6 +3750,7 @@ export default function FinalPlan({
                   setCommercialError('');
                   const ok = await savePlan();
                   if (ok) {
+                    await savePlanSummary(); // Save to new table
                     setShowExportDialog(false);
                     await handleExport(true);
                   }
