@@ -7,13 +7,14 @@ export default function BonusChannelBudgetSetup({
   channelMoney = {},
   optimizationInput = {},
   initialState = null,
-  onSaveState = () => {},
+  onSaveState = () => { },
   onBack,
   onProceed
 }) {
-  // --- helpers ---
   const num = (v) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
   const fmtLKR = (n) => `Rs. ${Number(n || 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`;
+
+
 
   // Number of commercials
   const [numCommercials, setNumCommercials] = useState(
@@ -61,21 +62,21 @@ export default function BonusChannelBudgetSetup({
     10
   );
 
-    const [channelMaxSpots, setChannelMaxSpots] = useState(
-      initialState?.channelMaxSpots ??
-      channels.reduce((acc, ch) => {
-        acc[ch] = optimizationInput?.maxSpots ?? 10;  // default = global
-        return acc;
-      }, {})
-    );
+  const [channelMaxSpots, setChannelMaxSpots] = useState(
+    initialState?.channelMaxSpots ??
+    channels.reduce((acc, ch) => {
+      acc[ch] = optimizationInput?.maxSpots ?? 10;  // default = global
+      return acc;
+    }, {})
+  );
 
-    const [channelWeekendMaxSpots, setChannelWeekendMaxSpots] = useState(
-      initialState?.channelWeekendMaxSpots ??
-      channels.reduce((acc, ch) => {
-        acc[ch] = initialState?.channelMaxSpots?.[ch] ?? optimizationInput?.maxSpots ?? 10;
-        return acc;
-      }, {})
-    );
+  const [channelWeekendMaxSpots, setChannelWeekendMaxSpots] = useState(
+    initialState?.channelWeekendMaxSpots ??
+    channels.reduce((acc, ch) => {
+      acc[ch] = initialState?.channelMaxSpots?.[ch] ?? optimizationInput?.maxSpots ?? 10;
+      return acc;
+    }, {})
+  );
 
   // Time limit
   const [timeLimit, setTimeLimit] = useState(
@@ -109,6 +110,36 @@ export default function BonusChannelBudgetSetup({
   const handleBoundChange = (ch, v) => {
     setChannelBounds(prev => ({ ...prev, [ch]: Math.max(0, num(v)) }));
   };
+
+  // --- Auto-save state ---
+  React.useEffect(() => {
+    if (typeof onSaveState === "function") {
+      onSaveState({
+        numCommercials,
+        durations,
+        budgetProportions,
+        channelCommercialSplits,
+        maxSpots,
+        timeLimit,
+        bonusPctByChannel,
+        channelBounds,
+        channelMaxSpots,
+        channelWeekendMaxSpots
+      });
+    }
+  }, [
+    numCommercials,
+    durations,
+    budgetProportions,
+    channelCommercialSplits,
+    maxSpots,
+    timeLimit,
+    bonusPctByChannel,
+    channelBounds,
+    channelMaxSpots,
+    channelWeekendMaxSpots,
+    onSaveState
+  ]);
 
   // Derived: base channel budget and bonus budget per channel
   const baseChannelBudget = useMemo(() => {
@@ -428,7 +459,7 @@ export default function BonusChannelBudgetSetup({
             return (
               <div key={ch} style={styles.card}>
                 <div style={styles.channelHeader}>
-                  <img src={getLogoPath(ch)} alt={ch} style={styles.logo} onError={(e)=>{e.currentTarget.style.display='none';}} />
+                  <img src={getLogoPath(ch)} alt={ch} style={styles.logo} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                   <span>{ch}</span>
                 </div>
 
@@ -466,15 +497,15 @@ export default function BonusChannelBudgetSetup({
                   return (
                     <div key={i} style={styles.commercialSplitRow}>
                       <span style={{ minWidth: 90 }}>Com {i + 1}:</span>
-                        <input
-                          type="number"
-                          value={splitPct}
-                          onChange={(e) => handleChannelCommercialChange(ch, i, e.target.value)}
-                          style={{
-                            ...styles.commercialPctInput,
-                            borderColor: hasError ? '#e53e3e' : '#e2e8f0'
-                          }}
-                        />
+                      <input
+                        type="number"
+                        value={splitPct}
+                        onChange={(e) => handleChannelCommercialChange(ch, i, e.target.value)}
+                        style={{
+                          ...styles.commercialPctInput,
+                          borderColor: hasError ? '#e53e3e' : '#e2e8f0'
+                        }}
+                      />
 
                       <span>%</span>
                       <span style={styles.pill}>{fmtLKR(amt)}</span>
@@ -548,7 +579,7 @@ export default function BonusChannelBudgetSetup({
             type="number"
             min={1}
             value={maxSpots}
-            onChange={(e)=>setMaxSpots(parseInt(e.target.value || 0, 10))}
+            onChange={(e) => setMaxSpots(parseInt(e.target.value || 0, 10))}
             style={{ ...styles.input, width: 120 }}
           />
         </div>
@@ -558,7 +589,7 @@ export default function BonusChannelBudgetSetup({
             type="number"
             min={60}
             value={timeLimit}
-            onChange={(e)=>setTimeLimit(parseInt(e.target.value || 0, 10))}
+            onChange={(e) => setTimeLimit(parseInt(e.target.value || 0, 10))}
             style={{ ...styles.input, width: 120 }}
           />
         </div>

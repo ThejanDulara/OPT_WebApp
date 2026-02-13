@@ -1,5 +1,5 @@
 // PropertyProgramsEditor.jsx
-import React, { useMemo , useEffect  } from 'react';
+import React, { useMemo, useEffect } from 'react';
 
 const num = v => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
 const iNum = v => (isNaN(parseInt(v)) ? 0 : parseInt(v));
@@ -43,7 +43,7 @@ function computeComputed(row) {
 
   const rateCardTotal = rateCardCost * spots;
 
-  return { NTVR, NCost, NGRP, GRP , rateCardTotal , totalBudget: budget,totalSaving: rateCardTotal - budget,cprp: NGRP > 0 ? budget / NGRP : 0};
+  return { NTVR, NCost, NGRP, GRP, rateCardTotal, totalBudget: budget, totalSaving: rateCardTotal - budget, cprp: NGRP > 0 ? budget / NGRP : 0 };
 }
 
 export default function PropertyProgramsEditor({
@@ -70,37 +70,59 @@ export default function PropertyProgramsEditor({
     return out;
   }, [channels, propertyPrograms, propertyAmounts]);
 
-    // 🔒 Validate required fields (Duration + PT/NPT) for all added rows
-    const requiredFieldValidation = useMemo(() => {
-      let valid = true;
+  // 🔒 Validate required fields (Duration + PT/NPT) for all added rows
+  const requiredFieldValidation = useMemo(() => {
+    let valid = true;
 
-      (channels || []).forEach(ch => {
-        if (!hasProperty[ch]) return;
+    (channels || []).forEach(ch => {
+      if (!hasProperty[ch]) return;
 
-        const rows = propertyPrograms[ch] || [];
-        rows.forEach(r => {
-          if (!r) return;
+      const rows = propertyPrograms[ch] || [];
+      rows.forEach(r => {
+        if (!r) return;
 
-          const durationMissing = !r.duration || Number(r.duration) <= 0;
-          const ptMissing = !r.pt_npt;
+        const durationMissing = !r.duration || Number(r.duration) <= 0;
+        const ptMissing = !r.pt_npt;
 
-          if (durationMissing || ptMissing) {
-            valid = false;
-          }
-        });
+        if (durationMissing || ptMissing) {
+          valid = false;
+        }
       });
+    });
 
-      return valid;
-    }, [channels, hasProperty, propertyPrograms]);
+    return valid;
+  }, [channels, hasProperty, propertyPrograms]);
 
 
-    // 🔔 Inform parent whether all required fields are filled
-    useEffect(() => {
-      if (typeof setRequiredRowsValid === "function") {
-        setRequiredRowsValid(requiredFieldValidation);
-      }
-    }, [requiredFieldValidation, setRequiredRowsValid]);
+  // 🔔 Inform parent whether all required fields are filled
+  useEffect(() => {
+    if (typeof setRequiredRowsValid === "function") {
+      setRequiredRowsValid(requiredFieldValidation);
+    }
+  }, [requiredFieldValidation, setRequiredRowsValid]);
 
+
+  const handleDuplicateRow = (ch, rowId) => {
+    setPropertyPrograms(prev => {
+      const rows = prev[ch] || [];
+      const index = rows.findIndex(r => r.id === rowId);
+      if (index === -1) return prev;
+
+      const rowToClone = rows[index];
+      const newRow = {
+        ...rowToClone,
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`
+      };
+
+      const newRows = [
+        ...rows.slice(0, index + 1),
+        newRow,
+        ...rows.slice(index + 1)
+      ];
+
+      return { ...prev, [ch]: newRows };
+    });
+  };
 
   const handleAddRow = (ch) => {
     setPropertyPrograms(prev => {
@@ -116,89 +138,89 @@ export default function PropertyProgramsEditor({
     });
   };
 
-    const handleChange = (ch, id, field, value) => {
-      setPropertyPrograms(prev => {
-        const rows = (prev[ch] || []).map(r => {
-          let newVal = value;
+  const handleChange = (ch, id, field, value) => {
+    setPropertyPrograms(prev => {
+      const rows = (prev[ch] || []).map(r => {
+        let newVal = value;
 
-          // Keep everything as string in state
-          if (field === 'budget' || field === 'duration' || field === 'TVR' || field === 'spots') {
-            newVal = value.replace(/^0+/, '');  // strip leading zeros
-          }
+        // Keep everything as string in state
+        if (field === 'budget' || field === 'duration' || field === 'TVR' || field === 'spots') {
+          newVal = value.replace(/^0+/, '');  // strip leading zeros
+        }
 
-          return r.id === id ? { ...r, [field]: newVal } : r;
-        });
-        return { ...prev, [ch]: rows };
+        return r.id === id ? { ...r, [field]: newVal } : r;
       });
-    };
+      return { ...prev, [ch]: rows };
+    });
+  };
 
 
 
-    const visibleChannels = (channels || []).filter(
-      ch => !!hasProperty[ch]
-    );
+  const visibleChannels = (channels || []).filter(
+    ch => !!hasProperty[ch]
+  );
 
   if (visibleChannels.length === 0) return null;
 
-      const formatTime12Hour = (time24) => {
-      if (!time24) return '';
-      const [h, m] = time24.split(':').map(Number);
+  const formatTime12Hour = (time24) => {
+    if (!time24) return '';
+    const [h, m] = time24.split(':').map(Number);
 
-      const period = h >= 12 ? 'PM' : 'AM';
-      const hour12 = h % 12 || 12;
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h % 12 || 12;
 
-      return `${hour12}.${m.toString().padStart(2, '0')} ${period}`;
-    };
+    return `${hour12}.${m.toString().padStart(2, '0')} ${period}`;
+  };
 
-    const combineTimeRange = (start, end) => {
-      if (!start) return '';
-      if (start && !end) return formatTime12Hour(start);
-      return `${formatTime12Hour(start)} – ${formatTime12Hour(end)}`;
-    };
+  const combineTimeRange = (start, end) => {
+    if (!start) return '';
+    if (start && !end) return formatTime12Hour(start);
+    return `${formatTime12Hour(start)} – ${formatTime12Hour(end)}`;
+  };
 
-    const parseTime12To24 = (time12) => {
-      if (!time12) return '';
+  const parseTime12To24 = (time12) => {
+    if (!time12) return '';
 
-      const cleaned = time12
-        .trim()
-        .replace(/\./g, ':')
-        .replace(/\s+/g, ' ');
+    const cleaned = time12
+      .trim()
+      .replace(/\./g, ':')
+      .replace(/\s+/g, ' ');
 
-      const match = cleaned.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-      if (!match) return '';
+    const match = cleaned.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!match) return '';
 
-      let [, h, m, period] = match;
-      h = parseInt(h, 10);
-      m = parseInt(m, 10);
-      period = period.toUpperCase();
+    let [, h, m, period] = match;
+    h = parseInt(h, 10);
+    m = parseInt(m, 10);
+    period = period.toUpperCase();
 
-      if (period === 'PM' && h !== 12) h += 12;
-      if (period === 'AM' && h === 12) h = 0;
+    if (period === 'PM' && h !== 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
 
-      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-    };
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  };
 
-    const splitTimeRange = (range) => {
-      if (!range) return { start: '', end: '' };
+  const splitTimeRange = (range) => {
+    if (!range) return { start: '', end: '' };
 
-      const normalized = range
-        .trim()
-        .replace(/\s*-\s*/g, ' – ')
-        .replace(/\s+/g, ' ');
+    const normalized = range
+      .trim()
+      .replace(/\s*-\s*/g, ' – ')
+      .replace(/\s+/g, ' ');
 
-      if (normalized.includes('–')) {
-        const [start12, end12] = normalized.split('–').map(s => s.trim());
-        return {
-          start: parseTime12To24(start12),
-          end: parseTime12To24(end12),
-        };
-      }
-
+    if (normalized.includes('–')) {
+      const [start12, end12] = normalized.split('–').map(s => s.trim());
       return {
-        start: parseTime12To24(normalized),
-        end: '',
+        start: parseTime12To24(start12),
+        end: parseTime12To24(end12),
       };
+    }
+
+    return {
+      start: parseTime12To24(normalized),
+      end: '',
     };
+  };
 
 
 
@@ -214,19 +236,19 @@ export default function PropertyProgramsEditor({
           <div key={ch} style={{ ...styles.summaryCard, marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <img
-                src={`/logos/${ch}.png`}
-                alt={ch}
-                style={{ height: '40px', width: 'auto', objectFit: 'contain', borderRadius: '4px' }}
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-              <h4 style={{ ...styles.summaryTitle, fontSize: 16, fontWeight: 'bold', color: '#2d3748' }}>
-                {ch}
-              </h4>
-            </div>
-            <div style={{ fontSize: 12, color: '#718096' }}>
-              ⏱ Please use the <strong>24-hour time format</strong> when updating the time column.
-            </div>
+                <img
+                  src={`/logos/${ch}.png`}
+                  alt={ch}
+                  style={{ height: '40px', width: 'auto', objectFit: 'contain', borderRadius: '4px' }}
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+                <h4 style={{ ...styles.summaryTitle, fontSize: 16, fontWeight: 'bold', color: '#2d3748' }}>
+                  {ch}
+                </h4>
+              </div>
+              <div style={{ fontSize: 12, color: '#718096' }}>
+                ⏱ Please use the <strong>24-hour time format</strong> when updating the time column.
+              </div>
               <div style={{ fontSize: 13, color: totals.ok ? '#2d3748' : '#e53e3e' }}>
                 Target: <strong>{formatLKR(totals.target)}</strong> &nbsp;|&nbsp;
                 Entered: <strong>{formatLKR(totals.totalBudget)}</strong> &nbsp;|&nbsp;
@@ -263,7 +285,7 @@ export default function PropertyProgramsEditor({
                 <tbody>
                   {rows.map((r) => {
                     const errors = validateRow(r);
-                    const { NTVR, NCost, NGRP, GRP, rateCardTotal} = computeComputed(r);
+                    const { NTVR, NCost, NGRP, GRP, rateCardTotal } = computeComputed(r);
                     const totalBudget = num(r.budget);
                     const onCost = num(r.budget);
                     const cprp = NGRP > 0 ? onCost / NGRP : 0;
@@ -288,24 +310,24 @@ export default function PropertyProgramsEditor({
                           />
                         </td>
                         <td style={{ ...styles.td, textAlign: 'right' }}>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={r.duration}
-                          onChange={e => handleChange(ch, r.id, 'duration', e.target.value)}
-                          style={{
-                            ...styles.numberInput,
-                            width: 110,
-                            textAlign: 'right',
-                            borderColor: errors.duration ? '#e53e3e' : undefined
-                          }}
-                        />
-                        {errors.duration && (
-                          <div style={{ color: '#e53e3e', fontSize: 11 }}>
-                            Duration is required
-                          </div>
-                        )}
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={r.duration}
+                            onChange={e => handleChange(ch, r.id, 'duration', e.target.value)}
+                            style={{
+                              ...styles.numberInput,
+                              width: 110,
+                              textAlign: 'right',
+                              borderColor: errors.duration ? '#e53e3e' : undefined
+                            }}
+                          />
+                          {errors.duration && (
+                            <div style={{ color: '#e53e3e', fontSize: 11 }}>
+                              Duration is required
+                            </div>
+                          )}
 
                         </td>
 
@@ -362,20 +384,20 @@ export default function PropertyProgramsEditor({
                           })()}
                         </td>
                         <td style={styles.td}>
-                        <select
-                          value={r.pt_npt}
-                          onChange={(e) => handleChange(ch, r.id, "pt_npt", e.target.value)}
-                          style={{
-                            ...styles.numberInput,
-                            width: 120,
-                            borderColor: errors.pt_npt ? '#e53e3e' : undefined
-                          }}
-                        >
-                        {errors.pt_npt && (
-                          <div style={{ color: '#e53e3e', fontSize: 11 }}>
-                            Please select PT / NPT
-                          </div>
-                        )}
+                          <select
+                            value={r.pt_npt}
+                            onChange={(e) => handleChange(ch, r.id, "pt_npt", e.target.value)}
+                            style={{
+                              ...styles.numberInput,
+                              width: 120,
+                              borderColor: errors.pt_npt ? '#e53e3e' : undefined
+                            }}
+                          >
+                            {errors.pt_npt && (
+                              <div style={{ color: '#e53e3e', fontSize: 11 }}>
+                                Please select PT / NPT
+                              </div>
+                            )}
 
                             <option value="">Select</option>
                             <option value="A">{r.pt_npt === "A" ? "A" : "A (PT)"}</option>
@@ -404,7 +426,7 @@ export default function PropertyProgramsEditor({
                             style={{ ...styles.numberInput, width: 120, textAlign: 'right' }}
                           />
                         </td>
-                        <td style={{ ...styles.td, textAlign: 'right' ,width: 120}}>
+                        <td style={{ ...styles.td, textAlign: 'right', width: 120 }}>
                           {fmt2(rateCardTotal)}     {/* ⭐ NEW */}
                         </td>
                         <td style={{ ...styles.td, textAlign: 'right', width: 120 }}>
@@ -449,13 +471,24 @@ export default function PropertyProgramsEditor({
                           />
                         </td>
                         <td style={{ ...styles.td }}>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteRow(ch, r.id)}
-                            style={{ ...styles.smallSyncBtn, background: '#ffe5e5', borderColor: '#ffb3b3' }}
-                          >
-                            Remove
-                          </button>
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleDuplicateRow(ch, r.id)}
+                              style={{ ...styles.smallSyncBtn, background: '#e6fffa', borderColor: '#b2f5ea', color: '#2c7a7b', padding: '4px 8px', fontSize: 11 }}
+                              title="Duplicate row"
+                            >
+                              Dup
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRow(ch, r.id)}
+                              style={{ ...styles.smallSyncBtn, background: '#ffe5e5', borderColor: '#ffb3b3', padding: '4px 8px', fontSize: 11 }}
+                              title="Remove row"
+                            >
+                              Del
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

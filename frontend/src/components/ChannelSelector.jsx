@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 
-export default function ChannelSelector({ initialSelectedChannels = [], onBack, onProceed }) {
+export default function ChannelSelector({ initialSelectedChannels = [], onBack, onProceed, onChange }) {
   const [channels, setChannels] = useState([]);
   const [selected, setSelected] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -8,7 +8,7 @@ export default function ChannelSelector({ initialSelectedChannels = [], onBack, 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   /* ========== IMAGES ========== */
-  const programImages = ["/1.jpg", "/2.jpg", "/3.jpg", "/4.jpg", "/5.jpg", "/6.jpg","/7.jpg","/8.jpg",];
+  const programImages = ["/1.jpg", "/2.jpg", "/3.jpg", "/4.jpg", "/5.jpg", "/6.jpg", "/7.jpg", "/8.jpg",];
 
   // Fetch channels
   useEffect(() => {
@@ -19,11 +19,11 @@ export default function ChannelSelector({ initialSelectedChannels = [], onBack, 
       .finally(() => setLoading(false));
   }, []);
 
-    useEffect(() => {
-      if (initialSelectedChannels.length > 0) {
-        setSelected(new Set(initialSelectedChannels));
-      }
-    }, [initialSelectedChannels]);
+  useEffect(() => {
+    if (initialSelectedChannels.length > 0) {
+      setSelected(new Set(initialSelectedChannels));
+    }
+  }, [initialSelectedChannels]);
 
   // Auto-rotate background images every 4s
   useEffect(() => {
@@ -44,6 +44,9 @@ export default function ChannelSelector({ initialSelectedChannels = [], onBack, 
     setSelected((prev) => {
       const next = new Set(prev);
       next.has(ch) ? next.delete(ch) : next.add(ch);
+      if (onChange) {
+        onChange(Array.from(next));
+      }
       return next;
     });
   };

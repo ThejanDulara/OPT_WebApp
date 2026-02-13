@@ -55,6 +55,8 @@ function App() {
   const [allocatorState, setAllocatorState] = useState(null);
 
 
+  const [manualOverride, setManualOverride] = useState({});
+
   const hasAnyComBenefit = useMemo(
     () =>
       Object.values(channelMoney || {}).some(
@@ -264,6 +266,7 @@ function App() {
                   setChannels(chs);
                   navigate('/negotiated');
                 }}
+                onChange={setChannels}
               />
             }
           />
@@ -281,16 +284,25 @@ function App() {
                 initialNegotiatedRates={negotiatedRates}
                 initialTG={selectedTG}
                 initialClient={selectedClient}
+                initialManualOverride={manualOverride} // Add this
                 selectedClient={selectedClient}
 
                 onBack={() => navigate('/select-channels')}
 
-                onProceed={({ channelDiscounts: cd = {}, negotiatedRates: nr = {}, selectedTG: tg, selectedClient: sc }) => {
+                onProceed={({ channelDiscounts: cd = {}, negotiatedRates: nr = {}, selectedTG: tg, selectedClient: sc, manualOverride: mo = {} }) => {
                   setChannelDiscounts(cd);
                   setNegotiatedRates(nr);
                   setSelectedTG(tg);
                   setSelectedClient(sc);
+                  setManualOverride(mo);
                   navigate('/program-selector');
+                }}
+                onChange={({ channelDiscounts, negotiatedRates, selectedTG, selectedClient, manualOverride }) => {
+                  setChannelDiscounts(channelDiscounts);
+                  setNegotiatedRates(negotiatedRates);
+                  setSelectedTG(selectedTG);
+                  setSelectedClient(selectedClient);
+                  setManualOverride(manualOverride);
                 }}
               />
             }
@@ -309,6 +321,7 @@ function App() {
 
                 onSubmit={handleProgramsSubmit}
                 onBack={() => navigate('/negotiated')}
+                onChange={setSelectedProgramIds}
               />
             }
           />
@@ -321,6 +334,7 @@ function App() {
                 onSubmit={handleOptimizationSubmit}
                 onBack={() => navigate('/program-selector')}
                 initialValues={optimizationInput}
+                onChange={setOptimizationInput}
                 selectedTG={selectedTG}
               />
             }
