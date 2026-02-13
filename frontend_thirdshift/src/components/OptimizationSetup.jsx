@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-function OptimizationSetup({ onSubmit, onBack, initialValues }) {
-   const formatWithCommas = (value) => {
-      if (value === '' || value === null || value === undefined) return '';
-      return Number(value).toLocaleString('en-LK');
-    };
+function OptimizationSetup({ onSubmit, onBack, initialValues, onChange }) {
+  const formatWithCommas = (value) => {
+    if (value === '' || value === null || value === undefined) return '';
+    return Number(value).toLocaleString('en-LK');
+  };
 
-    const removeCommas = (value) => {
-      return value.replace(/,/g, '');
-    };
+  const removeCommas = (value) => {
+    return value.replace(/,/g, '');
+  };
   const [numCommercials, setNumCommercials] = useState(initialValues?.numCommercials || 1);
   const [durations, setDurations] = useState(initialValues?.durations || ['']);
   const [budgetProportions, setBudgetProportions] = useState(initialValues?.budgetProportions || [100]);
@@ -17,6 +17,21 @@ function OptimizationSetup({ onSubmit, onBack, initialValues }) {
   const [minSpots, setMinSpots] = useState(initialValues?.minSpots || 0);
   const [maxSpots, setMaxSpots] = useState(initialValues?.maxSpots || 10);
   const [timeLimit, setTimeLimit] = useState(initialValues?.timeLimit || 120); // seconds
+
+  useEffect(() => {
+    if (onChange) {
+      onChange({
+        numCommercials,
+        durations: durations.map(d => parseFloat(d)),
+        budgetProportions: budgetProportions.map(b => parseFloat(b)),
+        budget: parseFloat(budget),
+        budgetBound: parseFloat(budgetBound),
+        minSpots: parseInt(minSpots),
+        maxSpots: parseInt(maxSpots),
+        timeLimit: parseInt(timeLimit)
+      });
+    }
+  }, [numCommercials, durations, budgetProportions, budget, budgetBound, minSpots, maxSpots, timeLimit, onChange]);
 
   const handleDurationChange = (index, value) => {
     const newDurations = [...durations];
@@ -209,25 +224,25 @@ function OptimizationSetup({ onSubmit, onBack, initialValues }) {
     },
   };
 
-          return (
-            <form onSubmit={handleSubmit} style={enhancedStyles.form}>
-              <h2 style={enhancedStyles.title}>Optimization Setup</h2>
+  return (
+    <form onSubmit={handleSubmit} style={enhancedStyles.form}>
+      <h2 style={enhancedStyles.title}>Optimization Setup</h2>
 
-              {/* Commercial Details */}
-              <div style={enhancedStyles.sectionContainer}>
-                <h3 style={enhancedStyles.sectionTitle}>Commercial Details</h3>
+      {/* Commercial Details */}
+      <div style={enhancedStyles.sectionContainer}>
+        <h3 style={enhancedStyles.sectionTitle}>Commercial Details</h3>
 
-                {/* Number of Commercials inside the section */}
-                <div style={enhancedStyles.numCommercialsInput}>
-                  <span style={enhancedStyles.numCommercialsLabel}>Number of Commercials:</span>
-                  <input
-                    type="number"
-                    value={numCommercials}
-                    onChange={handleNumCommercialsChange}
-                    min={1}
-                    style={{ ...enhancedStyles.input, width: '80px' }}
-                  />
-                </div>
+        {/* Number of Commercials inside the section */}
+        <div style={enhancedStyles.numCommercialsInput}>
+          <span style={enhancedStyles.numCommercialsLabel}>Number of Commercials:</span>
+          <input
+            type="number"
+            value={numCommercials}
+            onChange={handleNumCommercialsChange}
+            min={1}
+            style={{ ...enhancedStyles.input, width: '80px' }}
+          />
+        </div>
 
         <div>
           {durations.map((duration, idx) => (

@@ -20,43 +20,43 @@ const CLIENT_OPTIONS = [
 // ----------------------------------------
 
 
-    function NegotiatedRates({
-      onBack,
-      onProceed,
-      initialChannelDiscounts,
-      initialNegotiatedRates,
-      initialTG,
-      selectedChannels,
-      initialClient,
-      selectedClient: selectedClientProp,
-    })
-
-{
+function NegotiatedRates({
+  onBack,
+  onProceed,
+  initialChannelDiscounts,
+  initialNegotiatedRates,
+  initialTG,
+  selectedChannels,
+  initialClient,
+  selectedClient: selectedClientProp,
+  initialManualOverride, // Add this
+  onChange // Add this
+}) {
   const [channels, setChannels] = useState([]);
   const [selectedChannel, setSelectedChannel] = useState('');
   const [programs, setPrograms] = useState([]); // rows for the selected channel (must include id)
   const [channelDiscounts, setChannelDiscounts] = useState({});
   const [negotiatedRates, setNegotiatedRates] = useState({});
-  const [manualOverride, setManualOverride] = useState({}); // { [id]: true } if user edited that row
+  const [manualOverride, setManualOverride] = useState(initialManualOverride || {}); // { [id]: true } if user edited that row
   const [loadingChannels, setLoadingChannels] = useState(true);
   const [loadingPrograms, setLoadingPrograms] = useState(false);
   const [selectedClient, setSelectedClient] = useState(selectedClientProp || initialClient || OTHER_CLIENT);
 
 
   const TG_OPTIONS = [
-    { key: "tvr_all",              label: "All TG" },
-    { key: "tvr_abc_15_90",        label: "SEC ABC | Age 15-90" },
-    { key: "tvr_abc_30_60",        label: "SEC ABC | Age 30-60" },
-    { key: "tvr_abc_15_30",        label: "SEC ABC | Age 15-30" },
-    { key: "tvr_abc_20_plus",      label: "SEC ABC | Age 20+" },
-    { key: "tvr_ab_15_plus",       label: "SEC AB | Age 15+" },
-    { key: "tvr_cd_15_plus",       label: "SEC CD | Age 15+" },
-    { key: "tvr_ab_female_15_45",  label: "SEC AB | Female Age 15-45" },
-    { key: "tvr_abc_15_60",        label: "SEC ABC | Age 15-60" },
-    { key: "tvr_bcde_15_plus",     label: "SEC BCDE | Age 15+" },
-    { key: "tvr_abcde_15_plus",    label: "SEC ABCDE | Age 15+" },
+    { key: "tvr_all", label: "All TG" },
+    { key: "tvr_abc_15_90", label: "SEC ABC | Age 15-90" },
+    { key: "tvr_abc_30_60", label: "SEC ABC | Age 30-60" },
+    { key: "tvr_abc_15_30", label: "SEC ABC | Age 15-30" },
+    { key: "tvr_abc_20_plus", label: "SEC ABC | Age 20+" },
+    { key: "tvr_ab_15_plus", label: "SEC AB | Age 15+" },
+    { key: "tvr_cd_15_plus", label: "SEC CD | Age 15+" },
+    { key: "tvr_ab_female_15_45", label: "SEC AB | Female Age 15-45" },
+    { key: "tvr_abc_15_60", label: "SEC ABC | Age 15-60" },
+    { key: "tvr_bcde_15_plus", label: "SEC BCDE | Age 15+" },
+    { key: "tvr_abcde_15_plus", label: "SEC ABCDE | Age 15+" },
     { key: "tvr_abc_female_15_60", label: "SEC ABC | Female Age 15-60" },
-    { key: "tvr_abc_male_15_60",   label: "SEC ABC | Male Age 15-60" },
+    { key: "tvr_abc_male_15_60", label: "SEC ABC | Male Age 15-60" },
   ];
 
   const [selectedTG, setSelectedTG] = useState(initialTG || "tvr_all");
@@ -66,10 +66,10 @@ const CLIENT_OPTIONS = [
   const isDiscountLocked = (channel, client) => {
     // Lock for existing special channels
     if (SPECIAL_CHANNELS.includes(channel)) return true;
-    
+
     // Lock for Cargills special rate on DERANA TV
     if (channel === CARGILLS_CHANNEL && client === CARGILLS_CLIENT) return true;
-    
+
     return false;
   };
 
@@ -93,93 +93,114 @@ const CLIENT_OPTIONS = [
 
     // Select the first channel by default
     setSelectedChannel(selectedChannels[0]);
-  }, [selectedChannels, initialChannelDiscounts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only on mount
 
   // Restore negotiated rates if coming back
   useEffect(() => {
     if (initialNegotiatedRates) {
       setNegotiatedRates(initialNegotiatedRates);
     }
-  }, [initialNegotiatedRates]);
-
+    if (initialManualOverride) {
+      setManualOverride(initialManualOverride);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only on mount
 
   // --- Logic to re-load programs when channel, TG, OR client changes ---
-// --- Logic to re-load programs when channel, TG, OR client changes ---
-useEffect(() => {
-  if (!selectedChannel) return;
-  setLoadingPrograms(true);
+  useEffect(() => {
+    if (!selectedChannel) return;
+    setLoadingPrograms(true);
 
-  // Determine the base state for the current selection
-  const isSpecialChannel = SPECIAL_CHANNELS.includes(selectedChannel);
-  const isCargillsDerana = selectedChannel === CARGILLS_CHANNEL && selectedClient === CARGILLS_CLIENT;
-  const isChannelLocked = isSpecialChannel || isCargillsDerana;
+    // Determine the base state for the current selection
+    const isSpecialChannel = SPECIAL_CHANNELS.includes(selectedChannel);
+    const isCargillsDerana = selectedChannel === CARGILLS_CHANNEL && selectedClient === CARGILLS_CLIENT;
+    const isChannelLocked = isSpecialChannel || isCargillsDerana;
 
-  // Set the discount to 0% if the channel is locked
-  if (isChannelLocked && channelDiscounts[selectedChannel] !== 0) {
-    setChannelDiscounts(prev => ({
-      ...prev,
-      [selectedChannel]: 0,
-    }));
-  }
+    // Set the discount to 0% if the channel is locked
+    if (isChannelLocked && channelDiscounts[selectedChannel] !== 0) {
+      setChannelDiscounts(prev => ({
+        ...prev,
+        [selectedChannel]: 0,
+      }));
+    }
 
-  fetch(`https://optwebapp-production.up.railway.app/programs?channel=${encodeURIComponent(selectedChannel)}`)
-    .then(res => res.json())
-    .then(data => {
-      const rows = (data.programs || []).map(p => {
-        const tvrValue = toNumber(p[selectedTG] ?? 0);
-        const dbNet = isSpecialChannel ? toNumber(p.net_cost) : null;
-        const cargillsRate = isCargillsDerana ? toNumber(p.cargills_rate) : null;
+    const controller = new AbortController();
+    const signal = controller.signal;
 
-        return {
-          id: p.id,
-          day: p.day,
-          time: p.time,
-          program: p.program,
-          cost: toNumber(p.cost),
-          cargillsRate: cargillsRate,
-          tvr: tvrValue,
-          slot: p.slot,
-          channel: selectedChannel,
-          dbNet,
-          isSpecial: isSpecialChannel || isCargillsDerana,
-        };
-      });
+    fetch(`https://optwebapp-production.up.railway.app/programs?channel=${encodeURIComponent(selectedChannel)}`, { signal })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch');
+        return res.json();
+      })
+      .then(data => {
+        if (signal.aborted) return;
+        const rows = (data.programs || []).map(p => {
+          const tvrValue = toNumber(p[selectedTG] ?? 0);
+          const dbNet = isSpecialChannel ? toNumber(p.net_cost) : null;
+          const cargillsRate = isCargillsDerana ? toNumber(p.cargills_rate) : null;
 
-      setPrograms(rows);
-
-      // Seed negotiated rates - FIXED LOGIC
-      setNegotiatedRates(prev => {
-        const next = { ...prev };
-
-        rows.forEach(r => {
-          const existing = initialNegotiatedRates?.[r.id] ?? prev[r.id];
-
-          // If we have an existing value AND it's manually overridden, keep it
-          if (existing != null && manualOverride[r.id]) {
-            next[r.id] = existing;
-          }
-          // Otherwise, calculate based on channel type
-          else if (isCargillsDerana) {
-            // NEW: Use cargills_rate for Cargills on Derana TV
-            const baseRate = r.cargillsRate && !Number.isNaN(r.cargillsRate) ? r.cargillsRate : r.cost;
-            next[r.id] = baseRate;
-          } else if (isSpecialChannel) {
-            // For existing special channels, use DB net_cost
-            const baseNet = r.dbNet && !Number.isNaN(r.dbNet) ? r.dbNet : r.cost;
-            next[r.id] = baseNet;
-          } else {
-            // Normal channels → discounted cost
-            const discPct = toNumber(channelDiscounts[selectedChannel] ?? 30);
-            const disc = discPct / 100;
-            next[r.id] = +(r.cost * (1 - disc)).toFixed(2);
-          }
+          return {
+            id: p.id,
+            day: p.day,
+            time: p.time,
+            program: p.program,
+            cost: toNumber(p.cost),
+            cargillsRate: cargillsRate,
+            tvr: tvrValue,
+            slot: p.slot,
+            channel: selectedChannel,
+            dbNet,
+            isSpecial: isSpecialChannel || isCargillsDerana,
+          };
         });
 
-        return next;
+        setPrograms(rows);
+
+        // Seed negotiated rates - FIXED LOGIC
+        setNegotiatedRates(prev => {
+          const next = { ...prev };
+
+          rows.forEach(r => {
+            // Priority 1: Check if there's an existing override in the manualOverride state
+            // Priority 2: Check if there's an already set negotiated rate for this ID (from props/prev state) AND it was marked as manual
+            const isOverridden = manualOverride[r.id] || (initialManualOverride && initialManualOverride[r.id]);
+
+            if (isOverridden) {
+              // Keep the existing rate if we have one, otherwise use the one passed in props
+              next[r.id] = prev[r.id] !== undefined ? prev[r.id] : (initialNegotiatedRates?.[r.id] ?? prev[r.id]);
+            }
+            // Otherwise, calculate based on channel type
+            else if (isCargillsDerana) {
+              // NEW: Use cargills_rate for Cargills on Derana TV
+              const baseRate = r.cargillsRate && !Number.isNaN(r.cargillsRate) ? r.cargillsRate : r.cost;
+              next[r.id] = baseRate;
+            } else if (isSpecialChannel) {
+              // For existing special channels, use DB net_cost
+              const baseNet = r.dbNet && !Number.isNaN(r.dbNet) ? r.dbNet : r.cost;
+              next[r.id] = baseNet;
+            } else {
+              // Normal channels → discounted cost
+              const discPct = toNumber(channelDiscounts[selectedChannel] ?? 30);
+              const disc = discPct / 100;
+              next[r.id] = +(r.cost * (1 - disc)).toFixed(2);
+            }
+          });
+
+          return next;
+        });
+      })
+      .catch(err => {
+        if (err.name !== 'AbortError') {
+          console.error("Fetch error:", err);
+        }
+      })
+      .finally(() => {
+        if (!signal.aborted) setLoadingPrograms(false);
       });
-    })
-    .finally(() => setLoadingPrograms(false));
-}, [selectedChannel, selectedTG, selectedClient, initialNegotiatedRates]); // Added initialNegotiatedRates dependency
+
+    return () => controller.abort();
+  }, [selectedChannel, selectedTG, selectedClient]); // Removed initialNegotiatedRates dependency
 
   // --- Recompute negotiated rates when discount for selected channel changes (non-special only) ---
   useEffect(() => {
@@ -198,11 +219,11 @@ useEffect(() => {
             let baseRate = r.cost; // Default fallback
 
             if (selectedChannel === CARGILLS_CHANNEL && selectedClient === CARGILLS_CLIENT) {
-                // Cargills/Derana: use the special rate
-                baseRate = r.cargillsRate && !Number.isNaN(r.cargillsRate) ? r.cargillsRate : r.cost;
+              // Cargills/Derana: use the special rate
+              baseRate = r.cargillsRate && !Number.isNaN(r.cargillsRate) ? r.cargillsRate : r.cost;
             } else if (SPECIAL_CHANNELS.includes(selectedChannel)) {
-                // Existing special channels: use DB net_cost
-                baseRate = r.dbNet && !Number.isNaN(r.dbNet) ? r.dbNet : r.cost;
+              // Existing special channels: use DB net_cost
+              baseRate = r.dbNet && !Number.isNaN(r.dbNet) ? r.dbNet : r.cost;
             }
             next[r.id] = baseRate;
           }
@@ -225,6 +246,24 @@ useEffect(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelDiscounts[selectedChannel], selectedClient]);
 
+  // --- Auto-save state to parent ---
+  const onChangeRef = React.useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    if (onChangeRef.current) {
+      onChangeRef.current({
+        channelDiscounts,
+        negotiatedRates,
+        selectedTG,
+        selectedClient,
+        manualOverride // Add this
+      });
+    }
+  }, [channelDiscounts, negotiatedRates, selectedTG, selectedClient, manualOverride]);
+
   const handleChannelSelect = e => {
     setSelectedChannel(e.target.value);
   };
@@ -244,18 +283,18 @@ useEffect(() => {
   };
 
   const handleClientChange = e => {
-      const newClient = e.target.value;
-      setSelectedClient(newClient);
-      
-      // If the new client selection locks the discount, enforce 0%
-      if (isDiscountLocked(selectedChannel, newClient) && channelDiscounts[selectedChannel] !== 0) {
-        setChannelDiscounts(prev => ({
-            ...prev,
-            [selectedChannel]: 0,
-        }));
-      }
-      
-      // The main useEffect (watching selectedClient) will handle program rate recomputation.
+    const newClient = e.target.value;
+    setSelectedClient(newClient);
+
+    // If the new client selection locks the discount, enforce 0%
+    if (isDiscountLocked(selectedChannel, newClient) && channelDiscounts[selectedChannel] !== 0) {
+      setChannelDiscounts(prev => ({
+        ...prev,
+        [selectedChannel]: 0,
+      }));
+    }
+
+    // The main useEffect (watching selectedClient) will handle program rate recomputation.
   }
 
 
@@ -266,9 +305,9 @@ useEffect(() => {
       const next = { ...prev };
 
       if (isCargillsDerana) {
-          // Reset to Cargills rate
-          const baseRate = row.cargillsRate && !Number.isNaN(row.cargillsRate) ? row.cargillsRate : row.cost;
-          next[row.id] = baseRate;
+        // Reset to Cargills rate
+        const baseRate = row.cargillsRate && !Number.isNaN(row.cargillsRate) ? row.cargillsRate : row.cost;
+        next[row.id] = baseRate;
       } else if (SPECIAL_CHANNELS.includes(row.channel)) {
         // Reset to DB net_cost (or cost) for existing special channels
         const baseNet = row.dbNet && !Number.isNaN(row.dbNet) ? row.dbNet : row.cost;
@@ -417,18 +456,18 @@ useEffect(() => {
             <option key={i} value={c}>{c}</option>
           ))}
         </select>
-        
+
         {/* --- NEW CLIENT DROPDOWN --- */}
         <label style={styles.label}>Client:</label>
         <select
-            id="client-select"
-            value={selectedClient}
-            onChange={handleClientChange}
-            style={styles.select}
+          id="client-select"
+          value={selectedClient}
+          onChange={handleClientChange}
+          style={styles.select}
         >
-            {CLIENT_OPTIONS.map(option => (
-                <option key={option.key} value={option.key}>{option.label}</option>
-            ))}
+          {CLIENT_OPTIONS.map(option => (
+            <option key={option.key} value={option.key}>{option.label}</option>
+          ))}
         </select>
         {/* --------------------------- */}
 
@@ -480,19 +519,32 @@ useEffect(() => {
             Programs for {selectedChannel}
           </h3>
           {isCurrentDiscountLocked && (
-             <span style={{ 
-                color: selectedChannel === CARGILLS_CHANNEL ? '#9b2c2c' : '#2c5282', 
-                backgroundColor: selectedChannel === CARGILLS_CHANNEL ? '#fed7d7' : '#ebf8ff', 
-                padding: '4px 8px',
-                borderRadius: '4px',
-                fontSize: '12px',
-                fontWeight: '600'
-             }}>
-                {selectedChannel === CARGILLS_CHANNEL ? 'Cargills Negotiated Rate' : 'Special Channel Rate'}
-             </span>
+            <span style={{
+              color: selectedChannel === CARGILLS_CHANNEL ? '#9b2c2c' : '#2c5282',
+              backgroundColor: selectedChannel === CARGILLS_CHANNEL ? '#fed7d7' : '#ebf8ff',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontSize: '12px',
+              fontWeight: '600'
+            }}>
+              {selectedChannel === CARGILLS_CHANNEL ? 'Cargills Negotiated Rate' : 'Special Channel Rate'}
+            </span>
           )}
         </div>
       )}
+
+      {/* Helper text */}
+      <div style={{
+        marginBottom: '12px',
+        fontSize: '14px',
+        color: '#718096',
+        backgroundColor: '#f7fafc',
+        padding: '8px 12px',
+        borderRadius: '6px',
+        display: 'inline-block'
+      }}>
+        💡 Rates highlighted in <span style={{ backgroundColor: '#fffaf0', border: '1px solid #ecc94b', padding: '0 4px', borderRadius: '4px', color: '#744210' }}>light yellow</span> have been manually overridden and will <strong>not</strong> update if you change the discount percentage. Click 'Reset' to revert to the calculated rate.
+      </div>
 
       {/* Table */}
       <div style={styles.tableContainer}>
@@ -530,7 +582,12 @@ useEffect(() => {
                       type="number"
                       value={negotiatedRates[p.id] ?? 0}
                       onChange={e => handleNegotiatedRateChange(p.id, e.target.value)}
-                      style={styles.inputCell}
+                      style={{
+                        ...styles.inputCell,
+                        backgroundColor: manualOverride[p.id] ? '#fffaf0' : 'white', // Pale yellow for overridden
+                        borderColor: manualOverride[p.id] ? '#ecc94b' : '#e2e8f0', // Darker yellow border
+                      }}
+                      title={manualOverride[p.id] ? "This rate has been manually overridden" : "Calculated from discount"}
                     />
                   </td>
                   <td style={{ ...styles.td, ...styles.center }}>
@@ -553,7 +610,7 @@ useEffect(() => {
       <div style={styles.buttonRow}>
         <button onClick={onBack} style={styles.backButton}>Back</button>
         <button
-          onClick={() => onProceed({ channelDiscounts, negotiatedRates, selectedTG, selectedClient })} // 👈 PASS selectedClient
+          onClick={() => onProceed({ channelDiscounts, negotiatedRates, selectedTG, selectedClient, manualOverride })} // 👈 PASS selectedClient AND manualOverride
           style={styles.primaryButton}
         >
           Proceed

@@ -15,39 +15,39 @@ export default function CommercialBenefitSetup({
   initialState,
   onSaveState,
 }) {
-    const safeInit = initialState || {};
+  const safeInit = initialState || {};
 
-    const [primePct, setPrimePct] = useState(safeInit.primePct ?? 80);
-    const [nonPrimePct, setNonPrimePct] = useState(safeInit.nonPrimePct ?? 20);
-    const [maxSpots, setMaxSpots] = useState(safeInit.maxSpots ?? (optimizationInput?.maxSpots || 10));
-    const [timeLimit, setTimeLimit] = useState(safeInit.timeLimit ?? (optimizationInput?.timeLimit || 120));
-    const [budgetProportions, setBudgetProportions] = useState(
-      safeInit.budgetProportions ??
-      optimizationInput?.budgetProportions ??
-      Array(optimizationInput?.numCommercials || 1).fill((100 / (optimizationInput?.numCommercials || 1)).toFixed(2))
-    );
-    // NEW: Per-channel Commercial budget splits
-    const [channelCommercialSplits, setChannelCommercialSplits] = useState(() => {
-      if (safeInit.channelCommercialSplits) return safeInit.channelCommercialSplits;
+  const [primePct, setPrimePct] = useState(safeInit.primePct ?? 80);
+  const [nonPrimePct, setNonPrimePct] = useState(safeInit.nonPrimePct ?? 20);
+  const [maxSpots, setMaxSpots] = useState(safeInit.maxSpots ?? (optimizationInput?.maxSpots || 10));
+  const [timeLimit, setTimeLimit] = useState(safeInit.timeLimit ?? (optimizationInput?.timeLimit || 120));
+  const [budgetProportions, setBudgetProportions] = useState(
+    safeInit.budgetProportions ??
+    optimizationInput?.budgetProportions ??
+    Array(optimizationInput?.numCommercials || 1).fill((100 / (optimizationInput?.numCommercials || 1)).toFixed(2))
+  );
+  // NEW: Per-channel Commercial budget splits
+  const [channelCommercialSplits, setChannelCommercialSplits] = useState(() => {
+    if (safeInit.channelCommercialSplits) return safeInit.channelCommercialSplits;
 
-      const seed = {};
-      (channels || []).forEach(ch => {
-        // ✅ Use inline logic instead of toNum
-        seed[ch] = (budgetProportions || []).map(v =>
-          isNaN(parseFloat(v)) ? 0 : parseFloat(v)
-        );
-      });
-      return seed;
+    const seed = {};
+    (channels || []).forEach(ch => {
+      // ✅ Use inline logic instead of toNum
+      seed[ch] = (budgetProportions || []).map(v =>
+        isNaN(parseFloat(v)) ? 0 : parseFloat(v)
+      );
     });
+    return seed;
+  });
 
 
-    const [channelMaxSpots, setChannelMaxSpots] = useState(
-      safeInit.channelMaxSpots ?? {}
-    );
+  const [channelMaxSpots, setChannelMaxSpots] = useState(
+    safeInit.channelMaxSpots ?? {}
+  );
 
-    const [channelWeekendMaxSpots, setChannelWeekendMaxSpots] = useState(
-      safeInit.channelWeekendMaxSpots ?? {}
-    );
+  const [channelWeekendMaxSpots, setChannelWeekendMaxSpots] = useState(
+    safeInit.channelWeekendMaxSpots ?? {}
+  );
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [stopRequested, setStopRequested] = useState(false);
@@ -55,22 +55,50 @@ export default function CommercialBenefitSetup({
   const [result, setResult] = useState(null);
 
   // Per-channel splits
-    const [channelSplits, setChannelSplits] = useState(() => {
-      if (safeInit.channelSplits) return safeInit.channelSplits;   // ⭐ RESTORE SAVED STATE
+  const [channelSplits, setChannelSplits] = useState(() => {
+    if (safeInit.channelSplits) return safeInit.channelSplits;   // ⭐ RESTORE SAVED STATE
 
-      // default initialization
-      const seed = {};
-      (channels || []).forEach(ch => {
-        if (ch === 'HIRU TV') {
-          const avgPrime = 80 / 5;
-          seed[ch] = { A1: avgPrime, A2: avgPrime, A3: avgPrime, A4: avgPrime, A5: avgPrime, B: 20 };
-        } else {
-          seed[ch] = { prime: 80, nonprime: 20 };
-        }
-      });
-      return seed;
+    // default initialization
+    const seed = {};
+    (channels || []).forEach(ch => {
+      if (ch === 'HIRU TV') {
+        const avgPrime = 80 / 5;
+        seed[ch] = { A1: avgPrime, A2: avgPrime, A3: avgPrime, A4: avgPrime, A5: avgPrime, B: 20 };
+      } else {
+        seed[ch] = { prime: 80, nonprime: 20 };
+      }
     });
+    return seed;
+  });
 
+
+  // --- Auto-save state ---
+  useEffect(() => {
+    if (typeof onSaveState === "function") {
+      onSaveState({
+        primePct,
+        nonPrimePct,
+        maxSpots,
+        timeLimit,
+        budgetProportions,
+        channelSplits,
+        channelCommercialSplits,
+        channelMaxSpots,
+        channelWeekendMaxSpots
+      });
+    }
+  }, [
+    primePct,
+    nonPrimePct,
+    maxSpots,
+    timeLimit,
+    budgetProportions,
+    channelSplits,
+    channelCommercialSplits,
+    channelMaxSpots,
+    channelWeekendMaxSpots,
+    onSaveState
+  ]);
 
   const toNum = (v) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
   const formatLKR = (n) => `Rs. ${Number(n || 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`;
@@ -94,17 +122,17 @@ export default function CommercialBenefitSetup({
     return errs;
   }, [benefitChannels, channelSplits]);
 
-    const perChannelCommercialErrors = useMemo(() => {
-      const errs = {};
-      if ((optimizationInput?.numCommercials || 1) <= 1) return errs;
+  const perChannelCommercialErrors = useMemo(() => {
+    const errs = {};
+    if ((optimizationInput?.numCommercials || 1) <= 1) return errs;
 
-      benefitChannels.forEach(ch => {
-        const arr = channelCommercialSplits[ch] || [];
-        const sum = arr.reduce((a, v) => a + toNum(v), 0);
-        if (Math.abs(sum - 100) > 0.01) errs[ch] = true;
-      });
-      return errs;
-    }, [benefitChannels, channelCommercialSplits, optimizationInput, toNum]);
+    benefitChannels.forEach(ch => {
+      const arr = channelCommercialSplits[ch] || [];
+      const sum = arr.reduce((a, v) => a + toNum(v), 0);
+      if (Math.abs(sum - 100) > 0.01) errs[ch] = true;
+    });
+    return errs;
+  }, [benefitChannels, channelCommercialSplits, optimizationInput, toNum]);
 
   // Small countdown indicator (same UX feel)
   const [countdown, setCountdown] = useState(null);
@@ -130,10 +158,10 @@ export default function CommercialBenefitSetup({
     return () => { if (id) clearInterval(id); };
   }, [isProcessing, timeLimit]);
 
-    useEffect(() => {
-      // Hide old results when user enters this page again
-      setResult(null);
-    }, []);
+  useEffect(() => {
+    // Hide old results when user enters this page again
+    setResult(null);
+  }, []);
 
   const applyGlobalToAllChannels = () => {
     const next = {};
@@ -169,22 +197,22 @@ export default function CommercialBenefitSetup({
     setBudgetProportions(next);
   };
 
-    const handleChannelCommercialChange = (ch, idx, val) => {
-      setChannelCommercialSplits(prev => {
-        const next = Array.isArray(prev[ch]) ? [...prev[ch]] : [];
-        next[idx] = toNum(val);
-        return { ...prev, [ch]: next };
-      });
-    };
+  const handleChannelCommercialChange = (ch, idx, val) => {
+    setChannelCommercialSplits(prev => {
+      const next = Array.isArray(prev[ch]) ? [...prev[ch]] : [];
+      next[idx] = toNum(val);
+      return { ...prev, [ch]: next };
+    });
+  };
 
-    const applyGlobalCommercialToAllChannels = () => {
-      const next = {};
-      benefitChannels.forEach(ch => {
-        next[ch] = budgetProportions.map(v => toNum(v));
-      });
-      setChannelCommercialSplits(next);
-      toast.info('Applied global Commercial split to all channels');
-    };
+  const applyGlobalCommercialToAllChannels = () => {
+    const next = {};
+    benefitChannels.forEach(ch => {
+      next[ch] = budgetProportions.map(v => toNum(v));
+    });
+    setChannelCommercialSplits(next);
+    toast.info('Applied global Commercial split to all channels');
+  };
 
 
   const styles = {
@@ -316,44 +344,44 @@ export default function CommercialBenefitSetup({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
-    .then(async (res) => {
-      let data;
-      try { data = await res.json(); }
-      catch { throw new Error('Server returned invalid JSON.'); }
-      if (!res.ok) {
-        const err = new Error(data?.message || `Server error (${res.status})`);
-        err.solver_status = data?.solver_status;
-        throw err;
-      }
-      return data;
-    })
-    .then((data) => {
-      if (stopRequested) return;
-
-      if (data?.success !== true) {
-        window.alert(data?.message || 'No feasible solution found.');
-        return;
-      }
-
-      const adapted = {
-        tables: {
-          by_program: Array.isArray(data.df_result) ? data.df_result : [],
-          by_channel: Array.isArray(data.channel_summary) ? data.channel_summary : []
-        },
-        commercials_summary: Array.isArray(data.commercials_summary) ? data.commercials_summary : [],
-        totals: {
-          total_budget_incl_property: data.total_cost,
-          total_cost_incl_property: data.total_cost,
-          total_rating: data.total_rating
-        },
-        inclusiveTotals: {
-          totalBudgetIncl: toNum(data.total_cost),
-          totalNGRPIncl: toNum(data.total_rating),
-          cprpIncl: toNum(data.total_rating) > 0
-            ? toNum(data.total_cost) / toNum(data.total_rating)
-            : 0
+      .then(async (res) => {
+        let data;
+        try { data = await res.json(); }
+        catch { throw new Error('Server returned invalid JSON.'); }
+        if (!res.ok) {
+          const err = new Error(data?.message || `Server error (${res.status})`);
+          err.solver_status = data?.solver_status;
+          throw err;
         }
-      };
+        return data;
+      })
+      .then((data) => {
+        if (stopRequested) return;
+
+        if (data?.success !== true) {
+          window.alert(data?.message || 'No feasible solution found.');
+          return;
+        }
+
+        const adapted = {
+          tables: {
+            by_program: Array.isArray(data.df_result) ? data.df_result : [],
+            by_channel: Array.isArray(data.channel_summary) ? data.channel_summary : []
+          },
+          commercials_summary: Array.isArray(data.commercials_summary) ? data.commercials_summary : [],
+          totals: {
+            total_budget_incl_property: data.total_cost,
+            total_cost_incl_property: data.total_cost,
+            total_rating: data.total_rating
+          },
+          inclusiveTotals: {
+            totalBudgetIncl: toNum(data.total_cost),
+            totalNGRPIncl: toNum(data.total_rating),
+            cprpIncl: toNum(data.total_rating) > 0
+              ? toNum(data.total_cost) / toNum(data.total_rating)
+              : 0
+          }
+        };
 
         setResult(adapted);
 
@@ -363,15 +391,15 @@ export default function CommercialBenefitSetup({
           if (el) el.scrollIntoView({ behavior: "smooth" });
         }, 300);
 
-      onResultReady?.({ raw: data, final: adapted, inclusiveTotals: adapted.inclusiveTotals });
-      toast.success('Commercial Benefit optimization complete.');
-    })
+        onResultReady?.({ raw: data, final: adapted, inclusiveTotals: adapted.inclusiveTotals });
+        toast.success('Commercial Benefit optimization complete.');
+      })
 
-    .catch(err => {
-      if (stopRequested) return;
-      window.alert(err?.message || 'Commercial Benefit optimization failed.');
-    })
-    .finally(() => setIsProcessing(false));
+      .catch(err => {
+        if (stopRequested) return;
+        window.alert(err?.message || 'Commercial Benefit optimization failed.');
+      })
+      .finally(() => setIsProcessing(false));
   };
 
   const handleStop = () => {
@@ -399,7 +427,7 @@ export default function CommercialBenefitSetup({
             <div key={ch} style={styles.card}>
               <div style={styles.head}>
                 <div style={styles.headInfo}>
-                  <img src={getLogoPath(ch)} alt={ch} style={styles.logo} onError={(e)=>{e.target.style.display='none';}} />
+                  <img src={getLogoPath(ch)} alt={ch} style={styles.logo} onError={(e) => { e.target.style.display = 'none'; }} />
                   <div style={{ fontWeight: 'bold', fontSize: 16, color: '#2d3748' }}>{ch}</div>
                 </div>
               </div>
@@ -407,63 +435,63 @@ export default function CommercialBenefitSetup({
               <div style={styles.amountBox}><strong>Channel Budget:</strong> {formatLKR(chAmount)}</div>
               <div style={styles.amountBox}><strong>Commercial Benefit:</strong> {formatLKR(comBenefit)}</div>
 
-                <div style={styles.splitWrap}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                    <span style={{ ...styles.label, minWidth: 140 }}>
-                      Max Spots (Channel):
-                    </span>
+              <div style={styles.splitWrap}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ ...styles.label, minWidth: 140 }}>
+                    Max Spots (Channel):
+                  </span>
 
-                    <input
-                      type="number"
-                      min="1"
-                      value={channelMaxSpots?.[ch] ?? maxSpots}
-                      onChange={e =>
-                        setChannelMaxSpots(prev => ({
-                          ...prev,
-                          [ch]: parseInt(e.target.value)
-                        }))
-                      }
-                      style={{ ...styles.numberInput, width: 70 }}
-                    />
+                  <input
+                    type="number"
+                    min="1"
+                    value={channelMaxSpots?.[ch] ?? maxSpots}
+                    onChange={e =>
+                      setChannelMaxSpots(prev => ({
+                        ...prev,
+                        [ch]: parseInt(e.target.value)
+                      }))
+                    }
+                    style={{ ...styles.numberInput, width: 70 }}
+                  />
 
-                    <span style={{ fontSize: 12, color:'#64748b' }}>
-                    </span>
-                  </div>
-
-                    <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:6 }}>
-                      <span style={{ ...styles.label, minWidth: 140 }}>
-                        Max Spots (WE Program):
-                      </span>
-
-                      <input
-                        type="number"
-                        min="1"
-                        value={
-                          channelWeekendMaxSpots?.[ch] ??
-                          channelMaxSpots?.[ch] ??
-                          maxSpots
-                        }
-                        onChange={e =>
-                          setChannelWeekendMaxSpots(prev => ({
-                            ...prev,
-                            [ch]: parseInt(e.target.value)
-                          }))
-                        }
-                        style={{ ...styles.numberInput, width: 70 }}
-                      />
-
-                      <span style={{ fontSize: 12, color:'#64748b' }}>
-                        Weekend only
-                      </span>
-                    </div>
-
-
+                  <span style={{ fontSize: 12, color: '#64748b' }}>
+                  </span>
                 </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                  <span style={{ ...styles.label, minWidth: 140 }}>
+                    Max Spots (WE Program):
+                  </span>
+
+                  <input
+                    type="number"
+                    min="1"
+                    value={
+                      channelWeekendMaxSpots?.[ch] ??
+                      channelMaxSpots?.[ch] ??
+                      maxSpots
+                    }
+                    onChange={e =>
+                      setChannelWeekendMaxSpots(prev => ({
+                        ...prev,
+                        [ch]: parseInt(e.target.value)
+                      }))
+                    }
+                    style={{ ...styles.numberInput, width: 70 }}
+                  />
+
+                  <span style={{ fontSize: 12, color: '#64748b' }}>
+                    Weekend only
+                  </span>
+                </div>
+
+
+              </div>
 
               <div style={styles.splitWrap}>
                 {!isHiru ? (
                   <>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ ...styles.label, minWidth: 90 }}>Prime Time:</span>
                       <input
                         type="number"
@@ -475,7 +503,7 @@ export default function CommercialBenefitSetup({
                       <span style={styles.amountBox}>{formatLKR((comBenefit * toNum(splits.prime ?? primePct)) / 100)}</span>
                     </div>
 
-                    <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ ...styles.label, minWidth: 90 }}>Non-Prime:</span>
                       <input
                         type="number"
@@ -503,7 +531,7 @@ export default function CommercialBenefitSetup({
                       const amount = (comBenefit * pct) / 100;
 
                       return (
-                        <div key={slot} style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                        <div key={slot} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <span style={{ ...styles.label, minWidth: 120 }}>{slotLabels[slot]}:</span>
                           <input
                             type="number"
@@ -521,40 +549,40 @@ export default function CommercialBenefitSetup({
                 {hasErr && <div style={styles.error}>Splits must total 100%</div>}
               </div>
               {Number(optimizationInput?.numCommercials || 1) > 1 && (
-  <div style={{ marginTop: 12 }}>
-    <strong style={styles.label}>Commercial Split</strong>
+                <div style={{ marginTop: 12 }}>
+                  <strong style={styles.label}>Commercial Split</strong>
 
-    {Array.from({ length: optimizationInput.numCommercials }).map((_, ci) => {
-      const pct = toNum(channelCommercialSplits[ch]?.[ci] ?? budgetProportions?.[ci] ?? 0);
-      const amt = (comBenefit * pct) / 100;
+                  {Array.from({ length: optimizationInput.numCommercials }).map((_, ci) => {
+                    const pct = toNum(channelCommercialSplits[ch]?.[ci] ?? budgetProportions?.[ci] ?? 0);
+                    const amt = (comBenefit * pct) / 100;
 
-      return (
-        <div key={ci} style={{ display:'flex', alignItems:'center', gap:8, marginTop:6 }}>
-          <span style={{ ...styles.label, minWidth: 110 }}>
-            Commercial {ci + 1}:
-          </span>
+                    return (
+                      <div key={ci} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                        <span style={{ ...styles.label, minWidth: 110 }}>
+                          Commercial {ci + 1}:
+                        </span>
 
-          <input
-            type="number"
-            value={pct}
-            onChange={e => handleChannelCommercialChange(ch, ci, e.target.value)}
-            style={{
-              ...styles.numberInput,
-              width: 70,
-              borderColor: perChannelCommercialErrors[ch] ? '#e53e3e' : '#e2e8f0'
-            }}
-          />
-          <span style={styles.percentSymbol}>%</span>
-          <span style={styles.amountBox}>{formatLKR(amt)}</span>
-        </div>
-      );
-    })}
+                        <input
+                          type="number"
+                          value={pct}
+                          onChange={e => handleChannelCommercialChange(ch, ci, e.target.value)}
+                          style={{
+                            ...styles.numberInput,
+                            width: 70,
+                            borderColor: perChannelCommercialErrors[ch] ? '#e53e3e' : '#e2e8f0'
+                          }}
+                        />
+                        <span style={styles.percentSymbol}>%</span>
+                        <span style={styles.amountBox}>{formatLKR(amt)}</span>
+                      </div>
+                    );
+                  })}
 
-    {perChannelCommercialErrors[ch] && (
-      <div style={styles.error}>Commercial % must total 100%</div>
-    )}
-  </div>
-)}
+                  {perChannelCommercialErrors[ch] && (
+                    <div style={styles.error}>Commercial % must total 100%</div>
+                  )}
+                </div>
+              )}
 
             </div>
           );
@@ -613,7 +641,7 @@ export default function CommercialBenefitSetup({
           <h3 style={styles.sectionTitle}>Override Budget percentage per Commercial</h3>
           <div style={styles.commercialGrid}>
             {budgetProportions.map((val, idx) => (
-              <div key={idx} style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <label style={{ ...styles.label, minWidth: 110 }}>Commercial {idx + 1}:</label>
                 <input
                   type="number"
@@ -625,15 +653,15 @@ export default function CommercialBenefitSetup({
               </div>
             ))}
           </div>
-          <div style={{ background:'#edf2f7', padding:'8px 12px', borderRadius:6, fontSize:14, color:'#4a5568', marginTop:8 }}>
-            Total must be 100% — Current: {budgetProportions.reduce((a,b)=>a+(isNaN(parseFloat(b))?0:parseFloat(b)),0).toFixed(2)}%
+          <div style={{ background: '#edf2f7', padding: '8px 12px', borderRadius: 6, fontSize: 14, color: '#4a5568', marginTop: 8 }}>
+            Total must be 100% — Current: {budgetProportions.reduce((a, b) => a + (isNaN(parseFloat(b)) ? 0 : parseFloat(b)), 0).toFixed(2)}%
           </div>
           <button
-              type="button"
-              onClick={applyGlobalCommercialToAllChannels}
-              style={{ marginTop: 8, padding: '6px 10px', border: '1px solid #cbd5e0', background: '#edf2f7', borderRadius: 6 }}
-            >
-              Apply global commercial split to all channels
+            type="button"
+            onClick={applyGlobalCommercialToAllChannels}
+            style={{ marginTop: 8, padding: '6px 10px', border: '1px solid #cbd5e0', background: '#edf2f7', borderRadius: 6 }}
+          >
+            Apply global commercial split to all channels
           </button>
         </div>
       )}
@@ -667,16 +695,16 @@ export default function CommercialBenefitSetup({
         {/* You can optionally show a “Proceed to Bonus” hint/button here after success, but we route from parent. */}
       </div>
       {result && (
-      <div style={{ marginTop: '32px' }}>
-        <CommercialBenefitResults
-          result={result}
-          onProceedToBonus={onProceedToBonus}   // 👈 pass from props
-          onHome={onHome}
-          onBack={onBack}                 // 👈 pass from props
-          formatLKR={formatLKR}
-        />
-      </div>
-    )}
+        <div style={{ marginTop: '32px' }}>
+          <CommercialBenefitResults
+            result={result}
+            onProceedToBonus={onProceedToBonus}   // 👈 pass from props
+            onHome={onHome}
+            onBack={onBack}                 // 👈 pass from props
+            formatLKR={formatLKR}
+          />
+        </div>
+      )}
     </div>
   );
 }

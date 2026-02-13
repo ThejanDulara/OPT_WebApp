@@ -167,7 +167,46 @@ function ChannelRatingAllocator({
     setChannelCommercialSplits(initialState.channelCommercialSplits || {});
     setChannelMaxSpots(initialState.channelMaxSpots || {}); // ⭐ RESTORE THIS
     setChannelWeekendMaxSpots(initialState.channelWeekendMaxSpots || {});
-  }, [initialState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only on mount
+
+  // --- Auto-save state ---
+  useEffect(() => {
+    if (typeof onSaveState === "function") {
+      onSaveState({
+        budgetShares,
+        maxSpots,
+        timeLimit,
+        primePct,
+        nonPrimePct,
+        channelSplits,
+        hasProperty,
+        propertyAmounts,
+        propertyPrograms,
+        propertyPercents,
+        budgetProportions,
+        channelCommercialSplits,
+        channelMaxSpots,
+        channelWeekendMaxSpots
+      });
+    }
+  }, [
+    budgetShares,
+    maxSpots,
+    timeLimit,
+    primePct,
+    nonPrimePct,
+    channelSplits,
+    hasProperty,
+    propertyAmounts,
+    propertyPrograms,
+    propertyPercents,
+    budgetProportions,
+    channelCommercialSplits,
+    channelMaxSpots,
+    channelWeekendMaxSpots,
+    onSaveState
+  ]);
 
   // Pass up channelMoney
   useEffect(() => {

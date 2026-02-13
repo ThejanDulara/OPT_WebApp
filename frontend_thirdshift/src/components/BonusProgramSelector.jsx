@@ -5,7 +5,7 @@ export default function BonusProgramSelector({
   channels = [],
   allDbPrograms = [],
   selectedBonusPrograms = {},               // { [channel]: Array<row> }
-  setSelectedBonusPrograms = () => {},
+  setSelectedBonusPrograms = () => { },
   onNext,
   onBack,
 }) {
@@ -67,7 +67,20 @@ export default function BonusProgramSelector({
       seeded[ch] = new Set(arr.map(rowKey));
     });
     setCheckedByChannel(seeded);
-  }, [channels, slotBByChannel, selectedBonusPrograms]); // Added selectedBonusPrograms to deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channels, slotBByChannel]); // Removed selectedBonusPrograms to avoid cycle
+
+  // --- Auto-save ---
+  useEffect(() => {
+    // Build {channel: Array<row>}
+    const payload = {};
+    channels.forEach((ch) => {
+      const keys = checkedByChannel[ch] || new Set();
+      const allRows = slotBByChannel[ch] || [];
+      payload[ch] = allRows.filter((r) => keys.has(rowKey(r)));
+    });
+    setSelectedBonusPrograms(payload);
+  }, [checkedByChannel, channels, slotBByChannel, setSelectedBonusPrograms]);
 
   const filteredRowsByChannel = useMemo(() => {
     const out = {};
@@ -151,8 +164,8 @@ export default function BonusProgramSelector({
     searchInput: { flex: 1, padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 6 },
     smlBtn: { padding: '6px 10px', borderRadius: 6, background: '#edf2f7', border: '1px solid #cbd5e0', cursor: 'pointer' },
     tableWrap: { maxHeight: 360, overflow: 'auto', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 },
-    table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 ,tableLayout: 'auto' },
-    th: {position: 'sticky',top: 0,background: '#f7fafc',borderBottom: '1px solid #e2e8f0',padding: '8px 10px',textAlign: 'center'},
+    table: { width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'auto' },
+    th: { position: 'sticky', top: 0, background: '#f7fafc', borderBottom: '1px solid #e2e8f0', padding: '8px 10px', textAlign: 'center' },
     td: { borderBottom: '1px solid #edf2f7', padding: '8px 10px', verticalAlign: 'top' },
     actions: { display: 'flex', gap: 12, marginTop: 16 },
     backBtn: { padding: '12px 18px', background: '#edf2f7', border: '1px solid #cbd5e0', borderRadius: 6, cursor: 'pointer' },
@@ -245,7 +258,7 @@ export default function BonusProgramSelector({
                       <th style={styles.th}>Program</th>
                       <th style={styles.th}>Day</th>
                       <th style={styles.th}>Time</th>
-                      <th style={{ ...styles.th, whiteSpace: 'nowrap'}}>RC Rate</th>
+                      <th style={{ ...styles.th, whiteSpace: 'nowrap' }}>RC Rate</th>
                       <th style={styles.th}>TVR</th>
                     </tr>
                   </thead>
@@ -265,9 +278,9 @@ export default function BonusProgramSelector({
                               onChange={() => toggleRow(ch, r)}
                             />
                           </td>
-                          <td style={{ ...styles.td, whiteSpace: 'nowrap'}}>{toStr(r.Program)}</td>
-                          <td style={{ ...styles.td, whiteSpace: 'nowrap'}}>{toStr(r.Day ?? r.Date ?? '')}</td>
-                          <td style={{ ...styles.td, whiteSpace: 'nowrap'}}>{toStr(time)}</td>
+                          <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>{toStr(r.Program)}</td>
+                          <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>{toStr(r.Day ?? r.Date ?? '')}</td>
+                          <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>{toStr(time)}</td>
                           <td style={styles.numTd}>{fmt(rate)}</td>
                           <td style={styles.numTd}>{toStr(tvr)}</td>
                         </tr>

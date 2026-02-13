@@ -1,10 +1,10 @@
-import React, { useEffect, useState ,useRef} from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
-function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRates ,channelDiscounts ,selectedTG ,selectedClient,}) {
+function DfPreview({ programIds, optimizationInput, onReady, goBack, negotiatedRates, channelDiscounts, selectedTG, selectedClient, }) {
   const [dfFull, setDfFull] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -14,15 +14,15 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
   const [optimizationFailed, setOptimizationFailed] = useState(false);
 
   // Define column orders and name mappings
-  const previewOrder = ['Commercial','Channel', 'Day', 'Time', 'Program', 'Cost', 'Negotiated_Rate', 'TVR', 'Slot','NCost', 'NTVR'];
-  const displayOrder = ['Channel', 'Program', 'Day', 'Time', 'Slot','Cost', 'TVR', 'NCost', 'NTVR', 'Total_Cost','GRP','Total_Rating', 'Spots'];
+  const previewOrder = ['Commercial', 'Channel', 'Day', 'Time', 'Program', 'Cost', 'Negotiated_Rate', 'TVR', 'Slot', 'NCost', 'NTVR'];
+  const displayOrder = ['Channel', 'Program', 'Day', 'Time', 'Slot', 'Cost', 'TVR', 'NCost', 'NTVR', 'Total_Cost', 'GRP', 'Total_Rating', 'Spots'];
   const channelSummaryOrder = ['Channel', 'Total_Cost', '% of Total'];
 
   const columnNameMappings_1 = {
     'Cost': 'Rate card (30 Sec)',
-   'Negotiated_Rate': 'Neg. Rate (30 Sec)',
-   'Slot': 'PT [A] / NPT [B]'
-   };
+    'Negotiated_Rate': 'Neg. Rate (30 Sec)',
+    'Slot': 'PT [A] / NPT [B]'
+  };
 
   const columnNameMappings_2 = {
     'Total_Cost': 'Total Budget',
@@ -37,15 +37,18 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
 
   const bottomRef = useRef(null);
 
-    const goDown = () => {
-      const summary = document.getElementById('optimization-summary');
-      if (summary) summary.scrollIntoView({ behavior: 'smooth' });
-      else bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    };
+  const goDown = () => {
+    const summary = document.getElementById('optimization-summary');
+    if (summary) summary.scrollIntoView({ behavior: 'smooth' });
+    else bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
 
   useEffect(() => {
-    if (!programIds.length || !optimizationInput) return;
+    if (!programIds || !programIds.length || !optimizationInput) {
+      setLoading(false);
+      return;
+    }
 
     const payload = {
       program_ids: programIds,
@@ -71,7 +74,7 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
         setError('Failed to fetch optimization table');
         setLoading(false);
       });
-  }, [programIds, optimizationInput ,selectedClient]);
+  }, [programIds, optimizationInput, selectedClient]);
 
   const handleStartOptimization = () => {
     setIsProcessing(true);
@@ -173,19 +176,29 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
   if (loading) return <div style={styles.loading}>Loading optimization table...</div>;
   if (error) return <div style={styles.error}>{error}</div>;
 
-    const totalGRP = (result?.commercials_summary || [])
-      .flatMap(c => c.details || [])
-      .reduce((sum, row) => sum + ((row.Spots || 0) * (row.TVR || 0)), 0);
+  if (!programIds || !programIds.length || !optimizationInput) {
+    return (
+      <div style={styles.error}>
+        <h3>No Optimization Data Found</h3>
+        <p>Please go back and ensure you have selected programs and configured optimization settings.</p>
+        <button onClick={goBack} style={styles.backButton}>Go Back</button>
+      </div>
+    );
+  }
+
+  const totalGRP = (result?.commercials_summary || [])
+    .flatMap(c => c.details || [])
+    .reduce((sum, row) => sum + ((row.Spots || 0) * (row.TVR || 0)), 0);
 
   return (
     <div style={styles.container}>
       <ToastContainer position="top-right" autoClose={3000} />
       <h2 style={styles.title}>Optimization-Ready Table</h2>
       <div style={styles.toolbar}>
-      <button type="button" onClick={goDown} style={styles.backButton_2}>
-        Go Down
-      </button>
-    </div>
+        <button type="button" onClick={goDown} style={styles.backButton_2}>
+          Go Down
+        </button>
+      </div>
 
       <div style={styles.tableContainer}>
         <table style={styles.table}>
@@ -204,7 +217,7 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
               <tr key={idx} style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
                 {previewOrder.map((col, i) => {
                   let val = row[col];
-                  const isNumeric = ['Cost', 'TVR', 'NCost', 'NTVR','Negotiated_Rate'].includes(col);
+                  const isNumeric = ['Cost', 'TVR', 'NCost', 'NTVR', 'Negotiated_Rate'].includes(col);
                   if (isNumeric) {
                     val = typeof val === 'number' ? val.toFixed(2) : parseFloat(val || 0).toFixed(2);
                   }
@@ -309,13 +322,13 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
                   {c.details.map((row, i) => (
                     <tr key={i} style={i % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
                       {displayOrder.map((key, j) => {
-                        const isNumeric = ['Cost', 'TVR', 'NCost', 'NTVR','Total_Cost' , 'Total_Rating','GRP'].includes(key);
+                        const isNumeric = ['Cost', 'TVR', 'NCost', 'NTVR', 'Total_Cost', 'Total_Rating', 'GRP'].includes(key);
                         const val =
-                         key === 'GRP'
-                         ? (row.Spots * row.TVR).toFixed(2)
-                         : isNumeric && typeof row[key] === 'number'
-                          ? row[key].toFixed(2)
-                          : row[key];
+                          key === 'GRP'
+                            ? (row.Spots * row.TVR).toFixed(2)
+                            : isNumeric && typeof row[key] === 'number'
+                              ? row[key].toFixed(2)
+                              : row[key];
                         return (
                           <td
                             key={j}
@@ -351,9 +364,9 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack,negotiatedRa
               <tbody>
                 {result.channel_summary.map((row, i) => (
                   <tr key={i} style={i % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
-                    <td style={{...styles.td, textAlign: 'left'}}>{row.Channel}</td>
-                    <td style={{...styles.td, textAlign: 'right'}}>{parseFloat(row.Total_Cost).toLocaleString()}</td>
-                    <td style={{...styles.td, textAlign: 'right'}}>{row['% of Total']}</td>
+                    <td style={{ ...styles.td, textAlign: 'left' }}>{row.Channel}</td>
+                    <td style={{ ...styles.td, textAlign: 'right' }}>{parseFloat(row.Total_Cost).toLocaleString()}</td>
+                    <td style={{ ...styles.td, textAlign: 'right' }}>{row['% of Total']}</td>
                   </tr>
                 ))}
               </tbody>
@@ -572,7 +585,7 @@ const styles = {
     justifyContent: 'flex-end',
     gap: '8px',
     marginBottom: '12px',
-      },
+  },
 };
 
 export default DfPreview;

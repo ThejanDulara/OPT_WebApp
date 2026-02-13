@@ -72,34 +72,34 @@ function PlanHistory({ onBack, onLoadPlan }) {
     }
   };
 
-    async function handleDeletePlan(id, ownerId) {
-      if (!window.confirm("Are you sure you want to delete this plan?")) {
+  async function handleDeletePlan(id, ownerId) {
+    if (!window.confirm("Are you sure you want to delete this plan?")) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/delete-plan/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          is_admin: isAdmin,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!json.success) {
+        alert(json.error || "Failed to delete plan.");
         return;
       }
 
-      try {
-        const res = await fetch(`${API_BASE}/delete-plan/${id}`, {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            user_id: userId,
-            is_admin: isAdmin,
-          }),
-        });
-
-        const json = await res.json();
-
-        if (!json.success) {
-          alert(json.error || "Failed to delete plan.");
-          return;
-        }
-
-        setPlans((prev) => prev.filter((p) => p.id !== id));
-      } catch (err) {
-        alert("Error deleting plan.");
-        console.error(err);
-      }
+      setPlans((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      alert("Error deleting plan.");
+      console.error(err);
     }
+  }
 
 
   return (
@@ -178,9 +178,9 @@ function PlanHistory({ onBack, onLoadPlan }) {
                     <td style={styles.rightAlignedCell}>
                       {p.total_budget != null
                         ? Number(p.total_budget).toLocaleString('en-LK', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })
                         : "-"}
                     </td>
                     {isAdmin && <td style={styles.tableCell}>{userName}</td>}
@@ -370,17 +370,17 @@ const styles = {
     gap: '12px',
     flexWrap: 'wrap',
   },
-    deleteButton: {
-      marginLeft: "10px",
-      padding: "8px 16px",
-      backgroundColor: "#e53e3e",
-      color: "white",
-      border: "none",
-      borderRadius: "6px",
-      fontSize: "13px",
-      cursor: "pointer",
-      transition: "0.2s",
-    },
+  deleteButton: {
+    marginLeft: "10px",
+    padding: "8px 16px",
+    backgroundColor: "#e53e3e",
+    color: "white",
+    border: "none",
+    borderRadius: "6px",
+    fontSize: "13px",
+    cursor: "pointer",
+    transition: "0.2s",
+  },
   backButton: {
     padding: '10px 20px',
     backgroundColor: '#edf2f7',

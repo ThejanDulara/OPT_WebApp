@@ -1,47 +1,54 @@
-import React, { useState, useEffect ,useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 
-function ProgramSelector({ onSubmit, onBack, negotiatedRates,selectedChannels,selectedTG  ,initialSelectedProgramIds = []}) {
+function ProgramSelector({ onSubmit, onBack, negotiatedRates, selectedChannels, selectedTG, initialSelectedProgramIds = [], onChange }) {
   const [programsByChannel, setProgramsByChannel] = useState({});
   const [selectedPrograms, setSelectedPrograms] = useState({});
 
-    useEffect(() => {
-      fetch('https://optwebapp-production.up.railway.app/all-programs')
-        .then(res => res.json())
-        .then(data => {
-          const grouped = {};
-          const restored = {};
+  useEffect(() => {
+    if (onChange) {
+      const selectedIds = Object.keys(selectedPrograms).filter(id => selectedPrograms[id]).map(id => parseInt(id));
+      onChange(selectedIds);
+    }
+  }, [selectedPrograms, onChange]);
 
-          data.programs.forEach(p => {
-            if (!selectedChannels.includes(p.channel)) return;
+  useEffect(() => {
+    fetch('https://optwebapp-production.up.railway.app/all-programs')
+      .then(res => res.json())
+      .then(data => {
+        const grouped = {};
+        const restored = {};
 
-            if (!grouped[p.channel]) grouped[p.channel] = [];
-            grouped[p.channel].push({
-              ...p,
-              tvr: p[selectedTG] ?? 0,
-            });
+        data.programs.forEach(p => {
+          if (!selectedChannels.includes(p.channel)) return;
 
-            // ⬇⬇ If previously selected, restore it ⬇⬇
-            if (initialSelectedProgramIds.includes(p.id)) restored[p.id] = true;
+          if (!grouped[p.channel]) grouped[p.channel] = [];
+          grouped[p.channel].push({
+            ...p,
+            tvr: p[selectedTG] ?? 0,
           });
 
-          setProgramsByChannel(grouped);
-
-          // If empty (first time), auto-select all
-          if (initialSelectedProgramIds.length === 0) {
-            const auto = {};
-            data.programs.forEach(p => {
-              if (!selectedChannels.includes(p.channel)) return;
-              auto[p.id] = true;
-            });
-            setSelectedPrograms(auto);
-          } else {
-            setSelectedPrograms(restored);
-          }
-
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          // ⬇⬇ If previously selected, restore it ⬇⬇
+          if (initialSelectedProgramIds.includes(p.id)) restored[p.id] = true;
         });
-    }, [selectedChannels, selectedTG]);
+
+        setProgramsByChannel(grouped);
+
+        // If empty (first time), auto-select all
+        if (initialSelectedProgramIds.length === 0) {
+          const auto = {};
+          data.programs.forEach(p => {
+            if (!selectedChannels.includes(p.channel)) return;
+            auto[p.id] = true;
+          });
+          setSelectedPrograms(auto);
+        } else {
+          setSelectedPrograms(restored);
+        }
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+  }, [selectedChannels, selectedTG]);
 
   const handleCheckboxChange = (programId) => {
     setSelectedPrograms(prev => ({
@@ -50,19 +57,19 @@ function ProgramSelector({ onSubmit, onBack, negotiatedRates,selectedChannels,se
     }));
   };
 
-    const bottomRef = useRef(null);
+  const bottomRef = useRef(null);
 
-    const handleSelectAllGlobal = () => {
-      const updated = { ...selectedPrograms };
-      Object.values(programsByChannel).forEach(list => {
-        (list || []).forEach(p => { updated[p.id] = true; });
-      });
-      setSelectedPrograms(updated);
-    };
+  const handleSelectAllGlobal = () => {
+    const updated = { ...selectedPrograms };
+    Object.values(programsByChannel).forEach(list => {
+      (list || []).forEach(p => { updated[p.id] = true; });
+    });
+    setSelectedPrograms(updated);
+  };
 
-    const scrollToBottom = () => {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    };
+  const scrollToBottom = () => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const handleSelectAll = (channel) => {
     const updated = { ...selectedPrograms };
@@ -72,13 +79,13 @@ function ProgramSelector({ onSubmit, onBack, negotiatedRates,selectedChannels,se
     setSelectedPrograms(updated);
   };
 
-    const handleDeselectAll = (channel) => {
-      const updated = { ...selectedPrograms };
-      (programsByChannel[channel] || []).forEach(p => {
-        updated[p.id] = false;
-      });
-      setSelectedPrograms(updated);
-    };
+  const handleDeselectAll = (channel) => {
+    const updated = { ...selectedPrograms };
+    (programsByChannel[channel] || []).forEach(p => {
+      updated[p.id] = false;
+    });
+    setSelectedPrograms(updated);
+  };
 
 
   const handleSubmit = (e) => {
@@ -92,82 +99,82 @@ function ProgramSelector({ onSubmit, onBack, negotiatedRates,selectedChannels,se
   return (
     <form onSubmit={handleSubmit} style={styles.form}>
       <h2 style={styles.title}>Select Programs from Channels</h2>
-     <div style={styles.toolbar}>
-      <button type="button" onClick={handleSelectAllGlobal} style={styles.selectAllButton_2}>
-        Select All (All Channels)
-      </button>
-      <button type="button" onClick={scrollToBottom} style={styles.selectAllButton_2}>
-        Go Down
-      </button>
-    </div>
+      <div style={styles.toolbar}>
+        <button type="button" onClick={handleSelectAllGlobal} style={styles.selectAllButton_2}>
+          Select All (All Channels)
+        </button>
+        <button type="button" onClick={scrollToBottom} style={styles.selectAllButton_2}>
+          Go Down
+        </button>
+      </div>
 
       {Object.entries(programsByChannel).map(([channel, programs]) => (
         <div key={channel} style={styles.channelCard}>
-        <div style={styles.channelHeader}>
-          <div style={styles.channelInfo}>
-            <img
-              src={getLogoPath(channel)}
-              alt={channel}
-              style={styles.channelLogo}
-              onError={(e) => { e.target.style.display = 'none'; }}
-            />
-            <h3 style={styles.channelName}>{channel}</h3>
-          </div>
+          <div style={styles.channelHeader}>
+            <div style={styles.channelInfo}>
+              <img
+                src={getLogoPath(channel)}
+                alt={channel}
+                style={styles.channelLogo}
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+              <h3 style={styles.channelName}>{channel}</h3>
+            </div>
 
-          <div style={styles.actionButtons}>
-            <button
-              type="button"
-              onClick={() => handleSelectAll(channel)}
-              style={styles.selectAllButton}
-            >
-              Select All
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDeselectAll(channel)}
-              style={styles.selectAllButton}
-            >
-              Deselect All
-            </button>
+            <div style={styles.actionButtons}>
+              <button
+                type="button"
+                onClick={() => handleSelectAll(channel)}
+                style={styles.selectAllButton}
+              >
+                Select All
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeselectAll(channel)}
+                style={styles.selectAllButton}
+              >
+                Deselect All
+              </button>
+            </div>
           </div>
-        </div>
 
 
           <div style={styles.tableContainer}>
             <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.tableHeader}>Select</th>
-                    <th style={styles.tableHeader}>Day</th>
-                    <th style={styles.tableHeader}>Time</th>
-                    <th style={styles.tableHeader}>Program</th>
-                    <th style={styles.tableHeader}>Rate card (30 Sec)</th>
-                    <th style={styles.tableHeader}>Neg. Rate (30 Sec)</th>
-                    <th style={styles.tableHeader}>TVR</th>
-                    <th style={styles.tableHeader}>PT [A] / NPT [B]</th>
+              <thead>
+                <tr>
+                  <th style={styles.tableHeader}>Select</th>
+                  <th style={styles.tableHeader}>Day</th>
+                  <th style={styles.tableHeader}>Time</th>
+                  <th style={styles.tableHeader}>Program</th>
+                  <th style={styles.tableHeader}>Rate card (30 Sec)</th>
+                  <th style={styles.tableHeader}>Neg. Rate (30 Sec)</th>
+                  <th style={styles.tableHeader}>TVR</th>
+                  <th style={styles.tableHeader}>PT [A] / NPT [B]</th>
+                </tr>
+              </thead>
+              <tbody>
+                {programs.map(p => (
+                  <tr key={p.id} style={selectedPrograms[p.id] ? styles.selectedRow : styles.tableRow}>
+                    <td style={styles.tableCell}>
+                      <input
+                        type="checkbox"
+                        checked={!!selectedPrograms[p.id]}
+                        onChange={() => handleCheckboxChange(p.id)}
+                        style={styles.checkbox}
+                      />
+                    </td>
+                    <td style={styles.tableCell}>{p.day}</td>
+                    <td style={styles.tableCell}>{p.time}</td>
+                    <td style={styles.tableCell}>{p.program}</td>
+                    <td style={styles.rightAlignedCell}>{p.cost !== null && p.cost !== undefined ? Number(p.cost).toFixed(2) : '-'}</td>
+                    <td style={styles.rightAlignedCell}>{negotiatedRates?.[p.id] != null ? Number(negotiatedRates[p.id]).toFixed(2) : (p.cost != null ? Number(p.cost).toFixed(2) : '-')}</td>
+                    <td style={styles.rightAlignedCell}>{p.tvr}</td>
+                    <td style={styles.centerAlignedCell}>{p.slot}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {programs.map(p => (
-                    <tr key={p.id} style={selectedPrograms[p.id] ? styles.selectedRow : styles.tableRow}>
-                      <td style={styles.tableCell}>
-                        <input
-                          type="checkbox"
-                          checked={!!selectedPrograms[p.id]}
-                          onChange={() => handleCheckboxChange(p.id)}
-                          style={styles.checkbox}
-                        />
-                      </td>
-                      <td style={styles.tableCell}>{p.day}</td>
-                      <td style={styles.tableCell}>{p.time}</td>
-                      <td style={styles.tableCell}>{p.program}</td>
-                      <td style={styles.rightAlignedCell}>{p.cost !== null && p.cost !== undefined ? Number(p.cost).toFixed(2) : '-'}</td>
-                      <td style={styles.rightAlignedCell}>{negotiatedRates?.[p.id] != null ? Number(negotiatedRates[p.id]).toFixed(2): (p.cost != null ? Number(p.cost).toFixed(2) : '-')}</td>
-                      <td style={styles.rightAlignedCell}>{p.tvr}</td>
-                      <td style={styles.centerAlignedCell}>{p.slot}</td>
-                    </tr>
-                  ))}
-                </tbody>
+                ))}
+              </tbody>
             </table>
           </div>
         </div>
@@ -175,7 +182,7 @@ function ProgramSelector({ onSubmit, onBack, negotiatedRates,selectedChannels,se
 
       <div ref={bottomRef} />
       <button type="button" onClick={onBack} style={styles.backButton}>
-          Go Back
+        Go Back
       </button>
       <button type="submit" style={styles.submitButton}>
         Go to Optimization Setup
@@ -290,19 +297,19 @@ const styles = {
     height: '16px',
     cursor: 'pointer',
   },
-    backButton: {
-      padding: '12px 20px',
-      backgroundColor: '#edf2f7',
-      color: '#2d3748',
-      border: 'none',
-      borderRadius: '6px',
-      fontSize: '14px',
-      fontWeight: '500',
-      cursor: 'pointer',
-      transition: 'background-color 0.2s ease',
-      flex: 1,
-      marginRight: '20px'
-    },
+  backButton: {
+    padding: '12px 20px',
+    backgroundColor: '#edf2f7',
+    color: '#2d3748',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s ease',
+    flex: 1,
+    marginRight: '20px'
+  },
 
   submitButton: {
     marginTop: '24px',
@@ -317,32 +324,32 @@ const styles = {
     transition: 'all 0.2s ease',
     ':hover': {
       backgroundColor: '#3182ce',
-  },
+    },
   },
 
   rightAlignedCell: {
-      padding: '12px 16px',
-      color: '#4a5568',
-      textAlign: 'right',
+    padding: '12px 16px',
+    color: '#4a5568',
+    textAlign: 'right',
   },
   centerAlignedCell: {
-      padding: '12px 16px',
-      color: '#4a5568',
-      textAlign: 'center',
+    padding: '12px 16px',
+    color: '#4a5568',
+    textAlign: 'center',
   },
-    actionButtons: {
-      display: 'flex',
-      gap: '10px',
-      flexWrap: 'wrap',
-    },
+  actionButtons: {
+    display: 'flex',
+    gap: '10px',
+    flexWrap: 'wrap',
+  },
 
-    toolbar: {
-      display: 'flex',
-      gap: '8px',
-      justifyContent: 'flex-end',
-      flexWrap: 'wrap',
-      marginBottom: '16px',
-    },
+  toolbar: {
+    display: 'flex',
+    gap: '8px',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    marginBottom: '16px',
+  },
 
   selectAllButton_2: {
     padding: '8px 16px',
