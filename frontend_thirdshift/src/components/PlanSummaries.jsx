@@ -8,21 +8,21 @@ const API_BASE = isLocal ? "http://localhost:5000" : "https://optwebapp-producti
 
 // Helper function to convert UTC to Sri Lanka time (GMT+5:30)
 const toSriLankaTime = (utcDateString) => {
-  if (!utcDateString) return '';
+    if (!utcDateString) return '';
 
-  const date = new Date(utcDateString);
-  // Sri Lanka is UTC+5:30
-  const sriLankaTime = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+    const date = new Date(utcDateString);
+    // Sri Lanka is UTC+5:30
+    const sriLankaTime = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
 
-  return sriLankaTime.toLocaleString('en-LK', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true
-  });
+    return sriLankaTime.toLocaleString('en-LK', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+    });
 };
 
 export default function PlanSummaries({ onBack }) {
@@ -141,11 +141,9 @@ export default function PlanSummaries({ onBack }) {
                 'Created At (Sri Lanka Time)': toSriLankaTime(row.created_at)
             };
 
-            // If admin, add user info
-            if (isAdmin) {
-                rowData['User ID'] = row.user_id;
-                rowData['User Name'] = `${row.user_first_name || ''} ${row.user_last_name || ''}`.trim();
-            }
+            // Always add user info
+            rowData['User ID'] = row.user_id;
+            rowData['User Name'] = `${row.user_first_name || ''} ${row.user_last_name || ''}`.trim();
 
             return rowData;
         });
@@ -165,11 +163,9 @@ export default function PlanSummaries({ onBack }) {
             { wch: 20 }, // Channel
             { wch: 18 }, // Budget
             { wch: 25 }, // Created At
+            { wch: 12 }, // User ID
+            { wch: 25 }, // User Name
         ];
-        if (isAdmin) {
-            wscols.push({ wch: 12 }); // User ID
-            wscols.push({ wch: 25 }); // User Name
-        }
         worksheet['!cols'] = wscols;
 
         const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
@@ -181,10 +177,16 @@ export default function PlanSummaries({ onBack }) {
     return (
         <div style={styles.container}>
             <div style={styles.header}>
-                <button onClick={onBack} style={styles.backButton}>
-                    ← Back to Home
-                </button>
                 <h2 style={styles.title}>Saved Plan Summaries</h2>
+            </div>
+
+            <div style={styles.controls}>
+                <button onClick={onBack} style={styles.backButton}>
+                    Back to Home
+                </button>
+                <button onClick={handleExport} style={styles.exportButton}>
+                    Export to Excel
+                </button>
             </div>
 
             {loading && (
@@ -217,10 +219,8 @@ export default function PlanSummaries({ onBack }) {
             </div>
 
             {!loading && summaries.length > 0 && (
-                <div style={styles.footer}>
-                    <button onClick={handleExport} style={styles.exportButton}>
-                        📥 Export to Excel
-                    </button>
+                <div style={{ marginTop: '20px', textAlign: 'center', color: '#666', fontSize: '14px' }}>
+                    {summaries.length} rows loaded covering {groupedSummaries.length} plans.
                 </div>
             )}
         </div>
@@ -296,8 +296,8 @@ function SummaryCard({ group, onDelete, onUpdate }) {
                     <div>
                         <div style={styles.cardHeaderTop}>
                             <div>
-                                <h3 style={styles.cardTitle}>{group.client}</h3>
-                                <h4 style={styles.cardSubtitle}>{group.brand}</h4>
+                                <h3 style={styles.cardTitle}><span style={styles.labelMuted}>Client:</span> {group.client}</h3>
+                                <h4 style={styles.cardSubtitle}><span style={styles.labelMuted}>Brand:</span> {group.brand}</h4>
                             </div>
                             <div style={styles.cardActions}>
                                 <button onClick={() => setIsEditing(true)} style={styles.editButton}>
@@ -333,8 +333,8 @@ function SummaryCard({ group, onDelete, onUpdate }) {
                         <tr>
                             <th style={styles.tableHeader}>#</th>
                             <th style={styles.tableHeader}>Channel</th>
-                            <th style={{...styles.tableHeader, textAlign: 'right'}}>Total Budget (LKR)</th>
-                            <th style={{...styles.tableHeader, textAlign: 'center', width: '120px'}}>Actions</th>
+                            <th style={{ ...styles.tableHeader, textAlign: 'right' }}>Total Budget (LKR)</th>
+                            <th style={{ ...styles.tableHeader, textAlign: 'center', width: '120px' }}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -350,7 +350,7 @@ function SummaryCard({ group, onDelete, onUpdate }) {
                             <td style={styles.tableCell} colSpan={2}>
                                 <strong>Total</strong>
                             </td>
-                            <td style={{...styles.tableCell, textAlign: 'right'}}>
+                            <td style={{ ...styles.tableCell, textAlign: 'right' }}>
                                 <strong>{totalBudget.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</strong>
                             </td>
                             <td style={styles.tableCell}></td>
@@ -374,7 +374,7 @@ function RowItem({ row, index, onUpdate }) {
     if (isEditing) {
         return (
             <tr style={styles.tableRow}>
-                <td style={{...styles.tableCell, textAlign: 'center'}}>{index}</td>
+                <td style={{ ...styles.tableCell, textAlign: 'center' }}>{index}</td>
                 <td style={styles.tableCell}>
                     <input
                         value={data.channel}
@@ -382,15 +382,15 @@ function RowItem({ row, index, onUpdate }) {
                         style={styles.inputCell}
                     />
                 </td>
-                <td style={{...styles.tableCell, textAlign: 'right'}}>
+                <td style={{ ...styles.tableCell, textAlign: 'right' }}>
                     <input
                         type="number"
                         value={data.budget}
                         onChange={e => setData({ ...data, budget: e.target.value })}
-                        style={{...styles.inputCell, textAlign: 'right'}}
+                        style={{ ...styles.inputCell, textAlign: 'right' }}
                     />
                 </td>
-                <td style={{...styles.tableCell, textAlign: 'center'}}>
+                <td style={{ ...styles.tableCell, textAlign: 'center' }}>
                     <button onClick={handleSave} style={styles.saveSmallButton}>
                         Save
                     </button>
@@ -404,12 +404,12 @@ function RowItem({ row, index, onUpdate }) {
 
     return (
         <tr style={styles.tableRow}>
-            <td style={{...styles.tableCell, textAlign: 'center'}}><strong>{index}</strong></td>
+            <td style={{ ...styles.tableCell, textAlign: 'center' }}><strong>{index}</strong></td>
             <td style={styles.tableCell}>{row.channel}</td>
-            <td style={{...styles.tableCell, textAlign: 'right'}}>
+            <td style={{ ...styles.tableCell, textAlign: 'right' }}>
                 {Number(row.budget).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
             </td>
-            <td style={{...styles.tableCell, textAlign: 'center'}}>
+            <td style={{ ...styles.tableCell, textAlign: 'center' }}>
                 <button onClick={() => setIsEditing(true)} style={styles.editSmallButton}>
                     ✏️ Edit
                 </button>
@@ -430,12 +430,14 @@ const styles = {
         fontFamily: "'Segoe UI', Roboto, sans-serif",
     },
     header: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '20px',
-        marginBottom: '32px',
+        marginBottom: '20px',
         paddingBottom: '16px',
-        borderBottom: '1px solid #e2e8f0',
+        borderBottom: '1px solid #cbd5e0',
+    },
+    controls: {
+        display: 'flex',
+        gap: '12px',
+        marginBottom: '24px',
     },
     title: {
         color: '#2d3748',
@@ -730,28 +732,37 @@ const styles = {
         border: '1px solid #e2e8f0',
     },
     exportButton: {
-        padding: '12px 32px',
+        padding: '10px 20px',
         backgroundColor: '#38a169',
         color: 'white',
         border: 'none',
-        borderRadius: '8px',
-        fontSize: '16px',
+        borderRadius: '6px',
+        fontSize: '14px',
         fontWeight: '600',
         cursor: 'pointer',
         transition: 'all 0.2s ease',
         boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
         ':hover': {
             backgroundColor: '#2f855a',
         },
     },
+    labelMuted: {
+        color: '#718096',
+        fontWeight: 'normal',
+        fontSize: '0.9em',
+        marginRight: '6px'
+    }
 };
 
 // Add keyframe animation for spinner
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+            @keyframes spin {
+                0 % { transform: rotate(0deg); }
+        100% {transform: rotate(360deg); }
     }
-`;
+            `;
 document.head.appendChild(styleSheet);
