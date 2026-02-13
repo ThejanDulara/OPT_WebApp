@@ -6,6 +6,25 @@ const hostname = window.location.hostname;
 const isLocal = hostname.includes("localhost") || hostname.includes("127.");
 const API_BASE = isLocal ? "http://localhost:5000" : "https://optwebapp-production.up.railway.app";
 
+// Helper function to convert UTC to Sri Lanka time (GMT+5:30)
+const toSriLankaTime = (utcDateString) => {
+  if (!utcDateString) return '';
+
+  const date = new Date(utcDateString);
+  // Sri Lanka is UTC+5:30
+  const sriLankaTime = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+
+  return sriLankaTime.toLocaleString('en-LK', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  });
+};
+
 export default function PlanSummaries({ onBack }) {
     const [summaries, setSummaries] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -69,7 +88,6 @@ export default function PlanSummaries({ onBack }) {
         if (!window.confirm("Are you sure you want to delete this plan summary?")) return;
 
         try {
-            // Sequentially delete to modify state safely or parallel
             await Promise.all(groupRows.map(r =>
                 fetch(`${API_BASE}/plan-summaries/${r.id}`, { method: 'DELETE' })
             ));
@@ -100,7 +118,18 @@ export default function PlanSummaries({ onBack }) {
     const handleExport = () => {
         if (!summaries.length) return;
 
-        const data = summaries.map(row => {
+        // Sort summaries by created_at (descending) and then by id (descending)
+        const sortedSummaries = [...summaries].sort((a, b) => {
+            // First sort by created_at (newest first)
+            const dateA = new Date(a.created_at);
+            const dateB = new Date(b.created_at);
+            if (dateA > dateB) return -1;
+            if (dateA < dateB) return 1;
+            // If same date, sort by id descending
+            return (b.id || 0) - (a.id || 0);
+        });
+
+        const data = sortedSummaries.map(row => {
             const rowData = {
                 ID: row.id,
                 'Client': row.client,
@@ -108,8 +137,8 @@ export default function PlanSummaries({ onBack }) {
                 'Activation Period': row.activation_period,
                 'Medium': row.medium,
                 'Channel': row.channel,
-                'Budget': row.budget,
-                'Created At': new Date(row.created_at).toLocaleString('en-LK', { timeZone: 'Asia/Colombo' })
+                'Budget (LKR)': Number(row.budget || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 }),
+                'Created At (Sri Lanka Time)': toSriLankaTime(row.created_at)
             };
 
             // If admin, add user info
@@ -125,7 +154,24 @@ export default function PlanSummaries({ onBack }) {
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Plan Summaries");
 
-        // Generate buffer
+        // Auto-size columns
+        const maxWidth = 50;
+        const wscols = [
+            { wch: 10 }, // ID
+            { wch: 20 }, // Client
+            { wch: 20 }, // Brand
+            { wch: 25 }, // Activation Period
+            { wch: 15 }, // Medium
+            { wch: 20 }, // Channel
+            { wch: 18 }, // Budget
+            { wch: 25 }, // Created At
+        ];
+        if (isAdmin) {
+            wscols.push({ wch: 12 }); // User ID
+            wscols.push({ wch: 25 }); // User Name
+        }
+        worksheet['!cols'] = wscols;
+
         const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
         const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
 
@@ -133,18 +179,28 @@ export default function PlanSummaries({ onBack }) {
     };
 
     return (
-        <div style={s.container}>
-            <div style={s.header}>
-                <button onClick={onBack} style={s.backButton}>&larr; Back to Home</button>
-                <div style={{ flex: 1, textAlign: 'center' }}>
-                    <h2 style={s.title}>Saved Plan Summaries</h2>
-                </div>
+        <div style={styles.container}>
+            <div style={styles.header}>
+                <button onClick={onBack} style={styles.backButton}>
+                    ← Back to Home
+                </button>
+                <h2 style={styles.title}>Saved Plan Summaries</h2>
             </div>
 
-            {loading && <div style={{ textAlign: 'center', padding: 20 }}>Loading summaries...</div>}
-            {error && <div style={{ color: 'red', textAlign: 'center', padding: 20 }}>{error}</div>}
+            {loading && (
+                <div style={styles.loadingContainer}>
+                    <div style={styles.loadingSpinner}></div>
+                    <p style={styles.loadingText}>Loading summaries...</p>
+                </div>
+            )}
 
-            <div style={s.grid}>
+            {error && (
+                <div style={styles.errorContainer}>
+                    <p style={styles.errorText}>{error}</p>
+                </div>
+            )}
+
+            <div style={styles.grid}>
                 {!loading && groupedSummaries.map(group => (
                     <SummaryCard
                         key={group.key}
@@ -154,13 +210,17 @@ export default function PlanSummaries({ onBack }) {
                     />
                 ))}
                 {!loading && groupedSummaries.length === 0 && (
-                    <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>No saved plan summaries found.</div>
+                    <div style={styles.emptyContainer}>
+                        <p style={styles.emptyText}>No saved plan summaries found.</p>
+                    </div>
                 )}
             </div>
 
             {!loading && summaries.length > 0 && (
-                <div style={s.footer}>
-                    <button onClick={handleExport} style={s.btnExport}>Export to Excel</button>
+                <div style={styles.footer}>
+                    <button onClick={handleExport} style={styles.exportButton}>
+                        📥 Export to Excel
+                    </button>
                 </div>
             )}
         </div>
@@ -176,7 +236,6 @@ function SummaryCard({ group, onDelete, onUpdate }) {
     });
 
     const saveHeader = async () => {
-        // Update all rows in group
         for (const row of group.rows) {
             await onUpdate(row, {
                 ...row,
@@ -190,68 +249,111 @@ function SummaryCard({ group, onDelete, onUpdate }) {
 
     const totalBudget = group.rows.reduce((a, r) => a + Number(r.budget || 0), 0);
 
+    // Sort rows by id descending within the group
+    const sortedRows = useMemo(() => {
+        return [...group.rows].sort((a, b) => (b.id || 0) - (a.id || 0));
+    }, [group.rows]);
+
     return (
-        <div style={s.card}>
-            <div style={s.cardHeader}>
+        <div style={styles.card}>
+            <div style={styles.cardHeader}>
                 {isEditing ? (
-                    <div style={s.editHeaderForm}>
-                        <div style={s.formGroup}>
-                            <label style={s.label}>Client</label>
-                            <input value={editData.client} onChange={e => setEditData({ ...editData, client: e.target.value })} style={s.input} />
+                    <div style={styles.editHeaderForm}>
+                        <div style={styles.formGroup}>
+                            <label style={styles.label}>Client</label>
+                            <input
+                                value={editData.client}
+                                onChange={e => setEditData({ ...editData, client: e.target.value })}
+                                style={styles.input}
+                            />
                         </div>
-                        <div style={s.formGroup}>
-                            <label style={s.label}>Brand</label>
-                            <input value={editData.brand} onChange={e => setEditData({ ...editData, brand: e.target.value })} style={s.input} />
+                        <div style={styles.formGroup}>
+                            <label style={styles.label}>Brand</label>
+                            <input
+                                value={editData.brand}
+                                onChange={e => setEditData({ ...editData, brand: e.target.value })}
+                                style={styles.input}
+                            />
                         </div>
-                        <div style={s.formGroup}>
-                            <label style={s.label}>Activation Period</label>
-                            <input value={editData.activation_period} onChange={e => setEditData({ ...editData, activation_period: e.target.value })} style={s.input} />
+                        <div style={styles.formGroup}>
+                            <label style={styles.label}>Activation Period</label>
+                            <input
+                                value={editData.activation_period}
+                                onChange={e => setEditData({ ...editData, activation_period: e.target.value })}
+                                style={styles.input}
+                            />
                         </div>
-                        <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-                            <button onClick={saveHeader} style={s.btnSave}>Save Changes</button>
-                            <button onClick={() => setIsEditing(false)} style={s.btnCancel}>Cancel</button>
+                        <div style={styles.editHeaderActions}>
+                            <button onClick={saveHeader} style={styles.saveButton}>
+                                Save Changes
+                            </button>
+                            <button onClick={() => setIsEditing(false)} style={styles.cancelButton}>
+                                Cancel
+                            </button>
                         </div>
                     </div>
                 ) : (
                     <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={styles.cardHeaderTop}>
                             <div>
-                                <h3 style={s.cardTitle}>{group.client}</h3>
-                                <h4 style={s.cardSubtitle}>{group.brand}</h4>
+                                <h3 style={styles.cardTitle}>{group.client}</h3>
+                                <h4 style={styles.cardSubtitle}>{group.brand}</h4>
                             </div>
-                            <div style={s.actions}>
-                                <button onClick={() => setIsEditing(true)} style={s.btnEdit}>Edit Header</button>
-                                <button onClick={onDelete} style={s.btnDelete}>Delete</button>
+                            <div style={styles.cardActions}>
+                                <button onClick={() => setIsEditing(true)} style={styles.editButton}>
+                                    ✏️ Edit Header
+                                </button>
+                                <button onClick={onDelete} style={styles.deleteButton}>
+                                    🗑️ Delete
+                                </button>
                             </div>
                         </div>
 
-                        <div style={s.cardMeta}>
-                            <div style={s.metaItem}><strong>Period:</strong> {group.activation_period}</div>
-                            <div style={s.metaItem}><strong>Created by:</strong> {group.user_first_name} {group.user_last_name}</div>
-                            <div style={s.metaItem}><strong>Date:</strong> {new Date(group.created_at).toLocaleString('en-LK', { timeZone: 'Asia/Colombo' })}</div>
-                            <div style={s.metaItem}><strong>Medium:</strong> {group.medium}</div>
+                        <div style={styles.cardMeta}>
+                            <div style={styles.metaItem}>
+                                <strong>Period:</strong> {group.activation_period}
+                            </div>
+                            <div style={styles.metaItem}>
+                                <strong>Created by:</strong> {group.user_first_name} {group.user_last_name}
+                            </div>
+                            <div style={styles.metaItem}>
+                                <strong>Date:</strong> {toSriLankaTime(group.created_at)}
+                            </div>
+                            <div style={styles.metaItem}>
+                                <strong>Medium:</strong> {group.medium}
+                            </div>
                         </div>
                     </div>
                 )}
             </div>
 
-            <div style={s.tableWrapper}>
-                <table style={s.table}>
+            <div style={styles.tableWrapper}>
+                <table style={styles.table}>
                     <thead>
                         <tr>
-                            <th style={s.th}>Channel</th>
-                            <th style={s.thRight}>Total Budget (LKR)</th>
-                            <th style={s.thCenter}>Actions</th>
+                            <th style={styles.tableHeader}>#</th>
+                            <th style={styles.tableHeader}>Channel</th>
+                            <th style={{...styles.tableHeader, textAlign: 'right'}}>Total Budget (LKR)</th>
+                            <th style={{...styles.tableHeader, textAlign: 'center', width: '120px'}}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {group.rows.map(row => (
-                            <RowItem key={row.id} row={row} onUpdate={onUpdate} />
+                        {sortedRows.map((row, idx) => (
+                            <RowItem
+                                key={row.id}
+                                row={row}
+                                index={idx + 1}
+                                onUpdate={onUpdate}
+                            />
                         ))}
-                        <tr style={s.totalRow}>
-                            <td style={s.td}><strong>Total</strong></td>
-                            <td style={s.tdRight}><strong>{totalBudget.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</strong></td>
-                            <td></td>
+                        <tr style={styles.totalRow}>
+                            <td style={styles.tableCell} colSpan={2}>
+                                <strong>Total</strong>
+                            </td>
+                            <td style={{...styles.tableCell, textAlign: 'right'}}>
+                                <strong>{totalBudget.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</strong>
+                            </td>
+                            <td style={styles.tableCell}></td>
                         </tr>
                     </tbody>
                 </table>
@@ -260,7 +362,7 @@ function SummaryCard({ group, onDelete, onUpdate }) {
     );
 }
 
-function RowItem({ row, onUpdate }) {
+function RowItem({ row, index, onUpdate }) {
     const [isEditing, setIsEditing] = useState(false);
     const [data, setData] = useState({ channel: row.channel, budget: row.budget });
 
@@ -271,266 +373,385 @@ function RowItem({ row, onUpdate }) {
 
     if (isEditing) {
         return (
-            <tr>
-                <td style={s.td}>
-                    <input value={data.channel} onChange={e => setData({ ...data, channel: e.target.value })} style={s.inputSm} />
+            <tr style={styles.tableRow}>
+                <td style={{...styles.tableCell, textAlign: 'center'}}>{index}</td>
+                <td style={styles.tableCell}>
+                    <input
+                        value={data.channel}
+                        onChange={e => setData({ ...data, channel: e.target.value })}
+                        style={styles.inputCell}
+                    />
                 </td>
-                <td style={s.tdRight}>
-                    <input value={data.budget} onChange={e => setData({ ...data, budget: e.target.value })} style={s.inputSmRight} />
+                <td style={{...styles.tableCell, textAlign: 'right'}}>
+                    <input
+                        type="number"
+                        value={data.budget}
+                        onChange={e => setData({ ...data, budget: e.target.value })}
+                        style={{...styles.inputCell, textAlign: 'right'}}
+                    />
                 </td>
-                <td style={s.tdCenter}>
-                    <button onClick={handleSave} style={s.btnSaveSm}>Save</button>
-                    <button onClick={() => setIsEditing(false)} style={s.btnCancelSm}>Cancel</button>
+                <td style={{...styles.tableCell, textAlign: 'center'}}>
+                    <button onClick={handleSave} style={styles.saveSmallButton}>
+                        Save
+                    </button>
+                    <button onClick={() => setIsEditing(false)} style={styles.cancelSmallButton}>
+                        Cancel
+                    </button>
                 </td>
             </tr>
         );
     }
+
     return (
-        <tr>
-            <td style={s.td}>{row.channel}</td>
-            <td style={s.tdRight}>{Number(row.budget).toLocaleString('en-LK', { minimumFractionDigits: 2 })}</td>
-            <td style={s.tdCenter}><button onClick={() => setIsEditing(true)} style={s.btnEditSm}>Edit</button></td>
+        <tr style={styles.tableRow}>
+            <td style={{...styles.tableCell, textAlign: 'center'}}><strong>{index}</strong></td>
+            <td style={styles.tableCell}>{row.channel}</td>
+            <td style={{...styles.tableCell, textAlign: 'right'}}>
+                {Number(row.budget).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+            </td>
+            <td style={{...styles.tableCell, textAlign: 'center'}}>
+                <button onClick={() => setIsEditing(true)} style={styles.editSmallButton}>
+                    ✏️ Edit
+                </button>
+            </td>
         </tr>
     );
 }
 
-const s = {
+const styles = {
     container: {
-        maxWidth: '1000px',
+        padding: '32px',
+        maxWidth: '1200px',
         margin: '0 auto',
-        padding: '40px 20px',
+        backgroundColor: '#d5e9f7',
+        borderRadius: '12px',
+        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.05)',
+        minHeight: '100vh',
         fontFamily: "'Segoe UI', Roboto, sans-serif",
-        paddingBottom: '100px'
     },
     header: {
-        marginBottom: '30px',
         display: 'flex',
         alignItems: 'center',
-        gap: '20px'
+        gap: '20px',
+        marginBottom: '32px',
+        paddingBottom: '16px',
+        borderBottom: '1px solid #e2e8f0',
+    },
+    title: {
+        color: '#2d3748',
+        fontSize: '24px',
+        fontWeight: '600',
+        margin: 0,
     },
     backButton: {
         padding: '10px 20px',
         backgroundColor: '#edf2f7',
-        border: '1px solid #cbd5e0',
+        color: '#4a5568',
+        border: 'none',
         borderRadius: '6px',
+        fontSize: '14px',
+        fontWeight: '500',
         cursor: 'pointer',
-        fontWeight: '600',
-        color: '#4a5568'
+        transition: 'all 0.2s ease',
+        ':hover': {
+            backgroundColor: '#e2e8f0',
+        },
     },
-    title: {
-        fontSize: '28px',
-        color: '#2d3748',
-        margin: 0
+    loadingContainer: {
+        textAlign: 'center',
+        padding: '40px',
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        border: '1px solid #e2e8f0',
+    },
+    loadingSpinner: {
+        border: '3px solid #f3f3f3',
+        borderTop: '3px solid #4299e1',
+        borderRadius: '50%',
+        width: '40px',
+        height: '40px',
+        animation: 'spin 1s linear infinite',
+        margin: '0 auto 20px',
+    },
+    loadingText: {
+        color: '#4a5568',
+        fontSize: '16px',
+    },
+    errorContainer: {
+        backgroundColor: '#fff5f5',
+        border: '1px solid #fc8181',
+        color: '#c53030',
+        padding: '16px',
+        borderRadius: '8px',
+        textAlign: 'center',
+        marginBottom: '20px',
+    },
+    errorText: {
+        margin: 0,
+        fontSize: '14px',
+    },
+    emptyContainer: {
+        textAlign: 'center',
+        padding: '60px',
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        border: '1px solid #e2e8f0',
+    },
+    emptyText: {
+        color: '#718096',
+        fontSize: '16px',
+        margin: 0,
     },
     grid: {
         display: 'grid',
-        gap: '30px'
+        gap: '24px',
     },
     card: {
         backgroundColor: 'white',
         borderRadius: '12px',
-        boxShadow: '0 4px 6px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.1)',
+        border: '1px solid #e2e8f0',
         overflow: 'hidden',
-        border: '1px solid #e2e8f0'
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
     },
     cardHeader: {
-        padding: '20px 24px',
+        padding: '24px',
         borderBottom: '1px solid #e2e8f0',
-        background: '#f8fafc'
+        backgroundColor: '#f8fafc',
+    },
+    cardHeaderTop: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: '16px',
     },
     cardTitle: {
         margin: '0 0 5px 0',
         fontSize: '20px',
-        color: '#2d3748'
+        color: '#1a202c',
+        fontWeight: '600',
     },
     cardSubtitle: {
         margin: 0,
-        fontSize: '18px',
+        fontSize: '16px',
         color: '#4a5568',
-        fontWeight: 'normal'
+        fontWeight: '500',
+    },
+    cardActions: {
+        display: 'flex',
+        gap: '8px',
+    },
+    editButton: {
+        padding: '8px 14px',
+        backgroundColor: '#edf2f7',
+        color: '#4a5568',
+        border: 'none',
+        borderRadius: '6px',
+        fontSize: '13px',
+        fontWeight: '500',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        ':hover': {
+            backgroundColor: '#e2e8f0',
+        },
+    },
+    deleteButton: {
+        padding: '8px 14px',
+        backgroundColor: '#EF4444',
+        color: '#fff',
+        border: 'none',
+        borderRadius: '6px',
+        fontSize: '13px',
+        fontWeight: '500',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        ':hover': {
+            backgroundColor: '#dc2626',
+        },
     },
     cardMeta: {
-        marginTop: '15px',
         display: 'flex',
         flexWrap: 'wrap',
-        gap: '20px',
-        fontSize: '14px',
-        color: '#718096'
+        gap: '12px',
     },
     metaItem: {
-        background: '#edf2f7',
-        padding: '4px 10px',
-        borderRadius: '20px'
+        backgroundColor: '#edf2f7',
+        padding: '6px 12px',
+        borderRadius: '20px',
+        fontSize: '13px',
+        color: '#4a5568',
     },
-    actions: {
+    editHeaderForm: {
+        padding: '8px 0',
+    },
+    formGroup: {
+        marginBottom: '16px',
+    },
+    label: {
+        display: 'block',
+        fontSize: '13px',
+        fontWeight: '600',
+        color: '#4a5568',
+        marginBottom: '6px',
+    },
+    input: {
+        width: '100%',
+        padding: '8px 12px',
+        borderRadius: '6px',
+        border: '1px solid #e2e8f0',
+        fontSize: '14px',
+        ':focus': {
+            outline: 'none',
+            borderColor: '#4299e1',
+        },
+    },
+    editHeaderActions: {
         display: 'flex',
-        gap: '10px'
+        gap: '10px',
+        marginTop: '8px',
+    },
+    saveButton: {
+        padding: '8px 16px',
+        backgroundColor: '#4299e1',
+        color: 'white',
+        border: 'none',
+        borderRadius: '6px',
+        fontSize: '14px',
+        fontWeight: '500',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        ':hover': {
+            backgroundColor: '#3182ce',
+        },
+    },
+    cancelButton: {
+        padding: '8px 16px',
+        backgroundColor: '#edf2f7',
+        color: '#4a5568',
+        border: 'none',
+        borderRadius: '6px',
+        fontSize: '14px',
+        fontWeight: '500',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        ':hover': {
+            backgroundColor: '#e2e8f0',
+        },
     },
     tableWrapper: {
-        padding: '0'
+        width: '100%',
+        overflowX: 'auto',
     },
     table: {
         width: '100%',
         borderCollapse: 'collapse',
-        fontSize: '15px'
+        fontSize: '14px',
+        whiteSpace: 'nowrap',
     },
-    th: {
+    tableHeader: {
+        padding: '12px 16px',
         textAlign: 'left',
-        padding: '12px 24px',
-        backgroundColor: '#f1f5f9',
-        color: '#475569',
-        fontWeight: '600',
-        borderBottom: '1px solid #e2e8f0'
-    },
-    thRight: {
-        textAlign: 'right',
-        padding: '12px 24px',
-        backgroundColor: '#f1f5f9',
-        color: '#475569',
-        fontWeight: '600',
-        borderBottom: '1px solid #e2e8f0'
-    },
-    thCenter: {
-        textAlign: 'center',
-        padding: '12px 24px',
-        backgroundColor: '#f1f5f9',
-        color: '#475569',
+        backgroundColor: '#f7fafc',
+        color: '#4a5568',
         fontWeight: '600',
         borderBottom: '1px solid #e2e8f0',
-        width: '120px'
     },
-    td: {
-        padding: '12px 24px',
+    tableRow: {
         borderBottom: '1px solid #e2e8f0',
-        color: '#334155'
+        ':hover': {
+            backgroundColor: '#f8fafc',
+        },
     },
-    tdRight: {
-        padding: '12px 24px',
-        borderBottom: '1px solid #e2e8f0',
-        color: '#334155',
-        textAlign: 'right'
+    tableCell: {
+        padding: '12px 16px',
+        color: '#4a5568',
     },
-    tdCenter: {
-        padding: '12px 24px',
-        borderBottom: '1px solid #e2e8f0',
-        textAlign: 'center'
+    inputCell: {
+        width: '100%',
+        padding: '6px 8px',
+        border: '1px solid #e2e8f0',
+        borderRadius: '4px',
+        fontSize: '13px',
+        ':focus': {
+            outline: 'none',
+            borderColor: '#4299e1',
+        },
     },
     totalRow: {
-        backgroundColor: '#f8fafc'
-    },
-    btnEdit: {
-        fontSize: '13px',
-        padding: '6px 12px',
-        borderRadius: '4px',
-        border: '1px solid #4299e1',
-        color: '#4299e1',
-        background: 'white',
-        cursor: 'pointer'
-    },
-    btnDelete: {
-        fontSize: '13px',
-        padding: '6px 12px',
-        borderRadius: '4px',
-        border: '1px solid #e53e3e',
-        color: '#e53e3e',
-        background: 'white',
-        cursor: 'pointer'
-    },
-    btnSave: {
-        padding: '8px 16px',
-        borderRadius: '4px',
-        border: 'none',
-        color: 'white',
-        background: '#38a169',
-        cursor: 'pointer'
-    },
-    btnCancel: {
-        padding: '8px 16px',
-        borderRadius: '4px',
-        border: '1px solid #a0aec0',
-        color: '#4a5568',
-        background: 'white',
-        cursor: 'pointer'
-    },
-    btnEditSm: {
-        fontSize: '12px',
-        padding: '4px 8px',
-        borderRadius: '4px',
-        border: '1px solid #cbd5e0',
-        background: 'white',
-        cursor: 'pointer',
-        color: '#4a5568'
-    },
-    btnSaveSm: {
-        fontSize: '12px',
-        padding: '4px 8px',
-        borderRadius: '4px',
-        border: 'none',
-        background: '#38a169',
-        color: 'white',
-        cursor: 'pointer',
-        marginRight: '5px'
-    },
-    btnCancelSm: {
-        fontSize: '12px',
-        padding: '4px 8px',
-        borderRadius: '4px',
-        border: '1px solid #cbd5e0',
-        background: 'white',
-        cursor: 'pointer'
-    },
-    input: {
-        width: '100%',
-        padding: '8px',
-        borderRadius: '4px',
-        border: '1px solid #cbd5e0',
-        marginBottom: '10px'
-    },
-    inputSm: {
-        width: '100%',
-        padding: '4px',
-        borderRadius: '3px',
-        border: '1px solid #cbd5e0'
-    },
-    inputSmRight: {
-        width: '100%',
-        padding: '4px',
-        borderRadius: '3px',
-        border: '1px solid #cbd5e0',
-        textAlign: 'right'
-    },
-    formGroup: {
-        marginBottom: '10px'
-    },
-    label: {
-        display: 'block',
-        fontSize: '12px',
-        color: '#4a5568',
+        backgroundColor: '#f8fafc',
         fontWeight: '600',
-        marginBottom: '4px'
+    },
+    saveSmallButton: {
+        padding: '4px 10px',
+        backgroundColor: '#4299e1',
+        color: 'white',
+        border: 'none',
+        borderRadius: '4px',
+        fontSize: '12px',
+        fontWeight: '500',
+        cursor: 'pointer',
+        marginRight: '6px',
+        ':hover': {
+            backgroundColor: '#3182ce',
+        },
+    },
+    cancelSmallButton: {
+        padding: '4px 10px',
+        backgroundColor: '#edf2f7',
+        color: '#4a5568',
+        border: 'none',
+        borderRadius: '4px',
+        fontSize: '12px',
+        fontWeight: '500',
+        cursor: 'pointer',
+        ':hover': {
+            backgroundColor: '#e2e8f0',
+        },
+    },
+    editSmallButton: {
+        padding: '4px 10px',
+        backgroundColor: '#edf2f7',
+        color: '#4a5568',
+        border: 'none',
+        borderRadius: '4px',
+        fontSize: '12px',
+        fontWeight: '500',
+        cursor: 'pointer',
+        ':hover': {
+            backgroundColor: '#e2e8f0',
+        },
     },
     footer: {
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        width: '100%',
-        padding: '20px',
-        background: 'white',
-        borderTop: '1px solid #e2e8f0',
+        marginTop: '32px',
         display: 'flex',
         justifyContent: 'center',
-        boxShadow: '0 -4px 6px rgba(0,0,0,0.05)',
-        zIndex: 10
+        padding: '20px',
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        border: '1px solid #e2e8f0',
     },
-    btnExport: {
-        padding: '12px 24px',
-        backgroundColor: '#2b6cb0',
+    exportButton: {
+        padding: '12px 32px',
+        backgroundColor: '#38a169',
         color: 'white',
         border: 'none',
-        borderRadius: '6px',
-        fontWeight: '600',
+        borderRadius: '8px',
         fontSize: '16px',
+        fontWeight: '600',
         cursor: 'pointer',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-    }
+        transition: 'all 0.2s ease',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        ':hover': {
+            backgroundColor: '#2f855a',
+        },
+    },
 };
+
+// Add keyframe animation for spinner
+const styleSheet = document.createElement("style");
+styleSheet.textContent = `
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+`;
+document.head.appendChild(styleSheet);
