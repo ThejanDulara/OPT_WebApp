@@ -351,6 +351,7 @@ function App() {
                 channelDiscounts={channelDiscounts}
                 selectedTG={selectedTG}
                 selectedClient={selectedClient}
+                manualOverride={manualOverride}
                 onReady={handleDfReady}
                 goBack={() => navigate('/optimization-setup')}
               />

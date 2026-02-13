@@ -4,7 +4,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
-function DfPreview({ programIds, optimizationInput, onReady, goBack, negotiatedRates, channelDiscounts, selectedTG, selectedClient, }) {
+function DfPreview({ programIds, optimizationInput, onReady, goBack, negotiatedRates, channelDiscounts, selectedTG, selectedClient, manualOverride }) {
   const [dfFull, setDfFull] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -56,6 +56,7 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack, negotiatedR
       durations: optimizationInput.durations,
       negotiated_rates: negotiatedRates,       // { [programId]: number }
       channel_discounts: channelDiscounts,      // { [channel]: number }
+      manual_override: manualOverride,          // { [programId]: boolean } - PASS THIS
       target_group: selectedTG || "tvr_all",
       selected_client: selectedClient || "Other",
     };
@@ -67,14 +68,49 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack, negotiatedR
     })
       .then(res => res.json())
       .then(data => {
-        setDfFull(data.df_full || []);
+        // PATCH: Ensure negotiated rates match the frontend state (overrides)
+        // explicitly, in case backend recalculated them.
+        const rawDf = data.df_full || [];
+
+        const patchedDf = rawDf.map(row => {
+          // Attempt to resolve ID
+          const rowId = row.id ?? row.ProgramId ?? row.ID;
+
+          if (rowId && negotiatedRates[rowId] !== undefined) {
+            const frontendRate = parseFloat(negotiatedRates[rowId]);
+
+            // Check if backend value is significantly different (tolerance for float math)
+            const backendRate = parseFloat(row.Negotiated_Rate || 0);
+
+            if (Math.abs(frontendRate - backendRate) > 0.01) {
+              // If different, prefer frontend (user override/state)
+              // We also update NCost to match Negotiated_Rate assuming NCost in this table context
+              // often reflects the effective negotiated rate unit cost.
+              // NOTE: If NCost is duration-adjusted, this simple overwrite might be slightly off 
+              // if duration != 30, but usually DfPreview shows 30-sec rates or consistent units.
+              // Given "Neg. Rate (30 Sec)" header mapping, Negotiated_Rate is definitely 30s.
+              // If NCost is different, it might be spot cost.
+              // Let's just update Negotiated_Rate which is the key 30-sec anchor.
+              return {
+                ...row,
+                Negotiated_Rate: frontendRate,
+                // Optional: if NCost exists and equals old Negotiated Rate, update it too
+                NCost: (Math.abs(parseFloat(row.NCost) - backendRate) < 0.01) ? frontendRate : row.NCost
+              };
+            }
+          }
+          return row;
+        });
+
+        setDfFull(patchedDf);
         setLoading(false);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("Error fetching DF:", err);
         setError('Failed to fetch optimization table');
         setLoading(false);
       });
-  }, [programIds, optimizationInput, selectedClient]);
+  }, [programIds, optimizationInput, selectedClient, negotiatedRates]); // Added negotiatedRates to deps
 
   const handleStartOptimization = () => {
     setIsProcessing(true);
