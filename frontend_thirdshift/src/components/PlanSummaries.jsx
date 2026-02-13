@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 const hostname = window.location.hostname;
 const isLocal = hostname.includes("localhost") || hostname.includes("127.");
@@ -95,11 +97,48 @@ export default function PlanSummaries({ onBack }) {
         }
     };
 
+    const handleExport = () => {
+        if (!summaries.length) return;
+
+        const data = summaries.map(row => {
+            const rowData = {
+                ID: row.id,
+                'Client': row.client,
+                'Brand': row.brand,
+                'Activation Period': row.activation_period,
+                'Medium': row.medium,
+                'Channel': row.channel,
+                'Budget': row.budget,
+                'Created At': new Date(row.created_at).toLocaleString('en-LK', { timeZone: 'Asia/Colombo' })
+            };
+
+            // If admin, add user info
+            if (isAdmin) {
+                rowData['User ID'] = row.user_id;
+                rowData['User Name'] = `${row.user_first_name || ''} ${row.user_last_name || ''}`.trim();
+            }
+
+            return rowData;
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Plan Summaries");
+
+        // Generate buffer
+        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
+
+        saveAs(blob, `Plan_Summaries_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    };
+
     return (
         <div style={s.container}>
             <div style={s.header}>
                 <button onClick={onBack} style={s.backButton}>&larr; Back to Home</button>
-                <h2 style={s.title}>Saved Plan Summaries</h2>
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                    <h2 style={s.title}>Saved Plan Summaries</h2>
+                </div>
             </div>
 
             {loading && <div style={{ textAlign: 'center', padding: 20 }}>Loading summaries...</div>}
@@ -118,6 +157,12 @@ export default function PlanSummaries({ onBack }) {
                     <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>No saved plan summaries found.</div>
                 )}
             </div>
+
+            {!loading && summaries.length > 0 && (
+                <div style={s.footer}>
+                    <button onClick={handleExport} style={s.btnExport}>Export to Excel</button>
+                </div>
+            )}
         </div>
     );
 }
@@ -183,7 +228,7 @@ function SummaryCard({ group, onDelete, onUpdate }) {
                         <div style={s.cardMeta}>
                             <div style={s.metaItem}><strong>Period:</strong> {group.activation_period}</div>
                             <div style={s.metaItem}><strong>Created by:</strong> {group.user_first_name} {group.user_last_name}</div>
-                            <div style={s.metaItem}><strong>Date:</strong> {new Date(group.created_at).toLocaleString()}</div>
+                            <div style={s.metaItem}><strong>Date:</strong> {new Date(group.created_at).toLocaleString('en-LK', { timeZone: 'Asia/Colombo' })}</div>
                             <div style={s.metaItem}><strong>Medium:</strong> {group.medium}</div>
                         </div>
                     </div>
@@ -254,7 +299,8 @@ const s = {
         maxWidth: '1000px',
         margin: '0 auto',
         padding: '40px 20px',
-        fontFamily: "'Segoe UI', Roboto, sans-serif"
+        fontFamily: "'Segoe UI', Roboto, sans-serif",
+        paddingBottom: '100px'
     },
     header: {
         marginBottom: '30px',
@@ -462,5 +508,29 @@ const s = {
         color: '#4a5568',
         fontWeight: '600',
         marginBottom: '4px'
+    },
+    footer: {
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        width: '100%',
+        padding: '20px',
+        background: 'white',
+        borderTop: '1px solid #e2e8f0',
+        display: 'flex',
+        justifyContent: 'center',
+        boxShadow: '0 -4px 6px rgba(0,0,0,0.05)',
+        zIndex: 10
+    },
+    btnExport: {
+        padding: '12px 24px',
+        backgroundColor: '#2b6cb0',
+        color: 'white',
+        border: 'none',
+        borderRadius: '6px',
+        fontWeight: '600',
+        fontSize: '16px',
+        cursor: 'pointer',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
     }
 };
