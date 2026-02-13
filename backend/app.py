@@ -84,6 +84,7 @@ def generate_df():
     negotiated_rates  = data.get('negotiated_rates', {})   # { programId: value }
     channel_discounts = data.get('channel_discounts', {})  # { channel: pct }
     selected_client   = data.get('selected_client', "Other")  # NEW
+    manual_override   = data.get('manual_override', {})    # { programId: boolean } - NEW
 
     # ----- Allowed TG Values -----
     ALLOWED_TGS = [
@@ -174,12 +175,16 @@ def generate_df():
     # ---------- 3. Effective Rate Calculation ----------
     def effective_cost(row):
         pid = row['Id']
+        str_pid = str(pid) # Ensure string for JSON key lookup
         ch  = row['Channel']
         base_cost = float(row['Cost'])
 
-        # 1) Explicit override from front-end ALWAYS takes priority
-        if pid in negotiated_rates and negotiated_rates[pid] is not None:
-            return float(negotiated_rates[pid])
+        # 1) If Manually Overridden: use the frontend value
+        # We check manual_override map first.
+        if manual_override.get(str_pid):
+             val = negotiated_rates.get(str_pid)
+             if val is not None:
+                 return float(val)
 
         # 2) NEW: Cargills special rate for DERANA TV
         if (
@@ -194,7 +199,16 @@ def generate_df():
             if pd.notna(row['NetCost']):
                 return float(row['NetCost'])
             return base_cost  # fallback if net_cost is null
-
+        
+        # 4) Fallback to frontend negotiated_rates if available (e.g. calculated there)
+        #    BUT only if we haven't hit the special logic above? 
+        #    Actually frontend sends everything.
+        #    However, to be safe and respect backend logic for "freshness" if not overridden:
+        #    if NOT overridden, we should prefer backend calculation logic (discount) 
+        #    unless frontend logic is the source of truth? 
+        #    User requirement: "if user overide ... use that ... no need to reset"
+        #    Implies if NOT overridden, use standard logic.
+        
         # 4) Normal channel → apply discount
         disc_pct = float(channel_discounts.get(ch, 30.0))
         return round(base_cost * (1.0 - disc_pct / 100.0), 2)
