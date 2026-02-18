@@ -44,7 +44,7 @@ function FrontPage({ onStart, onManagePrograms, onOpenHistory, onOpenSummaries }
             </div>
           </div>
 
-          <h1 style={companyName}>MTM Group</h1>
+          <h1 style={companyName}>Media Factory (PVT) LTD</h1>
           <p style={tagline}>Where Intelligence Shapes Smarter Media Planning.</p>
 
           <button onClick={onStart} style={primaryButton}>

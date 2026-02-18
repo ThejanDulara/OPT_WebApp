@@ -4,7 +4,7 @@ import React from 'react';
 function Footer() {
   return (
     <footer style={styles.footer}>
-      <p>© {new Date().getFullYear()} MTM Group. All rights reserved.</p>
+      <p>© {new Date().getFullYear()} Media Factory (PVT) LTD. All rights reserved.</p>
     </footer>
   );
 }
