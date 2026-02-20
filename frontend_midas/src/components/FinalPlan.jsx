@@ -2869,7 +2869,7 @@ export default function FinalPlan({
 
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [clientName, setClientName] = useState("");
-  const [agencyName, setAgencyName] = useState('Third Shift Media (Pvt) Ltd');
+  const [agencyName, setAgencyName] = useState('Midas Media (Pvt) Ltd');
   const [brandName, setBrandName] = useState("");
   const [refNo, setRefNo] = useState("");
   const [commercialNames, setCommercialNames] = useState({});
