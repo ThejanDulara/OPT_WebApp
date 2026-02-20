@@ -22,7 +22,7 @@ export async function checkAuth() {
   const apiBase = "https://mtmbackend-production.up.railway.app/api";
 
   // Main portal for login
-  const portalBase = "https://www.mtmgroup.agency";
+  const portalBase = "https://www.mediafactorylk.agency";
 
   try {
     const res = await fetch(`${apiBase}/auth/me`, {
