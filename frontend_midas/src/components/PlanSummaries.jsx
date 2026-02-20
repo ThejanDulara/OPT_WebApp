@@ -4,7 +4,7 @@ import { saveAs } from 'file-saver';
 
 const hostname = window.location.hostname;
 const isLocal = hostname.includes("localhost") || hostname.includes("127.");
-const API_BASE = isLocal ? "http://localhost:5000" : "https://optwebapp-production.up.railway.app";
+const API_BASE = isLocal ? "http://localhost:5000" : "https://optwebapp-production-c7d6.up.railway.app";
 
 // Helper function to convert UTC to Sri Lanka time (GMT+5:30)
 const toSriLankaTime = (utcDateString) => {

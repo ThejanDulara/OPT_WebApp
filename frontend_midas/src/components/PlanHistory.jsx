@@ -7,7 +7,7 @@ const isLocal =
 
 const API_BASE = isLocal
   ? "http://localhost:5000"
-  : "https://optwebapp-production.up.railway.app";
+  : "https://optwebapp-production-c7d6.up.railway.app";
 
 function PlanHistory({ onBack, onLoadPlan }) {
   const [plans, setPlans] = useState([]);

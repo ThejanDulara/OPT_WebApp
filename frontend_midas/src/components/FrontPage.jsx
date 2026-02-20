@@ -17,7 +17,7 @@ function FrontPage({ onStart, onManagePrograms, onOpenHistory, onOpenSummaries }
           />
           <h1 style={leftTitle}>Media Intelligence Platform</h1>
           <p style={leftText}>
-            Meet the Daredevils in the Media Scene Who Curate Hand-Crafted Business Solutions By Harnessing the Power of Data Driven Local insights
+           Where Power Meets Precision,The Dragons of Media Leadership Powering Data-Driven Business Growth.
           </p>
         </div>
       </div>
@@ -44,7 +44,7 @@ function FrontPage({ onStart, onManagePrograms, onOpenHistory, onOpenSummaries }
             </div>
           </div>
 
-          <h1 style={companyName}>Third Shift Media (PVT) LTD</h1>
+          <h1 style={companyName}>Midas Media (PVT) LTD</h1>
           <p style={tagline}>Where Intelligence Shapes Smarter Media Planning.</p>
 
           <button onClick={onStart} style={primaryButton}>

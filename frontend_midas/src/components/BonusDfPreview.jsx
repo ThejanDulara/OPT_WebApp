@@ -257,7 +257,7 @@ export default function BonusDfPreview({
         commercialTolerancePct,
       };
 
-      const res = await fetch('https://optwebapp-production.up.railway.app/optimize-bonus', {
+      const res = await fetch('https://optwebapp-production-c7d6.up.railway.app/optimize-bonus', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

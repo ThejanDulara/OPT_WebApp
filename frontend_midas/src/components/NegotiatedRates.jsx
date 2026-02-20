@@ -128,7 +128,7 @@ function NegotiatedRates({
     const controller = new AbortController();
     const signal = controller.signal;
 
-    fetch(`https://optwebapp-production.up.railway.app/programs?channel=${encodeURIComponent(selectedChannel)}`, { signal })
+    fetch(`https://optwebapp-production-c7d6.up.railway.app/programs?channel=${encodeURIComponent(selectedChannel)}`, { signal })
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch');
         return res.json();

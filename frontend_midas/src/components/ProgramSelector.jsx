@@ -13,7 +13,7 @@ function ProgramSelector({ onSubmit, onBack, negotiatedRates, selectedChannels, 
   }, [selectedPrograms, onChange]);
 
   useEffect(() => {
-    fetch('https://optwebapp-production.up.railway.app/all-programs')
+    fetch('https://optwebapp-production-c7d6.up.railway.app/all-programs')
       .then(res => res.json())
       .then(data => {
         const grouped = {};

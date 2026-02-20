@@ -61,7 +61,7 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack, negotiatedR
       selected_client: selectedClient || "Other",
     };
 
-    fetch('https://optwebapp-production.up.railway.app/generate-df', {
+    fetch('https://optwebapp-production-c7d6.up.railway.app/generate-df', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -128,7 +128,7 @@ function DfPreview({ programIds, optimizationInput, onReady, goBack, negotiatedR
       time_limit: optimizationInput.timeLimit || 120
     };
 
-    fetch('https://optwebapp-production.up.railway.app/optimize', {
+    fetch('https://optwebapp-production-c7d6.up.railway.app/optimize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)

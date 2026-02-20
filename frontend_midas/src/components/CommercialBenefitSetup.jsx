@@ -337,7 +337,7 @@ export default function CommercialBenefitSetup({
     setStopRequested(false);
 
     // 🔁 Replace with your separate endpoint for CB optimization
-    const BENEFIT_ENDPOINT = 'https://optwebapp-production.up.railway.app/optimize-by-benefit-share';
+    const BENEFIT_ENDPOINT = 'https://optwebapp-production-c7d6.up.railway.app/optimize-by-benefit-share';
 
     fetch(BENEFIT_ENDPOINT, {
       method: 'POST',

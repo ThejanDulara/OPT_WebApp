@@ -8,10 +8,10 @@ const hostname = window.location.hostname;
 const isLocal =
   hostname.includes("localhost") || hostname.includes("127.");
 
-const API_BASE_SAVE = "https://optwebapp-production.up.railway.app"; // ✅ ALWAYS
+const API_BASE_SAVE = "https://optwebapp-production-c7d6.up.railway.app"; // ✅ ALWAYS
 const API_BASE_READ = isLocal
   ? "http://localhost:5000"      // if you read anything locally
-  : "https://optwebapp-production.up.railway.app";
+  : "https://optwebapp-production-c7d6.up.railway.app";
 
 // ✅ LOCAL DEV AUTH (matches backend contract)
 const auth = isLocal
