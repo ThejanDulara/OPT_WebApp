@@ -96,7 +96,8 @@ function App() {
 
   const PLAN_API_BASE = isLocal
     ? "http://localhost:5000"   // your local OPT backend
-    : "https://optwebapp-production.up.railway.app"; // correct production OPT backend
+    : "https://optwebapp-production-60b4.up.railway.app"; // correct production OPT backend
+
 
   const handleOpenHistory = () => {
     navigate('/history');
