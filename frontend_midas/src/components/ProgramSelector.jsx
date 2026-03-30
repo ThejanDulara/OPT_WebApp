@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 function ProgramSelector({ onSubmit, onBack, negotiatedRates, selectedChannels, selectedTG, initialSelectedProgramIds = [], onChange }) {
   const [programsByChannel, setProgramsByChannel] = useState({});
   const [selectedPrograms, setSelectedPrograms] = useState({});
+  const [tvrCaps, setTvrCaps] = useState({});
 
   useEffect(() => {
     if (onChange) {
@@ -57,6 +58,38 @@ function ProgramSelector({ onSubmit, onBack, negotiatedRates, selectedChannels, 
     }));
   };
 
+  const handleTvrCapChange = (channel, value) => {
+    setTvrCaps(prev => ({ ...prev, [channel]: value }));
+
+    // As soon as the value changes, trigger the selection logic
+    const cap = parseFloat(value);
+    const threshold = isNaN(cap) ? 0 : cap;
+
+    setSelectedPrograms(prev => {
+      const updated = { ...prev };
+      let changed = false;
+
+      (programsByChannel[channel] || []).forEach(p => {
+        const itemTvr = Number(p.tvr) || 0;
+        if (itemTvr < threshold) {
+          // Deselect if below cap
+          if (updated[p.id] !== false) {
+            updated[p.id] = false;
+            changed = true;
+          }
+        } else {
+          // Auto-select if equal or above cap
+          if (updated[p.id] !== true) {
+            updated[p.id] = true;
+            changed = true;
+          }
+        }
+      });
+
+      return changed ? updated : prev;
+    });
+  };
+
   const bottomRef = useRef(null);
 
   const handleSelectAllGlobal = () => {
@@ -65,6 +98,7 @@ function ProgramSelector({ onSubmit, onBack, negotiatedRates, selectedChannels, 
       (list || []).forEach(p => { updated[p.id] = true; });
     });
     setSelectedPrograms(updated);
+    setTvrCaps({}); // Reset all TVR caps
   };
 
   const scrollToBottom = () => {
@@ -77,6 +111,7 @@ function ProgramSelector({ onSubmit, onBack, negotiatedRates, selectedChannels, 
       updated[p.id] = true;
     });
     setSelectedPrograms(updated);
+    setTvrCaps(prev => ({ ...prev, [channel]: '' })); // Reset this channel's TVR cap
   };
 
   const handleDeselectAll = (channel) => {
@@ -85,6 +120,7 @@ function ProgramSelector({ onSubmit, onBack, negotiatedRates, selectedChannels, 
       updated[p.id] = false;
     });
     setSelectedPrograms(updated);
+    setTvrCaps(prev => ({ ...prev, [channel]: '' })); // Reset this channel's TVR cap
   };
 
 
@@ -121,21 +157,36 @@ function ProgramSelector({ onSubmit, onBack, negotiatedRates, selectedChannels, 
               <h3 style={styles.channelName}>{channel}</h3>
             </div>
 
-            <div style={styles.actionButtons}>
-              <button
-                type="button"
-                onClick={() => handleSelectAll(channel)}
-                style={styles.selectAllButton}
-              >
-                Select All
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDeselectAll(channel)}
-                style={styles.selectAllButton}
-              >
-                Deselect All
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+              <div style={styles.tvrCapContainer}>
+                <label style={styles.tvrCapLabel}>TVR Cap:</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={tvrCaps[channel] ?? ''}
+                  onChange={(e) => handleTvrCapChange(channel, e.target.value)}
+                  style={styles.tvrCapInput}
+                  placeholder="0.0"
+                />
+              </div>
+
+              <div style={styles.actionButtons}>
+                <button
+                  type="button"
+                  onClick={() => handleSelectAll(channel)}
+                  style={styles.selectAllButton}
+                >
+                  Select All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeselectAll(channel)}
+                  style={styles.selectAllButton}
+                >
+                  Deselect All
+                </button>
+              </div>
             </div>
           </div>
 
@@ -341,6 +392,23 @@ const styles = {
     display: 'flex',
     gap: '10px',
     flexWrap: 'wrap',
+  },
+  tvrCapContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  tvrCapLabel: {
+    fontWeight: '500',
+    color: '#4a5568',
+    fontSize: '14px',
+  },
+  tvrCapInput: {
+    padding: '6px 12px',
+    border: '1px solid #cbd5e0',
+    borderRadius: '6px',
+    width: '80px',
+    fontSize: '14px',
   },
 
   toolbar: {
