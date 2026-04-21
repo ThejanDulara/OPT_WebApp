@@ -1057,8 +1057,8 @@ def optimize_by_benefit_share():
             ch_cost_expr = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in ch_indices)
 
             # Channel Budget Constraint (+/- 5%)
-            prob += ch_cost_expr >= 0.95 * target_ch_budget
-            prob += ch_cost_expr <= 1.05 * target_ch_budget
+            prob += ch_cost_expr >= 0.98 * target_ch_budget
+            prob += ch_cost_expr <= 1.02 * target_ch_budget
 
             # --- SLOT CONSTRAINTS ---
             ch_slot_pcts = channel_slot_pct_map.get(ch, {'A': prime_pct_global, 'B': nonprime_pct_global})
