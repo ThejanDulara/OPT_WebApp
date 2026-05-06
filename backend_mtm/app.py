@@ -136,6 +136,7 @@ def generate_df():
             cost,
             net_cost,
             cargills_rate,
+            cbl_rate,
             {tg} AS tvr,
             slot
         FROM programs
@@ -164,6 +165,7 @@ def generate_df():
         'slot': 'Slot',
         'net_cost': 'NetCost',
         'cargills_rate': 'CargillsRate',
+        'cbl_rate': 'CblRate',
     }, inplace=True)
 
     # Ensure numeric
@@ -171,20 +173,26 @@ def generate_df():
     df['TVR'] = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
     df['NetCost'] = pd.to_numeric(df['NetCost'], errors='coerce')
     df['CargillsRate'] = pd.to_numeric(df['CargillsRate'], errors='coerce')
+    df['CblRate'] = pd.to_numeric(df['CblRate'], errors='coerce')
     df['IsWeekend'] = (pd.to_numeric(df['IsWeekend'], errors='coerce').fillna(0).astype(int))
+
+    # NEW: Override Cost with CblRate if CBL on DERANA TV
+    if selected_client == "CBL":
+        mask = (df['Channel'] == "DERANA TV")
+        df.loc[mask, 'Cost'] = df.loc[mask, 'CblRate']
 
     # ---------- 3. Effective Rate Calculation ----------
     def effective_cost(row):
         pid = row['Id']
         str_pid = str(pid)  # Ensure string for JSON key lookup
         ch = row['Channel']
-        base_cost = float(row['Cost'])
+        base_cost = row['Cost']
 
         # 1) If Manually Overridden: use the frontend value
         # We check manual_override map first.
         if manual_override.get(str_pid):
             val = negotiated_rates.get(str_pid)
-            if val is not None:
+            if val is not None and val != "":
                 return float(val)
 
         # 2) NEW: Cargills special rate for DERANA TV
@@ -195,26 +203,31 @@ def generate_df():
         ):
             return float(row['CargillsRate'])
 
-        # 3) Old special channels → use net_cost
+        # 3) Old special channels → use net_cost or cbl_rate
         if ch in SPECIAL_CHANNELS:
-            if pd.notna(row['NetCost']):
+            if selected_client == "CBL" and pd.notna(row['CblRate']):
+                return float(row['CblRate'])
+            elif pd.notna(row['NetCost']):
                 return float(row['NetCost'])
-            return base_cost  # fallback if net_cost is null
 
-        # 4) Fallback to frontend negotiated_rates if available (e.g. calculated there)
-        #    BUT only if we haven't hit the special logic above?
-        #    Actually frontend sends everything.
-        #    However, to be safe and respect backend logic for "freshness" if not overridden:
-        #    if NOT overridden, we should prefer backend calculation logic (discount)
-        #    unless frontend logic is the source of truth?
-        #    User requirement: "if user overide ... use that ... no need to reset"
-        #    Implies if NOT overridden, use standard logic.
+            if pd.isna(base_cost):
+                return None
+            return float(base_cost)
+
+        if pd.isna(base_cost):
+            return None
+
+        base_cost = float(base_cost)
 
         # 4) Normal channel → apply discount
         disc_pct = float(channel_discounts.get(ch, 30.0))
         return round(base_cost * (1.0 - disc_pct / 100.0), 2)
 
     df['Negotiated_Rate'] = df.apply(effective_cost, axis=1)
+
+    # NEW: Drop any programs that don't have a valid base cost or negotiated rate (e.g. missing CBL rate)
+    # This prevents the solver from treating them as "free" programs with 0.0 cost.
+    df = df.dropna(subset=['Cost', 'Negotiated_Rate'])
 
     # ---------- 4. Expand by commercials ----------
     df_list = []
@@ -256,6 +269,7 @@ def generate_bonus_df():
     program_ids = data.get('program_ids', [])
     tg = data.get("target_group", "tvr_all")  # Dynamic TG from frontend
     durations = data.get('durations', [])
+    selected_client = data.get('selected_client', "Other")
 
     if not program_ids or not durations:
         return jsonify({"error": "Missing program_ids or durations"}), 400
@@ -285,6 +299,7 @@ def generate_bonus_df():
             time,
             program,
             cost,
+            cbl_rate,
             {tg} AS tvr,
             slot
         FROM programs 
@@ -307,14 +322,23 @@ def generate_bonus_df():
         'time': 'Time',
         'program': 'Program',
         'cost': 'Cost',
+        'cbl_rate': 'CblRate',
         'tvr': 'TVR',
         'slot': 'Slot'
     }, inplace=True)
 
     # Ensure numeric types
     df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce').fillna(0.0)
+    df['CblRate'] = pd.to_numeric(df['CblRate'], errors='coerce')
     df['TVR'] = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
     df['IsWeekend'] = (pd.to_numeric(df['IsWeekend'], errors='coerce').fillna(0).astype(int))
+
+    # NEW: Override Cost with CblRate if CBL on DERANA TV
+    if selected_client == "CBL":
+        mask = (df['Channel'] == "DERANA TV")
+        df.loc[mask, 'Cost'] = df.loc[mask, 'CblRate']
+
+    df = df.dropna(subset=['Cost'])
 
     # For bonus: Rate = Raw Cost (no negotiation, no discount)
     df['Negotiated_Rate'] = df['Cost']  # Exact copy — no changes
@@ -495,11 +519,13 @@ def update_programs():
     cursor.execute("DELETE FROM programs WHERE channel = %s", (channel,))
 
     for p in programs:
-        # net_cost only applies for the 4 special channels
+        # net_cost and cbl_rate only applies for the 4 special channels
         if channel in SPECIAL_CHANNELS:
             net_cost = p.get('net_cost')
+            cbl_rate = p.get('cbl_rate')
         else:
             net_cost = None
+            cbl_rate = p.get('cbl_rate') if channel == "DERANA TV" else None
 
         # cargills_rate only applies for DERANA TV
         if channel == "DERANA TV":
@@ -525,14 +551,15 @@ def update_programs():
                 tvr_abc_female_15_60,
                 tvr_abc_male_15_60,
                 net_cost,
-                cargills_rate
+                cargills_rate,
+                cbl_rate
             )
             VALUES (
                 %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
                 %s, %s, %s,
-                %s, %s
+                %s, %s, %s
             )
             """,
             (
@@ -559,7 +586,8 @@ def update_programs():
                 p.get('tvr_abc_male_15_60'),
 
                 net_cost,
-                cargills_rate
+                cargills_rate,
+                cbl_rate
             )
         )
 
@@ -733,8 +761,8 @@ def optimize_by_budget_share():
         ch_cost = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in ch_indices)
 
         # Keep channel budget within ±5%
-        prob += ch_cost >= 0.98 * ch_budget
-        prob += ch_cost <= 1.02 * ch_budget
+        prob += ch_cost >= 0.95 * ch_budget
+        prob += ch_cost <= 1.05 * ch_budget
 
         # PT / NPT sets
         prime_indices = df_full[(df_full['Channel'] == ch) & (df_full['Slot'].str.startswith('A', na=False))].index
@@ -1057,8 +1085,8 @@ def optimize_by_benefit_share():
             ch_cost_expr = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in ch_indices)
 
             # Channel Budget Constraint (+/- 5%)
-            prob += ch_cost_expr >= 0.98 * target_ch_budget
-            prob += ch_cost_expr <= 1.02 * target_ch_budget
+            prob += ch_cost_expr >= 0.95 * target_ch_budget
+            prob += ch_cost_expr <= 1.05 * target_ch_budget
 
             # --- SLOT CONSTRAINTS ---
             ch_slot_pcts = channel_slot_pct_map.get(ch, {'A': prime_pct_global, 'B': nonprime_pct_global})
