@@ -568,7 +568,7 @@ def update_programs():
                 p.get('tvr_abc_15_60'),
                 p.get('tvr_bcde_15_plus'),
                 p.get('tvr_abcde_15_plus'),
-                tvr_abc_female_15_60,
+                p.get('tvr_abc_female_15_60'),
                 p.get('tvr_abc_male_15_60'),
 
                 net_cost,
