@@ -104,10 +104,18 @@ function ProgramUpdater({ onBack }) {
   const saveChanges = () => {
     setIsSaving(true);
 
+    const updaterName = (typeof window !== 'undefined' && window.__AUTH__ && window.__AUTH__.firstName) 
+        ? `${window.__AUTH__.firstName} ${window.__AUTH__.lastName || ''}`.trim() 
+        : 'An Admin';
+
     fetch('https://optwebapp-production.up.railway.app/update-programs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channel: selectedChannel, programs })
+      body: JSON.stringify({ 
+        channel: selectedChannel, 
+        programs,
+        updater_name: updaterName
+      })
     })
       .then(res => res.json())
       .then(data => alert('✅ Programs updated successfully!'))

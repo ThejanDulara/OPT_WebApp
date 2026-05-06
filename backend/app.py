@@ -499,12 +499,81 @@ def create_channel():
     # Nothing to do — handled when inserting programs later
     return jsonify({'message': f'Channel "{name}" initialized (placeholder)'})
 
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import threading
+
+def send_update_email_async(updater_name, changes, channel):
+    if not changes:
+        return
+        
+    try:
+        conn = mysql.connector.connect(
+            host="ballast.proxy.rlwy.net",
+            port=48211,
+            user="root",
+            password="xIphibqobRlXuRTptpjsWqCUZScbaLZu",
+            database="railway",
+            autocommit=True
+        )
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT email FROM user WHERE email IS NOT NULL AND email != ''")
+        users = cursor.fetchall()
+        conn.close()
+        
+        emails = [u['email'] for u in users]
+        if not emails:
+            return
+            
+        sender = "devthirdshift@gmail.com"
+        app_password = "isxb ddte jsxv hatu"
+        
+        msg = MIMEMultipart()
+        msg['From'] = f"OPT WebApp <{sender}>"
+        msg['Subject'] = f"Program Data Updated for {channel}"
+        
+        html = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #333;">
+            <div style="background-color: #f7fafc; padding: 20px; border-radius: 8px;">
+                <h2 style="color: #2d3748;">Program Data Updated</h2>
+                <p>Hello,</p>
+                <p><b>{updater_name}</b> has updated the program data for <b>{channel}</b>.</p>
+                <p><b>Changes Made:</b></p>
+                <ul>
+        """
+        for change in changes:
+            html += f"<li style='margin-bottom: 8px;'><b>{change['program']}</b>: {change['details']}</li>"
+            
+        html += """
+                </ul>
+                <br>
+                <p style="font-size: 12px; color: #718096;">
+                    This is an automated notification. Please do not reply to this email.
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        msg.attach(MIMEText(html, 'html'))
+        
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender, app_password)
+        server.sendmail(sender, emails, msg.as_string())
+        server.quit()
+    except Exception as e:
+        print("Failed to send update email:", e)
+
 
 @app.route('/update-programs', methods=['POST'])
 def update_programs():
     data = request.get_json()
     channel = data['channel']
     programs = data['programs']
+    updater_name = data.get('updater_name', 'An Admin')
 
     SPECIAL_CHANNELS = [
         "SHAKTHI TV",
@@ -514,8 +583,82 @@ def update_programs():
     ]
 
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)
 
+    # Identify Changes
+    cursor.execute("SELECT * FROM programs WHERE channel = %s", (channel,))
+    old_programs = cursor.fetchall()
+    old_prog_dict = {(p['program'], p['slot']): p for p in old_programs}
+    
+    changes = []
+    
+    def norm(v):
+        if v is None or str(v).strip() == '':
+            return None
+        try:
+            return round(float(v), 2)
+        except ValueError:
+            return str(v).strip()
+            
+    def compare_vals(v1, v2):
+        n1 = norm(v1)
+        n2 = norm(v2)
+        if n1 is None and n2 is None: return True
+        return n1 == n2
+
+    fields_to_check = [
+        ('day', 'Day'), ('time', 'Time'), ('is_weekend', 'Is Weekend'),
+        ('cost', 'Rate Card'), ('cargills_rate', 'Cargills Rate'), ('cbl_rate', 'CBL Rate'),
+        ('net_cost', 'Negotiated Rate'), 
+        ('tvr_all', 'TVR All'), ('tvr_abc_15_90', 'TVR ABC 15-90'), ('tvr_abc_30_60', 'TVR ABC 30-60'),
+        ('tvr_abc_15_30', 'TVR ABC 15-30'), ('tvr_abc_20_plus', 'TVR ABC 20+'),
+        ('tvr_ab_15_plus', 'TVR AB 15+'), ('tvr_cd_15_plus', 'TVR CD 15+'),
+        ('tvr_ab_female_15_45', 'TVR AB Female 15-45'), ('tvr_abc_15_60', 'TVR ABC 15-60'),
+        ('tvr_bcde_15_plus', 'TVR BCDE 15+'), ('tvr_abcde_15_plus', 'TVR ABCDE 15+'),
+        ('tvr_abc_female_15_60', 'TVR ABC Female 15-60'), ('tvr_abc_male_15_60', 'TVR ABC Male 15-60')
+    ]
+
+    for p in programs:
+        prog_name = p.get('program')
+        slot = p.get('slot')
+        old_p = old_prog_dict.get((prog_name, slot))
+        
+        # Prepare specific fields according to logic in insertion
+        if channel in SPECIAL_CHANNELS:
+            p_net_cost = p.get('net_cost')
+            p_cbl_rate = p.get('cbl_rate')
+        else:
+            p_net_cost = None
+            p_cbl_rate = p.get('cbl_rate') if channel == "DERANA TV" else None
+
+        if channel == "DERANA TV":
+            p_cargills_rate = p.get('cargills_rate')
+        else:
+            p_cargills_rate = None
+            
+        p_for_compare = {**p, 'net_cost': p_net_cost, 'cbl_rate': p_cbl_rate, 'cargills_rate': p_cargills_rate}
+        
+        if not old_p:
+            changes.append({'program': prog_name, 'details': f"Added as new program (Slot: {slot})"})
+        else:
+            diffs = []
+            for key, label in fields_to_check:
+                if not compare_vals(old_p.get(key), p_for_compare.get(key)):
+                    diffs.append(f"{label} changed from {old_p.get(key)} to {p_for_compare.get(key)}")
+            if diffs:
+                changes.append({'program': prog_name, 'details': ", ".join(diffs)})
+
+    new_prog_keys = {(p.get('program'), p.get('slot')) for p in programs}
+    for old_k, old_p in old_prog_dict.items():
+        if old_k not in new_prog_keys:
+            changes.append({'program': old_p['program'], 'details': f"Deleted program (Slot: {old_p['slot']})"})
+            
+    if changes:
+        threading.Thread(target=send_update_email_async, args=(updater_name, changes, channel)).start()
+
+    cursor.close()
+
+    cursor = conn.cursor()
     # Delete old programs for this channel
     cursor.execute("DELETE FROM programs WHERE channel = %s", (channel,))
 
