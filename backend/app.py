@@ -186,7 +186,7 @@ def generate_df():
         # We check manual_override map first.
         if manual_override.get(str_pid):
              val = negotiated_rates.get(str_pid)
-             if val is not None:
+             if val is not None and val != "":
                  return float(val)
 
         # 2) NEW: Cargills special rate for DERANA TV
