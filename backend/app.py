@@ -177,7 +177,7 @@ def generate_df():
 
     # NEW: Override Cost with CblRate if CBL on DERANA TV
     if selected_client == "CBL":
-        mask = (df['Channel'] == "DERANA TV") & df['CblRate'].notna() & (df['CblRate'] > 0)
+        mask = (df['Channel'] == "DERANA TV")
         df.loc[mask, 'Cost'] = df.loc[mask, 'CblRate']
 
     # ---------- 3. Effective Rate Calculation ----------
@@ -185,7 +185,7 @@ def generate_df():
         pid = row['Id']
         str_pid = str(pid) # Ensure string for JSON key lookup
         ch  = row['Channel']
-        base_cost = float(row['Cost'])
+        base_cost = row['Cost']
 
         # 1) If Manually Overridden: use the frontend value
         # We check manual_override map first.
@@ -208,17 +208,16 @@ def generate_df():
                 return float(row['CblRate'])
             elif pd.notna(row['NetCost']):
                 return float(row['NetCost'])
-            return base_cost  # fallback if net_cost is null
+            
+            if pd.isna(base_cost):
+                return None
+            return float(base_cost)
         
-        # 4) Fallback to frontend negotiated_rates if available (e.g. calculated there)
-        #    BUT only if we haven't hit the special logic above? 
-        #    Actually frontend sends everything.
-        #    However, to be safe and respect backend logic for "freshness" if not overridden:
-        #    if NOT overridden, we should prefer backend calculation logic (discount) 
-        #    unless frontend logic is the source of truth? 
-        #    User requirement: "if user overide ... use that ... no need to reset"
-        #    Implies if NOT overridden, use standard logic.
+        if pd.isna(base_cost):
+            return None
         
+        base_cost = float(base_cost)
+
         # 4) Normal channel → apply discount
         disc_pct = float(channel_discounts.get(ch, 30.0))
         return round(base_cost * (1.0 - disc_pct / 100.0), 2)
