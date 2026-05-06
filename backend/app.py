@@ -224,6 +224,10 @@ def generate_df():
 
     df['Negotiated_Rate'] = df.apply(effective_cost, axis=1)
 
+    # NEW: Drop any programs that don't have a valid base cost or negotiated rate (e.g. missing CBL rate)
+    # This prevents the solver from treating them as "free" programs with 0.0 cost.
+    df = df.dropna(subset=['Cost', 'Negotiated_Rate'])
+
     # ---------- 4. Expand by commercials ----------
     df_list = []
     for c in range(int(num_commercials)):
@@ -266,6 +270,7 @@ def generate_bonus_df():
     program_ids = data.get('program_ids', [])
     tg = data.get("target_group", "tvr_all")  # Dynamic TG from frontend
     durations = data.get('durations', [])
+    selected_client = data.get('selected_client', "Other")
 
     if not program_ids or not durations:
         return jsonify({"error": "Missing program_ids or durations"}), 400
@@ -295,6 +300,7 @@ def generate_bonus_df():
             time,
             program,
             cost,
+            cbl_rate,
             {tg} AS tvr,
             slot
         FROM programs 
@@ -317,14 +323,23 @@ def generate_bonus_df():
         'time': 'Time',
         'program': 'Program',
         'cost': 'Cost',
+        'cbl_rate': 'CblRate',
         'tvr': 'TVR',
         'slot': 'Slot'
     }, inplace=True)
 
     # Ensure numeric types
     df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce').fillna(0.0)
+    df['CblRate'] = pd.to_numeric(df['CblRate'], errors='coerce')
     df['TVR']  = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
     df['IsWeekend'] = (pd.to_numeric(df['IsWeekend'], errors='coerce').fillna(0).astype(int))
+
+    # NEW: Override Cost with CblRate if CBL on DERANA TV
+    if selected_client == "CBL":
+        mask = (df['Channel'] == "DERANA TV")
+        df.loc[mask, 'Cost'] = df.loc[mask, 'CblRate']
+        
+    df = df.dropna(subset=['Cost'])
 
     # For bonus: Rate = Raw Cost (no negotiation, no discount)
     df['Negotiated_Rate'] = df['Cost']  # Exact copy — no changes
