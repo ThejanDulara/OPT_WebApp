@@ -76,7 +76,7 @@ function ProgramUpdater({ onBack }) {
     setPrograms([
       ...programs,
       {
-        day: '', time: '', program: '', cost: 0, net_cost: 0, cargills_rate: 0, slot: '',
+        day: '', time: '', program: '', cost: 0, net_cost: 0, cargills_rate: 0, cbl_rate: 0, slot: '',
         tvr_all: 0, tvr_abc_15_90: 0, tvr_abc_30_60: 0, tvr_abc_15_30: 0,
         tvr_abc_20_plus: 0, tvr_ab_15_plus: 0, tvr_cd_15_plus: 0,
         tvr_ab_female_15_45: 0, tvr_abc_15_60: 0, tvr_bcde_15_plus: 0,
@@ -370,6 +370,13 @@ function ProgramUpdater({ onBack }) {
                   <th style={{ ...styles.tableHeader, minWidth: '140px' }}>Cargills Rate (30 Sec)</th>
                 )}
 
+                {/* CBL Rate Column - For Special Channels AND Derana TV */}
+                {(isSpecialChannel || isDeranaTV) && (
+                  <th style={{ ...styles.tableHeader, minWidth: '140px' }}>
+                    {isDeranaTV ? "CBL Rate Card (30 Sec)" : "CBL Neg. Rate (30 Sec)"}
+                  </th>
+                )}
+
                 {/* New Negotiated Rate Column */}
                 <th style={{ ...styles.tableHeader, minWidth: '140px' }}>Neg. Rate (30 Sec)</th>
                 <th style={styles.tableHeader}>Slot</th>
@@ -461,6 +468,18 @@ function ProgramUpdater({ onBack }) {
                         type="number"
                         value={p.cargills_rate || ''}
                         onChange={(e) => handleProgramChange(p.originalIndex, 'cargills_rate', parseFloat(e.target.value))}
+                        style={styles.inputCell}
+                      />
+                    </td>
+                  )}
+
+                  {/* CBL Rate Input - For Special Channels AND Derana TV */}
+                  {(isSpecialChannel || isDeranaTV) && (
+                    <td style={styles.rightAlignedCell}>
+                      <input
+                        type="number"
+                        value={p.cbl_rate || ''}
+                        onChange={(e) => handleProgramChange(p.originalIndex, 'cbl_rate', parseFloat(e.target.value))}
                         style={styles.inputCell}
                       />
                     </td>
