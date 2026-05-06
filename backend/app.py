@@ -175,6 +175,11 @@ def generate_df():
     df['CblRate']      = pd.to_numeric(df['CblRate'], errors='coerce')
     df['IsWeekend'] = ( pd.to_numeric(df['IsWeekend'], errors='coerce').fillna(0).astype(int))
 
+    # NEW: Override Cost with CblRate if CBL on DERANA TV
+    if selected_client == "CBL":
+        mask = (df['Channel'] == "DERANA TV") & df['CblRate'].notna() & (df['CblRate'] > 0)
+        df.loc[mask, 'Cost'] = df.loc[mask, 'CblRate']
+
     # ---------- 3. Effective Rate Calculation ----------
     def effective_cost(row):
         pid = row['Id']
@@ -215,12 +220,8 @@ def generate_df():
         #    Implies if NOT overridden, use standard logic.
         
         # 4) Normal channel → apply discount
-        base_to_discount = base_cost
-        if ch == "DERANA TV" and selected_client == "CBL" and pd.notna(row['CblRate']):
-            base_to_discount = float(row['CblRate'])
-
         disc_pct = float(channel_discounts.get(ch, 30.0))
-        return round(base_to_discount * (1.0 - disc_pct / 100.0), 2)
+        return round(base_cost * (1.0 - disc_pct / 100.0), 2)
 
     df['Negotiated_Rate'] = df.apply(effective_cost, axis=1)
 
