@@ -135,6 +135,7 @@ def generate_df():
             cost,
             net_cost,
             cargills_rate,
+            cbl_rate,
             {tg} AS tvr,
             slot
         FROM programs
@@ -163,6 +164,7 @@ def generate_df():
         'slot':         'Slot',
         'net_cost':     'NetCost',
         'cargills_rate':'CargillsRate',
+        'cbl_rate':     'CblRate',
     }, inplace=True)
 
     # Ensure numeric
@@ -170,6 +172,7 @@ def generate_df():
     df['TVR']          = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
     df['NetCost']      = pd.to_numeric(df['NetCost'], errors='coerce')
     df['CargillsRate'] = pd.to_numeric(df['CargillsRate'], errors='coerce')
+    df['CblRate']      = pd.to_numeric(df['CblRate'], errors='coerce')
     df['IsWeekend'] = ( pd.to_numeric(df['IsWeekend'], errors='coerce').fillna(0).astype(int))
 
     # ---------- 3. Effective Rate Calculation ----------
@@ -194,9 +197,11 @@ def generate_df():
         ):
             return float(row['CargillsRate'])
 
-        # 3) Old special channels → use net_cost
+        # 3) Old special channels → use net_cost or cbl_rate
         if ch in SPECIAL_CHANNELS:
-            if pd.notna(row['NetCost']):
+            if selected_client == "CBL" and pd.notna(row['CblRate']):
+                return float(row['CblRate'])
+            elif pd.notna(row['NetCost']):
                 return float(row['NetCost'])
             return base_cost  # fallback if net_cost is null
         
@@ -210,8 +215,12 @@ def generate_df():
         #    Implies if NOT overridden, use standard logic.
         
         # 4) Normal channel → apply discount
+        base_to_discount = base_cost
+        if ch == "DERANA TV" and selected_client == "CBL" and pd.notna(row['CblRate']):
+            base_to_discount = float(row['CblRate'])
+
         disc_pct = float(channel_discounts.get(ch, 30.0))
-        return round(base_cost * (1.0 - disc_pct / 100.0), 2)
+        return round(base_to_discount * (1.0 - disc_pct / 100.0), 2)
 
     df['Negotiated_Rate'] = df.apply(effective_cost, axis=1)
 
@@ -496,11 +505,13 @@ def update_programs():
     cursor.execute("DELETE FROM programs WHERE channel = %s", (channel,))
 
     for p in programs:
-        # net_cost only applies for the 4 special channels
+        # net_cost and cbl_rate only applies for the 4 special channels
         if channel in SPECIAL_CHANNELS:
             net_cost = p.get('net_cost')
+            cbl_rate = p.get('cbl_rate')
         else:
             net_cost = None
+            cbl_rate = p.get('cbl_rate') if channel == "DERANA TV" else None
 
         # cargills_rate only applies for DERANA TV
         if channel == "DERANA TV":
@@ -526,14 +537,15 @@ def update_programs():
                 tvr_abc_female_15_60,
                 tvr_abc_male_15_60,
                 net_cost,
-                cargills_rate
+                cargills_rate,
+                cbl_rate
             )
             VALUES (
                 %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
                 %s, %s, %s,
-                %s, %s
+                %s, %s, %s
             )
             """,
             (
@@ -556,11 +568,12 @@ def update_programs():
                 p.get('tvr_abc_15_60'),
                 p.get('tvr_bcde_15_plus'),
                 p.get('tvr_abcde_15_plus'),
-                p.get('tvr_abc_female_15_60'),
+                tvr_abc_female_15_60,
                 p.get('tvr_abc_male_15_60'),
 
                 net_cost,
-                cargills_rate
+                cargills_rate,
+                cbl_rate
             )
         )
 
