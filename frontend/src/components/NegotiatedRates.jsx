@@ -12,9 +12,11 @@ const SPECIAL_CHANNELS = [
 // --- NEW CONSTANTS FOR CARGILLS LOGIC ---
 const CARGILLS_CHANNEL = "DERANA TV";
 const CARGILLS_CLIENT = "Cargills";
+const CBL_CLIENT = "CBL";
 const OTHER_CLIENT = "Other";
 const CLIENT_OPTIONS = [
   { key: CARGILLS_CLIENT, label: CARGILLS_CLIENT },
+  { key: CBL_CLIENT, label: CBL_CLIENT },
   { key: OTHER_CLIENT, label: OTHER_CLIENT }
 ];
 // ----------------------------------------
@@ -139,14 +141,21 @@ function NegotiatedRates({
           const tvrValue = toNumber(p[selectedTG] ?? 0);
           const dbNet = isSpecialChannel ? toNumber(p.net_cost) : null;
           const cargillsRate = isCargillsDerana ? toNumber(p.cargills_rate) : null;
+          const cblRate = toNumber(p.cbl_rate); // Fetch it always so Derana can use it too
+
+          let finalCost = toNumber(p.cost);
+          if (selectedChannel === 'DERANA TV' && selectedClient === CBL_CLIENT) {
+              finalCost = cblRate > 0 ? cblRate : "";
+          }
 
           return {
             id: p.id,
             day: p.day,
             time: p.time,
             program: p.program,
-            cost: toNumber(p.cost),
+            cost: finalCost,
             cargillsRate: cargillsRate,
+            cblRate: cblRate,
             tvr: tvrValue,
             slot: p.slot,
             channel: selectedChannel,
@@ -176,14 +185,23 @@ function NegotiatedRates({
               const baseRate = r.cargillsRate && !Number.isNaN(r.cargillsRate) ? r.cargillsRate : r.cost;
               next[r.id] = baseRate;
             } else if (isSpecialChannel) {
-              // For existing special channels, use DB net_cost
-              const baseNet = r.dbNet && !Number.isNaN(r.dbNet) ? r.dbNet : r.cost;
-              next[r.id] = baseNet;
+              // For existing special channels, use DB net_cost or cbl_rate
+              if (selectedClient === CBL_CLIENT) {
+                const baseCbl = r.cblRate && !Number.isNaN(r.cblRate) ? r.cblRate : "";
+                next[r.id] = baseCbl;
+              } else {
+                const baseNet = r.dbNet && !Number.isNaN(r.dbNet) ? r.dbNet : "";
+                next[r.id] = baseNet;
+              }
             } else {
               // Normal channels → discounted cost
-              const discPct = toNumber(channelDiscounts[selectedChannel] ?? 30);
-              const disc = discPct / 100;
-              next[r.id] = +(r.cost * (1 - disc)).toFixed(2);
+              if (r.cost === "") {
+                next[r.id] = "";
+              } else {
+                const discPct = toNumber(channelDiscounts[selectedChannel] ?? 30);
+                const disc = discPct / 100;
+                next[r.id] = +(r.cost * (1 - disc)).toFixed(2);
+              }
             }
           });
 
@@ -222,8 +240,12 @@ function NegotiatedRates({
               // Cargills/Derana: use the special rate
               baseRate = r.cargillsRate && !Number.isNaN(r.cargillsRate) ? r.cargillsRate : r.cost;
             } else if (SPECIAL_CHANNELS.includes(selectedChannel)) {
-              // Existing special channels: use DB net_cost
-              baseRate = r.dbNet && !Number.isNaN(r.dbNet) ? r.dbNet : r.cost;
+              // Existing special channels: use DB net_cost or cbl_rate
+              if (selectedClient === CBL_CLIENT) {
+                baseRate = r.cblRate && !Number.isNaN(r.cblRate) ? r.cblRate : "";
+              } else {
+                baseRate = r.dbNet && !Number.isNaN(r.dbNet) ? r.dbNet : "";
+              }
             }
             next[r.id] = baseRate;
           }
@@ -237,7 +259,11 @@ function NegotiatedRates({
 
       programs.forEach(r => {
         if (!manualOverride[r.id]) {
-          next[r.id] = +(r.cost * (1 - disc)).toFixed(2);
+          if (r.cost === "") {
+            next[r.id] = "";
+          } else {
+            next[r.id] = +(r.cost * (1 - disc)).toFixed(2);
+          }
         }
       });
 
@@ -310,13 +336,22 @@ function NegotiatedRates({
         next[row.id] = baseRate;
       } else if (SPECIAL_CHANNELS.includes(row.channel)) {
         // Reset to DB net_cost (or cost) for existing special channels
-        const baseNet = row.dbNet && !Number.isNaN(row.dbNet) ? row.dbNet : row.cost;
-        next[row.id] = baseNet;
+        if (selectedClient === CBL_CLIENT) {
+          const baseCbl = row.cblRate && !Number.isNaN(row.cblRate) ? row.cblRate : "";
+          next[row.id] = baseCbl;
+        } else {
+          const baseNet = row.dbNet && !Number.isNaN(row.dbNet) ? row.dbNet : "";
+          next[row.id] = baseNet;
+        }
       } else {
-        const discPct = toNumber(channelDiscounts[row.channel] ?? 30);
-        const disc = discPct / 100;
-        const calc = +(row.cost * (1 - disc)).toFixed(2);
-        next[row.id] = calc;
+        if (row.cost === "") {
+          next[row.id] = "";
+        } else {
+          const discPct = toNumber(channelDiscounts[row.channel] ?? 30);
+          const disc = discPct / 100;
+          const calc = +(row.cost * (1 - disc)).toFixed(2);
+          next[row.id] = calc;
+        }
       }
 
       return next;
@@ -330,7 +365,7 @@ function NegotiatedRates({
   };
 
   const formatLKR = n =>
-    `${Number(n || 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`;
+    n === "" ? "" : `${Number(n || 0).toLocaleString('en-LK', { maximumFractionDigits: 2 })}`;
 
   const styles = {
     form: {
@@ -527,7 +562,7 @@ function NegotiatedRates({
               fontSize: '12px',
               fontWeight: '600'
             }}>
-              {selectedChannel === CARGILLS_CHANNEL ? 'Cargills Negotiated Rate' : 'Special Channel Rate'}
+              {selectedChannel === CARGILLS_CHANNEL ? 'Cargills Negotiated Rate' : (selectedClient === CBL_CLIENT ? 'CBL Negotiated Rate' : 'Special Channel Rate')}
             </span>
           )}
         </div>
@@ -580,7 +615,7 @@ function NegotiatedRates({
                   <td style={{ ...styles.td, ...styles.right }}>
                     <input
                       type="number"
-                      value={negotiatedRates[p.id] ?? 0}
+                      value={negotiatedRates[p.id] !== undefined ? negotiatedRates[p.id] : ''}
                       onChange={e => handleNegotiatedRateChange(p.id, e.target.value)}
                       style={{
                         ...styles.inputCell,
