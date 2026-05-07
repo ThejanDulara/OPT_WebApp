@@ -651,7 +651,7 @@ function App() {
             path="/program-updater"
             element={
               //window.__AUTH__?.canUpdateData ? (
-              (window.__AUTH__?.canUpdateData || window.location.hostname === "localhost") ? (
+              (window.__AUTH__?.canUpdateData || window.__AUTH__?.can_update_data == 1 || window.__AUTH__?.can_update_data === true || window.__AUTH__?.canUpdateData == 1 || window.location.hostname === "localhost") ? (
                 <ProgramUpdater onBack={() => navigate('/')} />
               ) : (
                 <div style={{ padding: "60px", textAlign: "center" }}>

@@ -43,8 +43,8 @@ export async function checkAuth() {
       email: user.email || "",
 
       // backend returns: is_admin = 1 or 0
-      isAdmin: user.is_admin === 1 || user.is_admin === "1",
-      canUpdateData: user.can_update_data === 1 || user.can_update_data === "1",
+      isAdmin: user.is_admin === 1 || user.is_admin === "1" || user.is_admin === true,
+      canUpdateData: user.can_update_data === 1 || user.can_update_data === "1" || user.can_update_data === true,
     };
 
   } catch (err) {
