@@ -19,7 +19,7 @@ export async function checkAuth() {
   }
 
   // Flask backend
-  const apiBase = "https://mtmbackend-production.up.railway.app/api";
+  const apiBase = "https://tsmbackend-production.up.railway.app/api";
 
   // Main portal for login
   const portalBase = "https://www.mediafactorylk.agency";
