@@ -104,18 +104,10 @@ function ProgramUpdater({ onBack }) {
   const saveChanges = () => {
     setIsSaving(true);
 
-    const updaterName = (typeof window !== 'undefined' && window.__AUTH__ && window.__AUTH__.firstName)
-      ? `${window.__AUTH__.firstName} ${window.__AUTH__.lastName || ''}`.trim()
-      : 'An Admin';
-
     fetch('https://optwebapp-production.up.railway.app/update-programs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        channel: selectedChannel,
-        programs,
-        updater_name: updaterName
-      })
+      body: JSON.stringify({ channel: selectedChannel, programs })
     })
       .then(res => res.json())
       .then(data => alert('✅ Programs updated successfully!'))
@@ -127,7 +119,7 @@ function ProgramUpdater({ onBack }) {
 
   const createChannel = () => {
     if (!newChannelName) return;
-    fetch('https://optwebapp-production.up.railway.app/create-channel', {
+    fetch('hhttps://optwebapp-production.up.railway.app/create-channel', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newChannelName })
@@ -930,4 +922,3 @@ const styles = {
 };
 
 export default ProgramUpdater;
-// frontend_thirdshift/src/components/ProgramUpdater.jsx
