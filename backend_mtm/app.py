@@ -12,6 +12,9 @@ from flask import send_file
 from datetime import datetime
 import numpy as np
 from collections import defaultdict
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for communication with React frontend
@@ -636,6 +639,66 @@ def delete_program():
     conn.close()
 
     return jsonify({'message': 'Program deleted'})
+
+
+@app.route('/notify-changes', methods=['POST'])
+def notify_changes():
+    data = request.get_json()
+    user_name = data.get('userName', 'A user')
+    changes = data.get('changes', [])
+    channel = data.get('channel', 'Unknown Channel')
+
+    if not changes:
+        return jsonify({'message': 'No changes to notify'})
+
+    try:
+        user_db_conn = mysql.connector.connect(
+            host=os.environ.get("USER_DB_HOST", "ballast.proxy.rlwy.net"),
+            port=int(os.environ.get("USER_DB_PORT", 48211)),
+            user=os.environ.get("USER_DB_USER", "root"),
+            password=os.environ.get("USER_DB_PASS", "xIphibqobRlXuRTptpjsWqCUZScbaLZu"),
+            database=os.environ.get("USER_DB_NAME", "railway"),
+            autocommit=True
+        )
+        cursor = user_db_conn.cursor(dictionary=True)
+        cursor.execute("SELECT email FROM user WHERE email IS NOT NULL AND email != ''")
+        users = cursor.fetchall()
+        user_db_conn.close()
+        emails = [u['email'] for u in users]
+    except Exception as e:
+        print("Error fetching emails:", e)
+        return jsonify({'error': 'Failed to fetch emails'}), 500
+
+    if not emails:
+        return jsonify({'message': 'No emails found'})
+
+    sender_email = os.environ.get("EMAIL_SENDER", "devthirdshift@gmail.com")
+    app_password = os.environ.get("EMAIL_APP_PASSWORD", "isxb ddte jsxv hatu")
+
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = sender_email
+    msg['Bcc'] = ", ".join(emails)
+    msg['Subject'] = f"Program Data Updated by {user_name} ({channel})"
+
+    body = f"Hello,\n\n{user_name} has made the following changes to the program data for {channel}:\n\n"
+    for change in changes:
+        body += f"- {change}\n"
+
+    body += "\n\nThis is an automated email. Please don't reply to this email."
+
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender_email, app_password)
+        server.send_message(msg)
+        server.quit()
+        return jsonify({'message': 'Notifications sent successfully'})
+    except Exception as e:
+        print("Error sending email:", e)
+        return jsonify({'error': 'Failed to send email'}), 500
 
 
 @app.route('/optimize-by-budget-share', methods=['POST'])

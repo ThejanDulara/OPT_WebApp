@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { checkAuth } from '../authCheck';
 
 const SPECIAL_CHANNELS = [
   "SHAKTHI TV",
@@ -11,6 +12,7 @@ function ProgramUpdater({ onBack }) {
   const [channels, setChannels] = useState([]);
   const [selectedChannel, setSelectedChannel] = useState('DERANA TV');
   const [programs, setPrograms] = useState([]);
+  const [originalPrograms, setOriginalPrograms] = useState([]);
   const [newChannelName, setNewChannelName] = useState('');
   const [isAddingChannel, setIsAddingChannel] = useState(false);
 
@@ -21,7 +23,14 @@ function ProgramUpdater({ onBack }) {
   // New State for Saving Status
   const [isSaving, setIsSaving] = useState(false);
 
+  // User name for email notifications
+  const [userName, setUserName] = useState('User');
+
   useEffect(() => {
+    checkAuth().then(user => {
+      if (user && user.firstName) setUserName(user.firstName);
+    });
+
     fetch('https://optwebapp-production-c7d6.up.railway.app/channels')
       .then(res => res.json())
       .then(data => {
@@ -29,7 +38,11 @@ function ProgramUpdater({ onBack }) {
         if (data.channels.includes('DERANA TV')) {
           fetch(`https://optwebapp-production-c7d6.up.railway.app/programs?channel=DERANA TV`)
             .then(res => res.json())
-            .then(data => setPrograms(data.programs || []));
+            .then(data => {
+              const fetched = data.programs || [];
+              setPrograms(fetched);
+              setOriginalPrograms(JSON.parse(JSON.stringify(fetched)));
+            });
         }
       });
   }, []);
@@ -41,7 +54,11 @@ function ProgramUpdater({ onBack }) {
     setSlotFilter('');
     fetch(`https://optwebapp-production-c7d6.up.railway.app/programs?channel=${channel}`)
       .then(res => res.json())
-      .then(data => setPrograms(data.programs || []));
+      .then(data => {
+        const fetched = data.programs || [];
+        setPrograms(fetched);
+        setOriginalPrograms(JSON.parse(JSON.stringify(fetched)));
+      });
   };
 
   // --- UPDATED INPUT HANDLER WITH SLOT RESTRICTION ---
@@ -96,7 +113,16 @@ function ProgramUpdater({ onBack }) {
       .then(res => res.json())
       .then(() => {
         setPrograms(programs.filter(p => !(p.program === program && p.slot === slot)));
+        setOriginalPrograms(originalPrograms.filter(p => !(p.program === program && p.slot === slot)));
         alert('🗑️ Program deleted.');
+
+        // Notify
+        const changes = [`Deleted program "${program}" from slot "${slot || 'N/A'}"`];
+        fetch('https://optwebapp-production-c7d6.up.railway.app/notify-changes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userName, changes, channel: selectedChannel })
+        }).catch(console.error);
       })
       .catch(() => alert('❌ Delete failed.'));
   };
@@ -104,13 +130,45 @@ function ProgramUpdater({ onBack }) {
   const saveChanges = () => {
     setIsSaving(true);
 
+    // Calculate changes
+    const changes = [];
+    programs.forEach(p => {
+      if (!p.id) {
+        changes.push(`Added new program "${p.program}" to slot "${p.slot || 'N/A'}"`);
+      } else {
+        const orig = originalPrograms.find(o => o.id === p.id);
+        if (orig) {
+          const fieldChanges = [];
+          Object.keys(p).forEach(key => {
+            if (key !== 'originalIndex' && p[key] !== orig[key]) {
+              fieldChanges.push(`[${key}] from "${orig[key]}" to "${p[key]}"`);
+            }
+          });
+          if (fieldChanges.length > 0) {
+            changes.push(`Updated program "${p.program}" (Slot: ${p.slot || 'N/A'}): ${fieldChanges.join(', ')}`);
+          }
+        }
+      }
+    });
+
     fetch('https://optwebapp-production-c7d6.up.railway.app/update-programs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channel: selectedChannel, programs })
     })
       .then(res => res.json())
-      .then(data => alert('✅ Programs updated successfully!'))
+      .then(data => {
+         setOriginalPrograms(JSON.parse(JSON.stringify(programs)));
+         alert('✅ Programs updated successfully!');
+
+         if (changes.length > 0) {
+            fetch('https://optwebapp-production-c7d6.up.railway.app/notify-changes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userName, changes, channel: selectedChannel })
+            }).catch(console.error);
+         }
+      })
       .catch(() => alert('❌ Failed to update programs.'))
       .finally(() => {
         setIsSaving(false);
@@ -171,74 +229,74 @@ function ProgramUpdater({ onBack }) {
       });
   }, [programs, searchTerm, slotFilter]);
 
-    const formatTime12Hour = (time24) => {
-      if (!time24) return '';
-      const [h, m] = time24.split(':').map(Number);
+  const formatTime12Hour = (time24) => {
+    if (!time24) return '';
+    const [h, m] = time24.split(':').map(Number);
 
-      const period = h >= 12 ? 'PM' : 'AM';
-      const hour12 = h % 12 || 12;
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h % 12 || 12;
 
-      return `${hour12}.${m.toString().padStart(2, '0')} ${period}`;
-    };
+    return `${hour12}.${m.toString().padStart(2, '0')} ${period}`;
+  };
 
-    const combineTimeRange = (start, end) => {
-      if (!start && !end) return '';
+  const combineTimeRange = (start, end) => {
+    if (!start && !end) return '';
 
-      if (start && !end) {
-        return formatTime12Hour(start);
-      }
+    if (start && !end) {
+      return formatTime12Hour(start);
+    }
 
-      if (!start && end) {
-        return formatTime12Hour(end);
-      }
+    if (!start && end) {
+      return formatTime12Hour(end);
+    }
 
-      return `${formatTime12Hour(start)} – ${formatTime12Hour(end)}`;
-    };
+    return `${formatTime12Hour(start)} – ${formatTime12Hour(end)}`;
+  };
 
 
-    const parseTime12To24 = (time12) => {
-      if (!time12) return '';
+  const parseTime12To24 = (time12) => {
+    if (!time12) return '';
 
-      const cleaned = time12
-        .trim()                       // remove leading/trailing spaces
-        .replace(/\./g, ':')          // dot → colon
-        .replace(/\s+/g, ' ');        // normalize spaces
+    const cleaned = time12
+      .trim()                       // remove leading/trailing spaces
+      .replace(/\./g, ':')          // dot → colon
+      .replace(/\s+/g, ' ');        // normalize spaces
 
-      const match = cleaned.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-      if (!match) return '';
+    const match = cleaned.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!match) return '';
 
-      let [, h, m, period] = match;
-      h = parseInt(h, 10);
-      m = parseInt(m, 10);
-      period = period.toUpperCase();
+    let [, h, m, period] = match;
+    h = parseInt(h, 10);
+    m = parseInt(m, 10);
+    period = period.toUpperCase();
 
-      if (period === 'PM' && h !== 12) h += 12;
-      if (period === 'AM' && h === 12) h = 0;
+    if (period === 'PM' && h !== 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
 
-      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-    };
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  };
 
-    const splitTimeRange = (range) => {
-      if (!range) return { start: '', end: '' };
+  const splitTimeRange = (range) => {
+    if (!range) return { start: '', end: '' };
 
-      const normalized = range
-        .trim()
-        .replace(/\s*-\s*/g, ' – ')
-        .replace(/\s+/g, ' ');
+    const normalized = range
+      .trim()
+      .replace(/\s*-\s*/g, ' – ')
+      .replace(/\s+/g, ' ');
 
-      if (normalized.includes('–')) {
-        const [start12, end12] = normalized.split('–').map(s => s.trim());
-        return {
-          start: parseTime12To24(start12),
-          end: parseTime12To24(end12),
-        };
-      }
-
+    if (normalized.includes('–')) {
+      const [start12, end12] = normalized.split('–').map(s => s.trim());
       return {
-        start: parseTime12To24(normalized),
-        end: '',
+        start: parseTime12To24(start12),
+        end: parseTime12To24(end12),
       };
+    }
+
+    return {
+      start: parseTime12To24(normalized),
+      end: '',
     };
+  };
 
 
 
@@ -311,99 +369,99 @@ function ProgramUpdater({ onBack }) {
             </div>
 
             <div style={styles.infoColumn}>
-                {/* General Slot Definition for ALL Channels */}
-                <div style={styles.hiruNoteInline}>
-                    Slot A - Prime time | Slot B - Non Prime time
-                </div>
+              {/* General Slot Definition for ALL Channels */}
+              <div style={styles.hiruNoteInline}>
+                Slot A - Prime time | Slot B - Non Prime time
+              </div>
 
-                {/* Specific Note for HIRU TV */}
-                {selectedChannel === "HIRU TV" && (
-                <div style={{...styles.hiruNoteInline, marginTop: '8px'}}>
-                    <strong>HIRU TV Specifics:</strong> A1 (6.55 News) | A2 (9.55 News) | A3 (WD PT + 11.55 News) | A4 (WE PT) | A5 (PT B)
+              {/* Specific Note for HIRU TV */}
+              {selectedChannel === "HIRU TV" && (
+                <div style={{ ...styles.hiruNoteInline, marginTop: '8px' }}>
+                  <strong>HIRU TV Specifics:</strong> A1 (6.55 News) | A2 (9.55 News) | A3 (WD PT + 11.55 News) | A4 (WE PT) | A5 (PT B)
                 </div>
-                )}
+              )}
             </div>
           </div>
 
           <div style={styles.filterBar}>
             <div style={styles.filterGroup}>
-                <label style={styles.filterLabel}>Search:</label>
-                <input
-                    type="text"
-                    placeholder="Search by Name, Day, Time..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    style={styles.searchInput}
-                />
+              <label style={styles.filterLabel}>Search:</label>
+              <input
+                type="text"
+                placeholder="Search by Name, Day, Time..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={styles.searchInput}
+              />
             </div>
             <div style={styles.filterGroup}>
-                <label style={styles.filterLabel}>Filter Slot:</label>
-                <select
-                    value={slotFilter}
-                    onChange={(e) => setSlotFilter(e.target.value)}
-                    style={styles.filterSelect}
-                >
-                    <option value="">All Slots</option>
-                    {uniqueSlots.map((slot, i) => (
-                        <option key={i} value={slot}>{slot}</option>
-                    ))}
-                </select>
+              <label style={styles.filterLabel}>Filter Slot:</label>
+              <select
+                value={slotFilter}
+                onChange={(e) => setSlotFilter(e.target.value)}
+                style={styles.filterSelect}
+              >
+                <option value="">All Slots</option>
+                {uniqueSlots.map((slot, i) => (
+                  <option key={i} value={slot}>{slot}</option>
+                ))}
+              </select>
             </div>
             <div style={styles.recordCount}>
-                Showing <strong>{filteredPrograms.length}</strong> of {programs.length} programs
+              Showing <strong>{filteredPrograms.length}</strong> of {programs.length} programs
             </div>
           </div>
 
           <div style={styles.tableContainer}>
             <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.tableHeader}>#</th>
-                <th style={{ ...styles.tableHeader, ...styles.columnWidths[0] }}>Day</th>
-                <th style={styles.tableHeader}>Is WE</th>
-                <th style={{ ...styles.tableHeader, ...styles.columnWidths[1] }}>Time</th>
-                <th style={{ ...styles.tableHeader, ...styles.columnWidths[2] }}>Program</th>
-                <th style={{ ...styles.tableHeader, ...styles.columnWidths[3] }}>Rate Card (30 Sec)</th>
+              <thead>
+                <tr>
+                  <th style={styles.tableHeader}>#</th>
+                  <th style={{ ...styles.tableHeader, ...styles.columnWidths[0] }}>Day</th>
+                  <th style={styles.tableHeader}>Is WE</th>
+                  <th style={{ ...styles.tableHeader, ...styles.columnWidths[1] }}>Time</th>
+                  <th style={{ ...styles.tableHeader, ...styles.columnWidths[2] }}>Program</th>
+                  <th style={{ ...styles.tableHeader, ...styles.columnWidths[3] }}>Rate Card (30 Sec)</th>
 
-                {/* Cargills Rate Column - Only for DERANA TV */}
-                {isDeranaTV && (
-                  <th style={{ ...styles.tableHeader, minWidth: '140px' }}>Cargills Rate (30 Sec)</th>
-                )}
+                  {/* Cargills Rate Column - Only for DERANA TV */}
+                  {isDeranaTV && (
+                    <th style={{ ...styles.tableHeader, minWidth: '140px' }}>Cargills Rate (30 Sec)</th>
+                  )}
 
-                {/* CBL Rate Column - For Special Channels AND Derana TV */}
-                {(isSpecialChannel || isDeranaTV) && (
-                  <th style={{ ...styles.tableHeader, minWidth: '140px' }}>
-                    {isDeranaTV ? "CBL Rate Card (30 Sec)" : "CBL Neg. Rate (30 Sec)"}
-                  </th>
-                )}
+                  {/* CBL Rate Column - For Special Channels AND Derana TV */}
+                  {(isSpecialChannel || isDeranaTV) && (
+                    <th style={{ ...styles.tableHeader, minWidth: '140px' }}>
+                      {isDeranaTV ? "CBL Rate Card (30 Sec)" : "CBL Neg. Rate (30 Sec)"}
+                    </th>
+                  )}
 
-                {/* New Negotiated Rate Column */}
-                <th style={{ ...styles.tableHeader, minWidth: '140px' }}>Neg. Rate (30 Sec)</th>
-                <th style={styles.tableHeader}>Slot</th>
-                <th style={styles.tableHeader}>TVR All</th>
-                <th style={styles.tableHeader}>ABC 15–90</th>
-                <th style={styles.tableHeader}>ABC 30–60</th>
-                <th style={styles.tableHeader}>ABC 15–30</th>
-                <th style={styles.tableHeader}>ABC 20+</th>
-                <th style={styles.tableHeader}>AB 15+</th>
-                <th style={styles.tableHeader}>CD 15+</th>
-                <th style={styles.tableHeader}>AB Female 15–45</th>
-                <th style={styles.tableHeader}>ABC 15–60</th>
-                <th style={styles.tableHeader}>BCDE 15+</th>
-                <th style={styles.tableHeader}>ABCDE 15+</th>
-                <th style={styles.tableHeader}>ABC Female 15–60</th>
-                <th style={styles.tableHeader}>ABC Male 15–60</th>
-                <th style={styles.tableHeader}>Delete</th>
-              </tr>
-            </thead>
+                  {/* New Negotiated Rate Column */}
+                  <th style={{ ...styles.tableHeader, minWidth: '140px' }}>Neg. Rate (30 Sec)</th>
+                  <th style={styles.tableHeader}>Slot</th>
+                  <th style={styles.tableHeader}>TVR All</th>
+                  <th style={styles.tableHeader}>ABC 15–90</th>
+                  <th style={styles.tableHeader}>ABC 30–60</th>
+                  <th style={styles.tableHeader}>ABC 15–30</th>
+                  <th style={styles.tableHeader}>ABC 20+</th>
+                  <th style={styles.tableHeader}>AB 15+</th>
+                  <th style={styles.tableHeader}>CD 15+</th>
+                  <th style={styles.tableHeader}>AB Female 15–45</th>
+                  <th style={styles.tableHeader}>ABC 15–60</th>
+                  <th style={styles.tableHeader}>BCDE 15+</th>
+                  <th style={styles.tableHeader}>ABCDE 15+</th>
+                  <th style={styles.tableHeader}>ABC Female 15–60</th>
+                  <th style={styles.tableHeader}>ABC Male 15–60</th>
+                  <th style={styles.tableHeader}>Delete</th>
+                </tr>
+              </thead>
               <tbody>
                 {filteredPrograms.map((p, idx) => (
-                <tr key={p.originalIndex} style={styles.tableRow}>
-                  <td style={styles.centerAlignedCell}><strong>{idx + 1}</strong></td>
+                  <tr key={p.originalIndex} style={styles.tableRow}>
+                    <td style={styles.centerAlignedCell}><strong>{idx + 1}</strong></td>
 
-                  <td style={styles.tableCell}>
-                    <input type="text" value={p.day || ''} onChange={(e) => handleProgramChange(p.originalIndex, 'day', e.target.value)} style={styles.inputCell}/>
-                  </td>
+                    <td style={styles.tableCell}>
+                      <input type="text" value={p.day || ''} onChange={(e) => handleProgramChange(p.originalIndex, 'day', e.target.value)} style={styles.inputCell} />
+                    </td>
 
                     <td style={styles.centerAlignedCell}>
                       <input
@@ -454,115 +512,115 @@ function ProgramUpdater({ onBack }) {
                       })()}
                     </td>
 
-                  <td style={styles.tableCell}>
-                    <input type="text" value={p.program} onChange={(e) => handleProgramChange(p.originalIndex, 'program', e.target.value)} style={styles.inputCell}/>
-                  </td>
-                  <td style={styles.rightAlignedCell}>
-                    <input type="number" value={p.cost} onChange={(e) => handleProgramChange(p.originalIndex, 'cost', parseFloat(e.target.value))} style={styles.inputCell}/>
-                  </td>
+                    <td style={styles.tableCell}>
+                      <input type="text" value={p.program} onChange={(e) => handleProgramChange(p.originalIndex, 'program', e.target.value)} style={styles.inputCell} />
+                    </td>
+                    <td style={styles.rightAlignedCell}>
+                      <input type="number" value={p.cost} onChange={(e) => handleProgramChange(p.originalIndex, 'cost', parseFloat(e.target.value))} style={styles.inputCell} />
+                    </td>
 
-                  {/* Cargills Rate Input - Only for DERANA TV */}
-                  {isDeranaTV && (
+                    {/* Cargills Rate Input - Only for DERANA TV */}
+                    {isDeranaTV && (
+                      <td style={styles.rightAlignedCell}>
+                        <input
+                          type="number"
+                          value={p.cargills_rate || ''}
+                          onChange={(e) => handleProgramChange(p.originalIndex, 'cargills_rate', parseFloat(e.target.value))}
+                          style={styles.inputCell}
+                        />
+                      </td>
+                    )}
+
+                    {/* CBL Rate Input - For Special Channels AND Derana TV */}
+                    {(isSpecialChannel || isDeranaTV) && (
+                      <td style={styles.rightAlignedCell}>
+                        <input
+                          type="number"
+                          value={p.cbl_rate || ''}
+                          onChange={(e) => handleProgramChange(p.originalIndex, 'cbl_rate', parseFloat(e.target.value))}
+                          style={styles.inputCell}
+                        />
+                      </td>
+                    )}
+
+                    {/* Negotiated Rate Input */}
                     <td style={styles.rightAlignedCell}>
                       <input
-                        type="number"
-                        value={p.cargills_rate || ''}
-                        onChange={(e) => handleProgramChange(p.originalIndex, 'cargills_rate', parseFloat(e.target.value))}
-                        style={styles.inputCell}
-                      />
-                    </td>
-                  )}
-
-                  {/* CBL Rate Input - For Special Channels AND Derana TV */}
-                  {(isSpecialChannel || isDeranaTV) && (
-                    <td style={styles.rightAlignedCell}>
-                      <input
-                        type="number"
-                        value={p.cbl_rate || ''}
-                        onChange={(e) => handleProgramChange(p.originalIndex, 'cbl_rate', parseFloat(e.target.value))}
-                        style={styles.inputCell}
-                      />
-                    </td>
-                  )}
-
-                  {/* Negotiated Rate Input */}
-                  <td style={styles.rightAlignedCell}>
-                    <input
                         type="number"
                         value={p.net_cost || ''}
                         disabled={!isSpecialChannel}
                         placeholder={!isSpecialChannel ? "-" : "0.00"}
                         onChange={(e) => handleProgramChange(p.originalIndex, 'net_cost', parseFloat(e.target.value))}
                         style={{
-                            ...styles.inputCell,
-                            backgroundColor: isSpecialChannel ? 'white' : '#edf2f7',
-                            cursor: isSpecialChannel ? 'text' : 'not-allowed',
-                            color: isSpecialChannel ? 'black' : '#a0aec0'
+                          ...styles.inputCell,
+                          backgroundColor: isSpecialChannel ? 'white' : '#edf2f7',
+                          cursor: isSpecialChannel ? 'text' : 'not-allowed',
+                          color: isSpecialChannel ? 'black' : '#a0aec0'
                         }}
-                    />
-                  </td>
+                      />
+                    </td>
 
-                  {/* --- SLOT INPUT (RESTRICTED) --- */}
-                  <td style={styles.centerAlignedCell}>
-                    <input
-                      type="text"
-                      value={p.slot || ''}
-                      onChange={(e) => handleProgramChange(p.originalIndex, 'slot', e.target.value)}
-                      style={styles.inputCell}
-                    />
-                  </td>
+                    {/* --- SLOT INPUT (RESTRICTED) --- */}
+                    <td style={styles.centerAlignedCell}>
+                      <input
+                        type="text"
+                        value={p.slot || ''}
+                        onChange={(e) => handleProgramChange(p.originalIndex, 'slot', e.target.value)}
+                        style={styles.inputCell}
+                      />
+                    </td>
 
-                  <td style={styles.rightAlignedCell}>
-                    <input type="number" value={p.tvr_all} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_all', parseFloat(e.target.value))} style={styles.inputCell}/>
-                  </td>
-                  <td style={styles.rightAlignedCell}>
-                    <input type="number" value={p.tvr_abc_15_90} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_abc_15_90', parseFloat(e.target.value))} style={styles.inputCell}/>
-                  </td>
-                  <td style={styles.rightAlignedCell}>
-                    <input type="number" value={p.tvr_abc_30_60} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_abc_30_60', parseFloat(e.target.value))} style={styles.inputCell}/>
-                  </td>
-                  <td style={styles.rightAlignedCell}>
-                    <input type="number" value={p.tvr_abc_15_30} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_abc_15_30', parseFloat(e.target.value))} style={styles.inputCell}/>
-                  </td>
-                  <td style={styles.rightAlignedCell}>
-                    <input type="number" value={p.tvr_abc_20_plus} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_abc_20_plus', parseFloat(e.target.value))} style={styles.inputCell}/>
-                  </td>
-                  <td style={styles.rightAlignedCell}>
-                    <input type="number" value={p.tvr_ab_15_plus} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_ab_15_plus', parseFloat(e.target.value))} style={styles.inputCell}/>
-                  </td>
-                  <td style={styles.rightAlignedCell}>
-                    <input type="number" value={p.tvr_cd_15_plus} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_cd_15_plus', parseFloat(e.target.value))} style={styles.inputCell}/>
-                  </td>
-                  <td style={styles.rightAlignedCell}>
-                    <input type="number" value={p.tvr_ab_female_15_45} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_ab_female_15_45', parseFloat(e.target.value))} style={styles.inputCell}/>
-                  </td>
-                  <td style={styles.rightAlignedCell}>
-                    <input type="number" value={p.tvr_abc_15_60} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_abc_15_60', parseFloat(e.target.value))} style={styles.inputCell}/>
-                  </td>
-                  <td style={styles.rightAlignedCell}>
-                    <input type="number" value={p.tvr_bcde_15_plus} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_bcde_15_plus', parseFloat(e.target.value))} style={styles.inputCell}/>
-                  </td>
-                  <td style={styles.rightAlignedCell}>
-                    <input type="number" value={p.tvr_abcde_15_plus} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_abcde_15_plus', parseFloat(e.target.value))} style={styles.inputCell}/>
-                  </td>
-                  <td style={styles.rightAlignedCell}>
-                    <input type="number" value={p.tvr_abc_female_15_60} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_abc_female_15_60', parseFloat(e.target.value))} style={styles.inputCell}/>
-                  </td>
-                  <td style={styles.rightAlignedCell}>
-                    <input type="number" value={p.tvr_abc_male_15_60} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_abc_male_15_60', parseFloat(e.target.value))} style={styles.inputCell}/>
-                  </td>
+                    <td style={styles.rightAlignedCell}>
+                      <input type="number" value={p.tvr_all} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_all', parseFloat(e.target.value))} style={styles.inputCell} />
+                    </td>
+                    <td style={styles.rightAlignedCell}>
+                      <input type="number" value={p.tvr_abc_15_90} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_abc_15_90', parseFloat(e.target.value))} style={styles.inputCell} />
+                    </td>
+                    <td style={styles.rightAlignedCell}>
+                      <input type="number" value={p.tvr_abc_30_60} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_abc_30_60', parseFloat(e.target.value))} style={styles.inputCell} />
+                    </td>
+                    <td style={styles.rightAlignedCell}>
+                      <input type="number" value={p.tvr_abc_15_30} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_abc_15_30', parseFloat(e.target.value))} style={styles.inputCell} />
+                    </td>
+                    <td style={styles.rightAlignedCell}>
+                      <input type="number" value={p.tvr_abc_20_plus} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_abc_20_plus', parseFloat(e.target.value))} style={styles.inputCell} />
+                    </td>
+                    <td style={styles.rightAlignedCell}>
+                      <input type="number" value={p.tvr_ab_15_plus} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_ab_15_plus', parseFloat(e.target.value))} style={styles.inputCell} />
+                    </td>
+                    <td style={styles.rightAlignedCell}>
+                      <input type="number" value={p.tvr_cd_15_plus} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_cd_15_plus', parseFloat(e.target.value))} style={styles.inputCell} />
+                    </td>
+                    <td style={styles.rightAlignedCell}>
+                      <input type="number" value={p.tvr_ab_female_15_45} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_ab_female_15_45', parseFloat(e.target.value))} style={styles.inputCell} />
+                    </td>
+                    <td style={styles.rightAlignedCell}>
+                      <input type="number" value={p.tvr_abc_15_60} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_abc_15_60', parseFloat(e.target.value))} style={styles.inputCell} />
+                    </td>
+                    <td style={styles.rightAlignedCell}>
+                      <input type="number" value={p.tvr_bcde_15_plus} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_bcde_15_plus', parseFloat(e.target.value))} style={styles.inputCell} />
+                    </td>
+                    <td style={styles.rightAlignedCell}>
+                      <input type="number" value={p.tvr_abcde_15_plus} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_abcde_15_plus', parseFloat(e.target.value))} style={styles.inputCell} />
+                    </td>
+                    <td style={styles.rightAlignedCell}>
+                      <input type="number" value={p.tvr_abc_female_15_60} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_abc_female_15_60', parseFloat(e.target.value))} style={styles.inputCell} />
+                    </td>
+                    <td style={styles.rightAlignedCell}>
+                      <input type="number" value={p.tvr_abc_male_15_60} onChange={(e) => handleProgramChange(p.originalIndex, 'tvr_abc_male_15_60', parseFloat(e.target.value))} style={styles.inputCell} />
+                    </td>
 
-                  <td style={styles.centerAlignedCell}>
-                    <button style={styles.deleteButton} onClick={() => deleteProgram(p.program, p.slot)}>Delete</button>
-                  </td>
-                </tr>
+                    <td style={styles.centerAlignedCell}>
+                      <button style={styles.deleteButton} onClick={() => deleteProgram(p.program, p.slot)}>Delete</button>
+                    </td>
+                  </tr>
                 ))}
                 {filteredPrograms.length === 0 && (
-                    <tr>
-                        <td colSpan={isDeranaTV ? "23" : "22"} style={{textAlign: 'center', padding: '20px', color: '#718096'}}>
-                            No programs found matching your filters.
-                        </td>
-                    </tr>
+                  <tr>
+                    <td colSpan={isDeranaTV ? "23" : "22"} style={{ textAlign: 'center', padding: '20px', color: '#718096' }}>
+                      No programs found matching your filters.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -574,13 +632,13 @@ function ProgramUpdater({ onBack }) {
             </button>
 
             <button
-                onClick={saveChanges}
-                style={{
-                    ...styles.primaryButton,
-                    opacity: isSaving ? 0.7 : 1,
-                    cursor: isSaving ? 'not-allowed' : 'pointer',
-                }}
-                disabled={isSaving}
+              onClick={saveChanges}
+              style={{
+                ...styles.primaryButton,
+                opacity: isSaving ? 0.7 : 1,
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+              }}
+              disabled={isSaving}
             >
               {isSaving ? '⏳ Saving...' : 'Save Changes'}
             </button>
@@ -588,15 +646,15 @@ function ProgramUpdater({ onBack }) {
         </div>
       )}
 
-        <div style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
-          <button onClick={onBack} style={styles.backButton}>
-            Back to Home
-          </button>
+      <div style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
+        <button onClick={onBack} style={styles.backButton}>
+          Back to Home
+        </button>
 
-          <button onClick={downloadAllProgramsExcel} style={styles.ExportButton}>
-            Download All Programs (Excel)
-          </button>
-        </div>
+        <button onClick={downloadAllProgramsExcel} style={styles.ExportButton}>
+          Download All Programs (Excel)
+        </button>
+      </div>
     </div>
   );
 }
@@ -618,12 +676,12 @@ const styles = {
     paddingBottom: '16px',
     borderBottom: '1px solid #e2e8f0',
   },
-    columnWidths: {
-      0: { minWidth: '120px' },
-      1: { minWidth: '130px' },
-      2: { minWidth: '260px' },
-      3: { minWidth: '140px' },
-    },
+  columnWidths: {
+    0: { minWidth: '120px' },
+    1: { minWidth: '130px' },
+    2: { minWidth: '260px' },
+    3: { minWidth: '140px' },
+  },
   channelSelector: {
     marginBottom: '24px',
     display: 'flex',
@@ -654,22 +712,22 @@ const styles = {
     maxWidth: '600px',
   },
   infoColumn: {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '4px',
-      flex: 1,
-      alignItems: 'flex-end',
-      marginLeft: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    flex: 1,
+    alignItems: 'flex-end',
+    marginLeft: 'auto',
   },
   hiruNoteInline: {
-      backgroundColor: '#fff4e5',
-      padding: '8px 12px',
-      borderRadius: '6px',
-      border: '1px solid #f6ad55',
-      color: '#7b341e',
-      fontSize: '13px',
-      maxWidth: '650px',
-      lineHeight: '1.4',
+    backgroundColor: '#fff4e5',
+    padding: '8px 12px',
+    borderRadius: '6px',
+    border: '1px solid #f6ad55',
+    color: '#7b341e',
+    fontSize: '13px',
+    maxWidth: '650px',
+    lineHeight: '1.4',
   },
   addButton: {
     padding: '8px 16px',
@@ -783,24 +841,24 @@ const styles = {
     backgroundColor: 'white'
   },
   recordCount: {
-      marginLeft: 'auto',
-      fontSize: '14px',
-      color: '#718096'
+    marginLeft: 'auto',
+    fontSize: '14px',
+    color: '#718096'
   },
   tableContainer: {
-      width: '100%',
-      overflowX: 'auto',
-      overflowY: 'hidden',
-      borderRadius: '8px',
-      border: '1px solid #e2e8f0',
-      marginTop: '12px'
-    },
-    table: {
-      width: '100%',
-      borderCollapse: 'collapse',
-      fontSize: '16px',
-      whiteSpace: 'nowrap'
-    },
+    width: '100%',
+    overflowX: 'auto',
+    overflowY: 'hidden',
+    borderRadius: '8px',
+    border: '1px solid #e2e8f0',
+    marginTop: '12px'
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    fontSize: '16px',
+    whiteSpace: 'nowrap'
+  },
   tableHeader: {
     padding: '12px 16px',
     textAlign: 'center',
@@ -841,19 +899,19 @@ const styles = {
     textAlign: 'center',
   },
   deleteButton: {
-      padding: '8px 14px',
-      backgroundColor: '#EF4444',
-      color: '#fff',
-      border: '1px solid transparent',
-      borderRadius: '0.3rem',
-      fontSize: '12px',
-      fontWeight: '500',
-      cursor: 'pointer',
-      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
-      transition: 'all 0.3s ease-in-out',
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '6px',
+    padding: '8px 14px',
+    backgroundColor: '#EF4444',
+    color: '#fff',
+    border: '1px solid transparent',
+    borderRadius: '0.3rem',
+    fontSize: '12px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
+    transition: 'all 0.3s ease-in-out',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
   },
   buttonGroup: {
     marginTop: '24px',
