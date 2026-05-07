@@ -2,8 +2,8 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import mysql.connector
 import pandas as pd
-#import pulp
-from pulp import LpProblem, LpMaximize, LpVariable, lpSum, PULP_CBC_CMD,LpInteger
+# import pulp
+from pulp import LpProblem, LpMaximize, LpVariable, lpSum, PULP_CBC_CMD, LpInteger
 from pulp import LpStatus
 import os
 import json
@@ -27,6 +27,7 @@ def get_db_connection():
         database=os.environ.get("DB_NAME", "optimization"),
         autocommit=True
     )
+
 
 # === Routes ===
 
@@ -76,15 +77,15 @@ def get_programs():
 def generate_df():
     data = request.get_json()
 
-    program_ids       = data.get('program_ids', [])
-    tg                = data.get("target_group", "tvr_all")
-    num_commercials   = data.get('num_commercials')
-    durations         = data.get('durations')
+    program_ids = data.get('program_ids', [])
+    tg = data.get("target_group", "tvr_all")
+    num_commercials = data.get('num_commercials')
+    durations = data.get('durations')
 
-    negotiated_rates  = data.get('negotiated_rates', {})   # { programId: value }
+    negotiated_rates = data.get('negotiated_rates', {})  # { programId: value }
     channel_discounts = data.get('channel_discounts', {})  # { channel: pct }
-    selected_client   = data.get('selected_client', "Other")  # NEW
-    manual_override   = data.get('manual_override', {})    # { programId: boolean } - NEW
+    selected_client = data.get('selected_client', "Other")  # NEW
+    manual_override = data.get('manual_override', {})  # { programId: boolean } - NEW
 
     # ----- Allowed TG Values -----
     ALLOWED_TGS = [
@@ -110,7 +111,7 @@ def generate_df():
         return jsonify({"error": "Missing required data"}), 400
 
     # ----- Special Logic Constants -----
-    CARGILLS_CLIENT  = "Cargills"
+    CARGILLS_CLIENT = "Cargills"
     CARGILLS_CHANNEL = "DERANA TV"
     SPECIAL_CHANNELS = {
         "SHAKTHI TV",
@@ -153,27 +154,27 @@ def generate_df():
     df = pd.DataFrame(rows)
 
     df.rename(columns={
-        'id':           'Id',
-        'channel':      'Channel',
-        'day':          'Day',
+        'id': 'Id',
+        'channel': 'Channel',
+        'day': 'Day',
         'is_weekend': 'IsWeekend',
-        'time':         'Time',
-        'program':      'Program',
-        'cost':         'Cost',
-        'tvr':          'TVR',
-        'slot':         'Slot',
-        'net_cost':     'NetCost',
-        'cargills_rate':'CargillsRate',
-        'cbl_rate':     'CblRate',
+        'time': 'Time',
+        'program': 'Program',
+        'cost': 'Cost',
+        'tvr': 'TVR',
+        'slot': 'Slot',
+        'net_cost': 'NetCost',
+        'cargills_rate': 'CargillsRate',
+        'cbl_rate': 'CblRate',
     }, inplace=True)
 
     # Ensure numeric
-    df['Cost']         = pd.to_numeric(df['Cost'], errors='coerce').fillna(0.0)
-    df['TVR']          = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
-    df['NetCost']      = pd.to_numeric(df['NetCost'], errors='coerce')
+    df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce').fillna(0.0)
+    df['TVR'] = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
+    df['NetCost'] = pd.to_numeric(df['NetCost'], errors='coerce')
     df['CargillsRate'] = pd.to_numeric(df['CargillsRate'], errors='coerce')
-    df['CblRate']      = pd.to_numeric(df['CblRate'], errors='coerce')
-    df['IsWeekend'] = ( pd.to_numeric(df['IsWeekend'], errors='coerce').fillna(0).astype(int))
+    df['CblRate'] = pd.to_numeric(df['CblRate'], errors='coerce')
+    df['IsWeekend'] = (pd.to_numeric(df['IsWeekend'], errors='coerce').fillna(0).astype(int))
 
     # NEW: Override Cost with CblRate if CBL on DERANA TV
     if selected_client == "CBL":
@@ -183,22 +184,22 @@ def generate_df():
     # ---------- 3. Effective Rate Calculation ----------
     def effective_cost(row):
         pid = row['Id']
-        str_pid = str(pid) # Ensure string for JSON key lookup
-        ch  = row['Channel']
+        str_pid = str(pid)  # Ensure string for JSON key lookup
+        ch = row['Channel']
         base_cost = row['Cost']
 
         # 1) If Manually Overridden: use the frontend value
         # We check manual_override map first.
         if manual_override.get(str_pid):
-             val = negotiated_rates.get(str_pid)
-             if val is not None and val != "":
-                 return float(val)
+            val = negotiated_rates.get(str_pid)
+            if val is not None and val != "":
+                return float(val)
 
         # 2) NEW: Cargills special rate for DERANA TV
         if (
-            selected_client == CARGILLS_CLIENT
-            and ch == CARGILLS_CHANNEL
-            and pd.notna(row['CargillsRate'])
+                selected_client == CARGILLS_CLIENT
+                and ch == CARGILLS_CHANNEL
+                and pd.notna(row['CargillsRate'])
         ):
             return float(row['CargillsRate'])
 
@@ -208,14 +209,14 @@ def generate_df():
                 return float(row['CblRate'])
             elif pd.notna(row['NetCost']):
                 return float(row['NetCost'])
-            
+
             if pd.isna(base_cost):
                 return None
             return float(base_cost)
-        
+
         if pd.isna(base_cost):
             return None
-        
+
         base_cost = float(base_cost)
 
         # 4) Normal channel → apply discount
@@ -235,7 +236,7 @@ def generate_df():
         temp['Commercial'] = c
         duration = float(durations[c])
 
-        temp['NTVR']  = (temp['TVR'] / 30.0) * duration
+        temp['NTVR'] = (temp['TVR'] / 30.0) * duration
         temp['NCost'] = (temp['Negotiated_Rate'] / 30.0) * duration
 
         df_list.append(temp)
@@ -252,8 +253,6 @@ def generate_df():
         )
 
     return jsonify({"df_full": json.loads(df_full.to_json(orient='records'))})
-
-
 
 
 @app.route('/generate-bonus-df', methods=['POST'])
@@ -331,14 +330,14 @@ def generate_bonus_df():
     # Ensure numeric types
     df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce').fillna(0.0)
     df['CblRate'] = pd.to_numeric(df['CblRate'], errors='coerce')
-    df['TVR']  = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
+    df['TVR'] = pd.to_numeric(df['TVR'], errors='coerce').fillna(0.0)
     df['IsWeekend'] = (pd.to_numeric(df['IsWeekend'], errors='coerce').fillna(0).astype(int))
 
     # NEW: Override Cost with CblRate if CBL on DERANA TV
     if selected_client == "CBL":
         mask = (df['Channel'] == "DERANA TV")
         df.loc[mask, 'Cost'] = df.loc[mask, 'CblRate']
-        
+
     df = df.dropna(subset=['Cost'])
 
     # For bonus: Rate = Raw Cost (no negotiation, no discount)
@@ -353,8 +352,8 @@ def generate_bonus_df():
         temp['Duration'] = dur
 
         # Scale TVR and Cost by duration (from 30-sec base)
-        temp['NTVR']  = (temp['TVR'] / 30.0) * dur
-        temp['NCost'] = (temp['Cost'] / 30.0) * dur   # Uses raw Cost → no discount
+        temp['NTVR'] = (temp['TVR'] / 30.0) * dur
+        temp['NCost'] = (temp['Cost'] / 30.0) * dur  # Uses raw Cost → no discount
         temp['Slot'] = 'B'
 
         df_list.append(temp)
@@ -448,7 +447,7 @@ def run_optimization():
             "total_cost": round(total_cost_c, 2),
             "total_rating": round(total_rating_c, 2),
             "cprp": round(cprp_c, 2) if cprp_c else None,
-            #"details": df_c.to_dict(orient='records')
+            # "details": df_c.to_dict(orient='records')
             "details": details_safe
         })
 
@@ -499,80 +498,12 @@ def create_channel():
     # Nothing to do — handled when inserting programs later
     return jsonify({'message': f'Channel "{name}" initialized (placeholder)'})
 
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-import threading
-
-def send_update_email_async(updater_name, changes, channel):
-    if not changes:
-        return
-        
-    try:
-        conn = mysql.connector.connect(
-            host=os.environ.get("USER_DB_HOST", "localhost"),
-            port=int(os.environ.get("USER_DB_PORT", 3306)),
-            user=os.environ.get("USER_DB_USER", "root"),
-            password=os.environ.get("USER_DB_PASS", ""),
-            database=os.environ.get("USER_DB_NAME", "railway"),
-            autocommit=True
-        )
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT email FROM user WHERE email IS NOT NULL AND email != ''")
-        users = cursor.fetchall()
-        conn.close()
-        
-        emails = [u['email'] for u in users]
-        if not emails:
-            return
-        sender = os.environ.get("SMTP_SENDER_EMAIL", "")
-        app_password = os.environ.get("SMTP_APP_PASSWORD", "")
-        
-        msg = MIMEMultipart()
-        msg['From'] = f"OPT WebApp <{sender}>"
-        msg['Subject'] = f"Program Data Updated for {channel}"
-        
-        html = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; color: #333;">
-            <div style="background-color: #f7fafc; padding: 20px; border-radius: 8px;">
-                <h2 style="color: #2d3748;">Program Data Updated</h2>
-                <p>Hello,</p>
-                <p><b>{updater_name}</b> has updated the program data for <b>{channel}</b>.</p>
-                <p><b>Changes Made:</b></p>
-                <ul>
-        """
-        for change in changes:
-            html += f"<li style='margin-bottom: 8px;'><b>{change['program']}</b>: {change['details']}</li>"
-            
-        html += """
-                </ul>
-                <br>
-                <p style="font-size: 12px; color: #718096;">
-                    This is an automated notification. Please do not reply to this email.
-                </p>
-            </div>
-        </body>
-        </html>
-        """
-        
-        msg.attach(MIMEText(html, 'html'))
-        
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(sender, app_password)
-        server.sendmail(sender, emails, msg.as_string())
-        server.quit()
-    except Exception as e:
-        print("Failed to send update email:", e)
-
 
 @app.route('/update-programs', methods=['POST'])
 def update_programs():
     data = request.get_json()
     channel = data['channel']
     programs = data['programs']
-    updater_name = data.get('updater_name', 'An Admin')
 
     SPECIAL_CHANNELS = [
         "SHAKTHI TV",
@@ -582,82 +513,8 @@ def update_programs():
     ]
 
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-
-    # Identify Changes
-    cursor.execute("SELECT * FROM programs WHERE channel = %s", (channel,))
-    old_programs = cursor.fetchall()
-    old_prog_dict = {(p['program'], p['slot']): p for p in old_programs}
-    
-    changes = []
-    
-    def norm(v):
-        if v is None or str(v).strip() == '':
-            return None
-        try:
-            return round(float(v), 2)
-        except ValueError:
-            return str(v).strip()
-            
-    def compare_vals(v1, v2):
-        n1 = norm(v1)
-        n2 = norm(v2)
-        if n1 is None and n2 is None: return True
-        return n1 == n2
-
-    fields_to_check = [
-        ('day', 'Day'), ('time', 'Time'), ('is_weekend', 'Is Weekend'),
-        ('cost', 'Rate Card'), ('cargills_rate', 'Cargills Rate'), ('cbl_rate', 'CBL Rate'),
-        ('net_cost', 'Negotiated Rate'), 
-        ('tvr_all', 'TVR All'), ('tvr_abc_15_90', 'TVR ABC 15-90'), ('tvr_abc_30_60', 'TVR ABC 30-60'),
-        ('tvr_abc_15_30', 'TVR ABC 15-30'), ('tvr_abc_20_plus', 'TVR ABC 20+'),
-        ('tvr_ab_15_plus', 'TVR AB 15+'), ('tvr_cd_15_plus', 'TVR CD 15+'),
-        ('tvr_ab_female_15_45', 'TVR AB Female 15-45'), ('tvr_abc_15_60', 'TVR ABC 15-60'),
-        ('tvr_bcde_15_plus', 'TVR BCDE 15+'), ('tvr_abcde_15_plus', 'TVR ABCDE 15+'),
-        ('tvr_abc_female_15_60', 'TVR ABC Female 15-60'), ('tvr_abc_male_15_60', 'TVR ABC Male 15-60')
-    ]
-
-    for p in programs:
-        prog_name = p.get('program')
-        slot = p.get('slot')
-        old_p = old_prog_dict.get((prog_name, slot))
-        
-        # Prepare specific fields according to logic in insertion
-        if channel in SPECIAL_CHANNELS:
-            p_net_cost = p.get('net_cost')
-            p_cbl_rate = p.get('cbl_rate')
-        else:
-            p_net_cost = None
-            p_cbl_rate = p.get('cbl_rate') if channel == "DERANA TV" else None
-
-        if channel == "DERANA TV":
-            p_cargills_rate = p.get('cargills_rate')
-        else:
-            p_cargills_rate = None
-            
-        p_for_compare = {**p, 'net_cost': p_net_cost, 'cbl_rate': p_cbl_rate, 'cargills_rate': p_cargills_rate}
-        
-        if not old_p:
-            changes.append({'program': prog_name, 'details': f"Added as new program (Slot: {slot})"})
-        else:
-            diffs = []
-            for key, label in fields_to_check:
-                if not compare_vals(old_p.get(key), p_for_compare.get(key)):
-                    diffs.append(f"{label} changed from {old_p.get(key)} to {p_for_compare.get(key)}")
-            if diffs:
-                changes.append({'program': prog_name, 'details': ", ".join(diffs)})
-
-    new_prog_keys = {(p.get('program'), p.get('slot')) for p in programs}
-    for old_k, old_p in old_prog_dict.items():
-        if old_k not in new_prog_keys:
-            changes.append({'program': old_p['program'], 'details': f"Deleted program (Slot: {old_p['slot']})"})
-            
-    if changes:
-        threading.Thread(target=send_update_email_async, args=(updater_name, changes, channel)).start()
-
-    cursor.close()
-
     cursor = conn.cursor()
+
     # Delete old programs for this channel
     cursor.execute("DELETE FROM programs WHERE channel = %s", (channel,))
 
@@ -738,6 +595,7 @@ def update_programs():
     conn.close()
     return jsonify({'message': 'Programs updated'})
 
+
 @app.route('/export-all-programs', methods=['GET'])
 def export_all_programs():
     conn = get_db_connection()
@@ -759,6 +617,7 @@ def export_all_programs():
         download_name="all_programs.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
 
 @app.route('/delete-program', methods=['POST'])
 def delete_program():
@@ -812,7 +671,7 @@ def optimize_by_budget_share():
         return jsonify({"error": "Missing data"}), 400
 
     # Safety: ensure required columns exist
-    required_cols = {'NCost', 'NTVR', 'Channel', 'Slot' , 'IsWeekend'}
+    required_cols = {'NCost', 'NTVR', 'Channel', 'Slot', 'IsWeekend'}
     missing = required_cols - set(df_full.columns)
     if missing:
         return jsonify({"error": f"Missing columns in df_full: {sorted(missing)}"}), 400
@@ -823,7 +682,7 @@ def optimize_by_budget_share():
         return jsonify({"error": "Commercial splits provided, but 'Commercial' column missing"}), 400
 
     prob = LpProblem("Maximize_TVR_With_Channel_and_Slot_Budget_Shares", LpMaximize)
-    #x = {i: LpVariable(f"x2_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
+    # x = {i: LpVariable(f"x2_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
     x = {}
 
     for i in df_full.index:
@@ -861,7 +720,8 @@ def optimize_by_budget_share():
     #   - Else (fallback): keep the existing global overall-plan commercial constraints (±5%).
     # ------------------------------------------------------------
 
-    has_channel_commercial_overrides = isinstance(channel_commercial_pct_map, dict) and len(channel_commercial_pct_map) > 0
+    has_channel_commercial_overrides = isinstance(channel_commercial_pct_map, dict) and len(
+        channel_commercial_pct_map) > 0
 
     if (num_commercials > 1) and (not has_channel_commercial_overrides) and budget_proportions:
         # Existing behavior: overall-plan constraints (±5% tolerance)
@@ -888,7 +748,7 @@ def optimize_by_budget_share():
             we_indices = df_full[
                 (df_full['Channel'] == ch) &
                 (df_full['IsWeekend'] == 1)
-            ].index
+                ].index
 
             for i in we_indices:
                 prob += x[i] <= we_cap
@@ -1158,7 +1018,7 @@ def optimize_by_benefit_share():
         if df_full.empty or not budget_shares:
             return jsonify({"error": "Missing data or empty selection"}), 400
 
-        required_cols = {'NCost', 'NTVR', 'Channel', 'Slot' , 'IsWeekend'}
+        required_cols = {'NCost', 'NTVR', 'Channel', 'Slot', 'IsWeekend'}
         missing = required_cols - set(df_full.columns)
         if missing:
             return jsonify({"error": f"Missing columns in df_full: {sorted(missing)}"}), 400
@@ -1170,7 +1030,7 @@ def optimize_by_benefit_share():
         prob = LpProblem("Maximize_TVR_CommercialBenefit", LpMaximize)
 
         # Variables: Integer spots per row
-        #x = {i: LpVariable(f"x_ben_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
+        # x = {i: LpVariable(f"x_ben_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
         x = {}
 
         for i in df_full.index:
@@ -1531,8 +1391,8 @@ def optimize_bonus():
 
         # set up an LP for this channel
         prob = LpProblem(f"Maximize_NTVR_{channel}", LpMaximize)
-        #x = {i: LpVariable(f"x_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer')
-            # for i in df_ch.index}
+        # x = {i: LpVariable(f"x_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer')
+        # for i in df_ch.index}
         # Channel-specific per-program cap
         ch_cap = channel_max_spots.get(channel, max_spots)
         try:
@@ -1660,6 +1520,7 @@ def optimize_bonus():
         }
     })
 
+
 @app.route('/save-plan', methods=['POST'])
 def save_plan():
     """
@@ -1695,7 +1556,7 @@ def save_plan():
     client_name = metadata.get("client_name")
     brand_name = metadata.get("brand_name")
     activation_from = metadata.get("activation_from")  # 'YYYY-MM-DD'
-    activation_to = metadata.get("activation_to")      # 'YYYY-MM-DD'
+    activation_to = metadata.get("activation_to")  # 'YYYY-MM-DD'
     campaign = metadata.get("campaign")
     tv_budget = metadata.get("tv_budget")
 
@@ -1868,6 +1729,7 @@ def get_plan(plan_id):
         "session_data": parsed.get("session_data") or {}
     }), 200
 
+
 @app.route('/delete-plan/<int:plan_id>', methods=['DELETE'])
 def delete_plan(plan_id):
     payload = request.get_json(silent=True) or {}
@@ -1932,14 +1794,14 @@ def save_plan_summary():
         values = []
         for ch_data in channel_summaries:
             values.append((
-                user_id, 
-                user_first_name, 
-                user_last_name, 
-                activation_period, 
-                client, 
-                brand, 
-                medium, 
-                ch_data.get('channel'), 
+                user_id,
+                user_first_name,
+                user_last_name,
+                activation_period,
+                client,
+                brand,
+                medium,
+                ch_data.get('channel'),
                 ch_data.get('budget')
             ))
 
@@ -1972,9 +1834,9 @@ def get_plan_summaries():
             cursor.execute("SELECT * FROM plan_summaries ORDER BY created_at DESC")
         else:
             cursor.execute("SELECT * FROM plan_summaries WHERE user_id = %s ORDER BY created_at DESC", (str(user_id),))
-        
+
         rows = cursor.fetchall()
-        
+
         # Convert decimals to float for JSON
         for row in rows:
             if 'budget' in row and row['budget'] is not None:
@@ -2000,17 +1862,17 @@ def update_plan_summary(id):
         # User allowed to update all values as requested
         # We'll update the fields provided in the payload
         # Fields: client, brand, medium, channel, budget, activation_period
-        
+
         # Construct update dynamically or fixed? User said "update all values".
-        
+
         sql = """
             UPDATE plan_summaries 
             SET client=%s, brand=%s, activation_period=%s, medium=%s, channel=%s, budget=%s
             WHERE id=%s
         """
-        # We expect all these fields to be present or we use existing? 
+        # We expect all these fields to be present or we use existing?
         # For simplicity, we expect the frontend to send the full object state.
-        
+
         cursor.execute(sql, (
             data.get('client'),
             data.get('brand'),
@@ -2044,9 +1906,9 @@ def delete_plan_summary(id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-#4
+# 4
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=True, host='0.0.0.0', port=port)
 
-#check for updating
+# check for updating
