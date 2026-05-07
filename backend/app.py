@@ -510,11 +510,11 @@ def send_update_email_async(updater_name, changes, channel):
         
     try:
         conn = mysql.connector.connect(
-            host="ballast.proxy.rlwy.net",
-            port=48211,
-            user="root",
-            password="xIphibqobRlXuRTptpjsWqCUZScbaLZu",
-            database="railway",
+            host=os.environ.get("USER_DB_HOST", "localhost"),
+            port=int(os.environ.get("USER_DB_PORT", 3306)),
+            user=os.environ.get("USER_DB_USER", "root"),
+            password=os.environ.get("USER_DB_PASS", ""),
+            database=os.environ.get("USER_DB_NAME", "railway"),
             autocommit=True
         )
         cursor = conn.cursor(dictionary=True)
@@ -525,9 +525,8 @@ def send_update_email_async(updater_name, changes, channel):
         emails = [u['email'] for u in users]
         if not emails:
             return
-            
-        sender = "devthirdshift@gmail.com"
-        app_password = "isxb ddte jsxv hatu"
+        sender = os.environ.get("SMTP_SENDER_EMAIL", "")
+        app_password = os.environ.get("SMTP_APP_PASSWORD", "")
         
         msg = MIMEMultipart()
         msg['From'] = f"OPT WebApp <{sender}>"
