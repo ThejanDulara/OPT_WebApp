@@ -119,7 +119,7 @@ function ProgramUpdater({ onBack }) {
 
   const createChannel = () => {
     if (!newChannelName) return;
-    fetch('hhttps://optwebapp-production.up.railway.app/create-channel', {
+    fetch('https://optwebapp-production.up.railway.app/create-channel', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newChannelName })
