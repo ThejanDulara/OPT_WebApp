@@ -687,6 +687,8 @@ def notify_changes():
         
     body += "\n\nThis is an automated email. Please don't reply to this email."
     
+    msg.attach(MIMEText(body, 'plain'))
+    
     try:
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
