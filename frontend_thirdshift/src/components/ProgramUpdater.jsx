@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { checkAuth } from '../authCheck';
 
 const SPECIAL_CHANNELS = [
   "SHAKTHI TV",
@@ -11,6 +12,7 @@ function ProgramUpdater({ onBack }) {
   const [channels, setChannels] = useState([]);
   const [selectedChannel, setSelectedChannel] = useState('DERANA TV');
   const [programs, setPrograms] = useState([]);
+  const [originalPrograms, setOriginalPrograms] = useState([]);
   const [newChannelName, setNewChannelName] = useState('');
   const [isAddingChannel, setIsAddingChannel] = useState(false);
 
@@ -20,8 +22,15 @@ function ProgramUpdater({ onBack }) {
 
   // New State for Saving Status
   const [isSaving, setIsSaving] = useState(false);
+  
+  // User name for email notifications
+  const [userName, setUserName] = useState('User');
 
   useEffect(() => {
+    checkAuth().then(user => {
+      if (user && user.firstName) setUserName(user.firstName);
+    });
+
     fetch('https://optwebapp-production.up.railway.app/channels')
       .then(res => res.json())
       .then(data => {
@@ -29,7 +38,11 @@ function ProgramUpdater({ onBack }) {
         if (data.channels.includes('DERANA TV')) {
           fetch(`https://optwebapp-production.up.railway.app/programs?channel=DERANA TV`)
             .then(res => res.json())
-            .then(data => setPrograms(data.programs || []));
+            .then(data => {
+              const fetched = data.programs || [];
+              setPrograms(fetched);
+              setOriginalPrograms(JSON.parse(JSON.stringify(fetched)));
+            });
         }
       });
   }, []);
@@ -41,7 +54,11 @@ function ProgramUpdater({ onBack }) {
     setSlotFilter('');
     fetch(`https://optwebapp-production.up.railway.app/programs?channel=${channel}`)
       .then(res => res.json())
-      .then(data => setPrograms(data.programs || []));
+      .then(data => {
+        const fetched = data.programs || [];
+        setPrograms(fetched);
+        setOriginalPrograms(JSON.parse(JSON.stringify(fetched)));
+      });
   };
 
   // --- UPDATED INPUT HANDLER WITH SLOT RESTRICTION ---
@@ -96,13 +113,43 @@ function ProgramUpdater({ onBack }) {
       .then(res => res.json())
       .then(() => {
         setPrograms(programs.filter(p => !(p.program === program && p.slot === slot)));
+        setOriginalPrograms(originalPrograms.filter(p => !(p.program === program && p.slot === slot)));
         alert('🗑️ Program deleted.');
+        
+        // Notify
+        const changes = [`Deleted program "${program}" from slot "${slot || 'N/A'}"`];
+        fetch('https://optwebapp-production.up.railway.app/notify-changes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userName, changes, channel: selectedChannel })
+        }).catch(console.error);
       })
       .catch(() => alert('❌ Delete failed.'));
   };
 
   const saveChanges = () => {
     setIsSaving(true);
+    
+    // Calculate changes
+    const changes = [];
+    programs.forEach(p => {
+      if (!p.id) {
+        changes.push(`Added new program "${p.program}" to slot "${p.slot || 'N/A'}"`);
+      } else {
+        const orig = originalPrograms.find(o => o.id === p.id);
+        if (orig) {
+          const fieldChanges = [];
+          Object.keys(p).forEach(key => {
+            if (key !== 'originalIndex' && p[key] !== orig[key]) {
+              fieldChanges.push(`[${key}] from "${orig[key]}" to "${p[key]}"`);
+            }
+          });
+          if (fieldChanges.length > 0) {
+            changes.push(`Updated program "${p.program}" (Slot: ${p.slot || 'N/A'}): ${fieldChanges.join(', ')}`);
+          }
+        }
+      }
+    });
 
     fetch('https://optwebapp-production.up.railway.app/update-programs', {
       method: 'POST',
@@ -110,7 +157,18 @@ function ProgramUpdater({ onBack }) {
       body: JSON.stringify({ channel: selectedChannel, programs })
     })
       .then(res => res.json())
-      .then(data => alert('✅ Programs updated successfully!'))
+      .then(data => {
+         setOriginalPrograms(JSON.parse(JSON.stringify(programs)));
+         alert('✅ Programs updated successfully!');
+         
+         if (changes.length > 0) {
+            fetch('https://optwebapp-production.up.railway.app/notify-changes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userName, changes, channel: selectedChannel })
+            }).catch(console.error);
+         }
+      })
       .catch(() => alert('❌ Failed to update programs.'))
       .finally(() => {
         setIsSaving(false);
