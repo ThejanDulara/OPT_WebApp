@@ -745,6 +745,53 @@ def optimize_by_budget_share():
     if commercial_required and ('Commercial' not in df_full.columns):
         return jsonify({"error": "Commercial splits provided, but 'Commercial' column missing"}), 400
 
+        # =========================================================
+    # PRE-CALCULATIONS FOR INDEX-BASED OPTIMIZATION
+    # =========================================================
+
+    # ---------- NTVR Index ----------
+    ntvr_min = df_full['NTVR'].min()
+    ntvr_max = df_full['NTVR'].max()
+
+    df_full['NTVR_Index'] = (
+        (df_full['NTVR'] - ntvr_min) /
+        (ntvr_max - ntvr_min)
+    ) * 100
+
+    # ---------- Program CPRP ----------
+    df_full['PCPRP'] = df_full['NCost'] / df_full['NTVR']
+
+    # ---------- CPRP Index ----------
+    pcprp_min = df_full['PCPRP'].min()
+    pcprp_max = df_full['PCPRP'].max()
+
+    df_full['CPRP_Index'] = (
+        (pcprp_max - df_full['PCPRP']) /
+        (pcprp_max - pcprp_min)
+    ) * 100
+
+    # ---------- Weighted Index ----------
+    # Currently hardcoded 50% / 50%
+
+    tvr_weight = 0.5
+    cprp_weight = 0.5
+
+    df_full['Weighted_Index'] = (
+        (df_full['NTVR_Index'] * tvr_weight) +
+        (df_full['CPRP_Index'] * cprp_weight)
+    )
+
+    # ---------- Optional Rounding ----------
+    cols_round = [
+        'NTVR_Index',
+        'PCPRP',
+        'CPRP_Index',
+        'Weighted_Index'
+    ]
+
+    for col in cols_round:
+        df_full[col] = df_full[col].round(2)
+
     prob = LpProblem("Maximize_TVR_With_Channel_and_Slot_Budget_Shares", LpMaximize)
     # x = {i: LpVariable(f"x2_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
     x = {}
@@ -769,7 +816,12 @@ def optimize_by_budget_share():
             cat='Integer'
         )
     # Objective: maximize NTVR * spots
-    prob += lpSum(df_full.loc[i, 'NTVR'] * x[i] for i in df_full.index)
+    #prob += lpSum(df_full.loc[i, 'NTVR'] * x[i] for i in df_full.index)
+    # Objective: maximize Weighted Index * spots
+    prob += lpSum(
+        df_full.loc[i, 'Weighted_Index'] * x[i]
+        for i in df_full.index
+    )
 
     # Total budget constraint
     total_cost_expr = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in df_full.index)
@@ -1082,6 +1134,53 @@ def optimize_by_benefit_share():
         if df_full.empty or not budget_shares:
             return jsonify({"error": "Missing data or empty selection"}), 400
 
+                # =========================================================
+        # PRE-CALCULATIONS FOR INDEX-BASED OPTIMIZATION
+        # =========================================================
+
+        # ---------- NTVR Index ----------
+        ntvr_min = df_full['NTVR'].min()
+        ntvr_max = df_full['NTVR'].max()
+
+        df_full['NTVR_Index'] = (
+            (df_full['NTVR'] - ntvr_min) /
+            (ntvr_max - ntvr_min)
+        ) * 100
+
+        # ---------- Program CPRP ----------
+        df_full['PCPRP'] = df_full['NCost'] / df_full['NTVR']
+
+        # ---------- CPRP Index ----------
+        pcprp_min = df_full['PCPRP'].min()
+        pcprp_max = df_full['PCPRP'].max()
+
+        df_full['CPRP_Index'] = (
+            (pcprp_max - df_full['PCPRP']) /
+            (pcprp_max - pcprp_min)
+        ) * 100
+
+        # ---------- Weighted Index ----------
+        # Hardcoded 50 / 50 for now
+
+        tvr_weight = 0.5
+        cprp_weight = 0.5
+
+        df_full['Weighted_Index'] = (
+            (df_full['NTVR_Index'] * tvr_weight) +
+            (df_full['CPRP_Index'] * cprp_weight)
+        )
+
+        # ---------- Optional Rounding ----------
+        round_cols = [
+            'NTVR_Index',
+            'PCPRP',
+            'CPRP_Index',
+            'Weighted_Index'
+        ]
+
+        for col in round_cols:
+            df_full[col] = df_full[col].round(2)
+
         required_cols = {'NCost', 'NTVR', 'Channel', 'Slot', 'IsWeekend'}
         missing = required_cols - set(df_full.columns)
         if missing:
@@ -1130,7 +1229,12 @@ def optimize_by_benefit_share():
             )
 
         # Objective: Maximize Total NTVR (Rating)
-        prob += lpSum(df_full.loc[i, 'NTVR'] * x[i] for i in df_full.index)
+       #prob += lpSum(df_full.loc[i, 'NTVR'] * x[i] for i in df_full.index)
+       # Objective: Maximize Weighted Index * Spots
+        prob += lpSum(
+            df_full.loc[i, 'Weighted_Index'] * x[i]
+            for i in df_full.index
+        )
 
         # Global Budget Constraint
         total_cost_expr = lpSum(df_full.loc[i, 'NCost'] * x[i] for i in df_full.index)
@@ -1446,6 +1550,53 @@ def optimize_bonus():
             "message": f"Missing columns: {sorted(missing)}"
         }), 400
 
+        # =========================================================
+    # PRE-CALCULATIONS FOR INDEX-BASED OPTIMIZATION
+    # =========================================================
+
+    # ---------- NTVR Index ----------
+    ntvr_min = df_full['NTVR'].min()
+    ntvr_max = df_full['NTVR'].max()
+
+    df_full['NTVR_Index'] = (
+        (df_full['NTVR'] - ntvr_min) /
+        (ntvr_max - ntvr_min)
+    ) * 100
+
+    # ---------- Program CPRP ----------
+    df_full['PCPRP'] = df_full['NCost'] / df_full['NTVR']
+
+    # ---------- CPRP Index ----------
+    pcprp_min = df_full['PCPRP'].min()
+    pcprp_max = df_full['PCPRP'].max()
+
+    df_full['CPRP_Index'] = (
+        (pcprp_max - df_full['PCPRP']) /
+        (pcprp_max - pcprp_min)
+    ) * 100
+
+    # ---------- Weighted Index ----------
+    # Hardcoded 50 / 50 for now
+
+    tvr_weight = 0.5
+    cprp_weight = 0.5
+
+    df_full['Weighted_Index'] = (
+        (df_full['NTVR_Index'] * tvr_weight) +
+        (df_full['CPRP_Index'] * cprp_weight)
+    )
+
+    # ---------- Optional Rounding ----------
+    round_cols = [
+        'NTVR_Index',
+        'PCPRP',
+        'CPRP_Index',
+        'Weighted_Index'
+    ]
+
+    for col in round_cols:
+        df_full[col] = df_full[col].round(2)
+
     results = []
     for channel in df_full['Channel'].unique():
         df_ch = df_full[df_full['Channel'] == channel].copy()
@@ -1488,7 +1639,12 @@ def optimize_bonus():
             )
 
         # maximise NTVR for this channel
-        prob += lpSum(df_ch.loc[i, 'NTVR'] * x[i] for i in df_ch.index)
+        #prob += lpSum(df_ch.loc[i, 'NTVR'] * x[i] for i in df_ch.index)
+        # maximise Weighted Index * Spots
+        prob += lpSum(
+            df_ch.loc[i, 'Weighted_Index'] * x[i]
+            for i in df_ch.index
+        )
 
         # channel budget constraint
         total_cost = lpSum(df_ch.loc[i, 'NCost'] * x[i] for i in df_ch.index)
