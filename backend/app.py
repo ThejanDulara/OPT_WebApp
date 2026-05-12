@@ -771,10 +771,9 @@ def optimize_by_budget_share():
     ) * 100
 
     # ---------- Weighted Index ----------
-    # Currently hardcoded 50% / 50%
 
-    tvr_weight = 0.5
-    cprp_weight = 0.5
+    tvr_weight = float(data.get('tvr_weight', 0.5))
+    cprp_weight = float(data.get('cprp_weight', 0.5))
 
     df_full['Weighted_Index'] = (
         (df_full['NTVR_Index'] * tvr_weight) +
@@ -1160,10 +1159,9 @@ def optimize_by_benefit_share():
         ) * 100
 
         # ---------- Weighted Index ----------
-        # Hardcoded 50 / 50 for now
 
-        tvr_weight = 0.5
-        cprp_weight = 0.5
+        tvr_weight = float(data.get('tvr_weight', 0.5))
+        cprp_weight = float(data.get('cprp_weight', 0.5))
 
         df_full['Weighted_Index'] = (
             (df_full['NTVR_Index'] * tvr_weight) +
@@ -1576,10 +1574,9 @@ def optimize_bonus():
     ) * 100
 
     # ---------- Weighted Index ----------
-    # Hardcoded 50 / 50 for now
 
-    tvr_weight = 0.5
-    cprp_weight = 0.5
+    tvr_weight = float(data.get('tvr_weight', 0.5))
+    cprp_weight = float(data.get('cprp_weight', 0.5))
 
     df_full['Weighted_Index'] = (
         (df_full['NTVR_Index'] * tvr_weight) +
