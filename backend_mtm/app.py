@@ -647,10 +647,10 @@ def notify_changes():
     user_name = data.get('userName', 'A user')
     changes = data.get('changes', [])
     channel = data.get('channel', 'Unknown Channel')
-    
+
     if not changes:
         return jsonify({'message': 'No changes to notify'})
-        
+
     try:
         user_db_conn = mysql.connector.connect(
             host=os.environ.get("USER_DB_HOST", "ballast.proxy.rlwy.net"),
@@ -680,15 +680,15 @@ def notify_changes():
     msg['To'] = sender_email
     msg['Bcc'] = ", ".join(emails)
     msg['Subject'] = f"Program Data Updated by {user_name} ({channel})"
-    
+
     body = f"Hello,\n\n{user_name} has made the following changes to the program data for {channel}:\n\n"
     for change in changes:
         body += f"- {change}\n"
-        
+
     body += "\n\nThis is an automated email. Please don't reply to this email."
-    
+
     msg.attach(MIMEText(body, 'plain'))
-    
+
     try:
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
@@ -699,7 +699,6 @@ def notify_changes():
     except Exception as e:
         print("Error sending email:", e)
         return jsonify({'error': 'Failed to send email'}), 500
-
 
 
 @app.route('/optimize-by-budget-share', methods=['POST'])
@@ -754,9 +753,9 @@ def optimize_by_budget_share():
     ntvr_max = df_full['NTVR'].max()
 
     df_full['NTVR_Index'] = (
-        (df_full['NTVR'] - ntvr_min) /
-        (ntvr_max - ntvr_min)
-    ) * 100
+                                    (df_full['NTVR'] - ntvr_min) /
+                                    (ntvr_max - ntvr_min)
+                            ) * 100
 
     # ---------- Program CPRP ----------
     df_full['PCPRP'] = df_full['NCost'] / df_full['NTVR']
@@ -766,19 +765,18 @@ def optimize_by_budget_share():
     pcprp_max = df_full['PCPRP'].max()
 
     df_full['CPRP_Index'] = (
-        (pcprp_max - df_full['PCPRP']) /
-        (pcprp_max - pcprp_min)
-    ) * 100
+                                    (pcprp_max - df_full['PCPRP']) /
+                                    (pcprp_max - pcprp_min)
+                            ) * 100
 
     # ---------- Weighted Index ----------
-    # Currently hardcoded 50% / 50%
 
-    tvr_weight = 0.5
-    cprp_weight = 0.5
+    tvr_weight = float(data.get('tvr_weight', 0.5))
+    cprp_weight = float(data.get('cprp_weight', 0.5))
 
     df_full['Weighted_Index'] = (
-        (df_full['NTVR_Index'] * tvr_weight) +
-        (df_full['CPRP_Index'] * cprp_weight)
+            (df_full['NTVR_Index'] * tvr_weight) +
+            (df_full['CPRP_Index'] * cprp_weight)
     )
 
     # ---------- Optional Rounding ----------
@@ -816,7 +814,7 @@ def optimize_by_budget_share():
             cat='Integer'
         )
     # Objective: maximize NTVR * spots
-    #prob += lpSum(df_full.loc[i, 'NTVR'] * x[i] for i in df_full.index)
+    # prob += lpSum(df_full.loc[i, 'NTVR'] * x[i] for i in df_full.index)
     # Objective: maximize Weighted Index * spots
     prob += lpSum(
         df_full.loc[i, 'Weighted_Index'] * x[i]
@@ -1134,7 +1132,7 @@ def optimize_by_benefit_share():
         if df_full.empty or not budget_shares:
             return jsonify({"error": "Missing data or empty selection"}), 400
 
-                # =========================================================
+            # =========================================================
         # PRE-CALCULATIONS FOR INDEX-BASED OPTIMIZATION
         # =========================================================
 
@@ -1143,9 +1141,9 @@ def optimize_by_benefit_share():
         ntvr_max = df_full['NTVR'].max()
 
         df_full['NTVR_Index'] = (
-            (df_full['NTVR'] - ntvr_min) /
-            (ntvr_max - ntvr_min)
-        ) * 100
+                                        (df_full['NTVR'] - ntvr_min) /
+                                        (ntvr_max - ntvr_min)
+                                ) * 100
 
         # ---------- Program CPRP ----------
         df_full['PCPRP'] = df_full['NCost'] / df_full['NTVR']
@@ -1155,19 +1153,18 @@ def optimize_by_benefit_share():
         pcprp_max = df_full['PCPRP'].max()
 
         df_full['CPRP_Index'] = (
-            (pcprp_max - df_full['PCPRP']) /
-            (pcprp_max - pcprp_min)
-        ) * 100
+                                        (pcprp_max - df_full['PCPRP']) /
+                                        (pcprp_max - pcprp_min)
+                                ) * 100
 
         # ---------- Weighted Index ----------
-        # Hardcoded 50 / 50 for now
 
-        tvr_weight = 0.5
-        cprp_weight = 0.5
+        tvr_weight = float(data.get('tvr_weight', 0.5))
+        cprp_weight = float(data.get('cprp_weight', 0.5))
 
         df_full['Weighted_Index'] = (
-            (df_full['NTVR_Index'] * tvr_weight) +
-            (df_full['CPRP_Index'] * cprp_weight)
+                (df_full['NTVR_Index'] * tvr_weight) +
+                (df_full['CPRP_Index'] * cprp_weight)
         )
 
         # ---------- Optional Rounding ----------
@@ -1229,8 +1226,8 @@ def optimize_by_benefit_share():
             )
 
         # Objective: Maximize Total NTVR (Rating)
-       #prob += lpSum(df_full.loc[i, 'NTVR'] * x[i] for i in df_full.index)
-       # Objective: Maximize Weighted Index * Spots
+        # prob += lpSum(df_full.loc[i, 'NTVR'] * x[i] for i in df_full.index)
+        # Objective: Maximize Weighted Index * Spots
         prob += lpSum(
             df_full.loc[i, 'Weighted_Index'] * x[i]
             for i in df_full.index
@@ -1559,9 +1556,9 @@ def optimize_bonus():
     ntvr_max = df_full['NTVR'].max()
 
     df_full['NTVR_Index'] = (
-        (df_full['NTVR'] - ntvr_min) /
-        (ntvr_max - ntvr_min)
-    ) * 100
+                                    (df_full['NTVR'] - ntvr_min) /
+                                    (ntvr_max - ntvr_min)
+                            ) * 100
 
     # ---------- Program CPRP ----------
     df_full['PCPRP'] = df_full['NCost'] / df_full['NTVR']
@@ -1571,19 +1568,18 @@ def optimize_bonus():
     pcprp_max = df_full['PCPRP'].max()
 
     df_full['CPRP_Index'] = (
-        (pcprp_max - df_full['PCPRP']) /
-        (pcprp_max - pcprp_min)
-    ) * 100
+                                    (pcprp_max - df_full['PCPRP']) /
+                                    (pcprp_max - pcprp_min)
+                            ) * 100
 
     # ---------- Weighted Index ----------
-    # Hardcoded 50 / 50 for now
 
-    tvr_weight = 0.5
-    cprp_weight = 0.5
+    tvr_weight = float(data.get('tvr_weight', 0.5))
+    cprp_weight = float(data.get('cprp_weight', 0.5))
 
     df_full['Weighted_Index'] = (
-        (df_full['NTVR_Index'] * tvr_weight) +
-        (df_full['CPRP_Index'] * cprp_weight)
+            (df_full['NTVR_Index'] * tvr_weight) +
+            (df_full['CPRP_Index'] * cprp_weight)
     )
 
     # ---------- Optional Rounding ----------
@@ -1639,7 +1635,7 @@ def optimize_bonus():
             )
 
         # maximise NTVR for this channel
-        #prob += lpSum(df_ch.loc[i, 'NTVR'] * x[i] for i in df_ch.index)
+        # prob += lpSum(df_ch.loc[i, 'NTVR'] * x[i] for i in df_ch.index)
         # maximise Weighted Index * Spots
         prob += lpSum(
             df_ch.loc[i, 'Weighted_Index'] * x[i]

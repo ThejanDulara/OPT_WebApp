@@ -85,6 +85,13 @@ export default function BonusChannelBudgetSetup({
     120
   );
 
+  // TVR Bias
+  const [tvrBias, setTvrBias] = useState(
+    initialState?.tvrBias ??
+    optimizationInput?.tvrBias ??
+    50
+  );
+
   // Bonus % per channel
   const [bonusPctByChannel, setBonusPctByChannel] = useState(
     initialState?.bonusPctByChannel ??
@@ -121,6 +128,7 @@ export default function BonusChannelBudgetSetup({
         channelCommercialSplits,
         maxSpots,
         timeLimit,
+        tvrBias,
         bonusPctByChannel,
         channelBounds,
         channelMaxSpots,
@@ -134,6 +142,7 @@ export default function BonusChannelBudgetSetup({
     channelCommercialSplits,
     maxSpots,
     timeLimit,
+    tvrBias,
     bonusPctByChannel,
     channelBounds,
     channelMaxSpots,
@@ -274,6 +283,7 @@ export default function BonusChannelBudgetSetup({
       channelCommercialSplits,
       maxSpots,
       timeLimit,
+      tvrBias,
       bonusPctByChannel,
       channelBounds,
       channelMaxSpots,
@@ -287,6 +297,7 @@ export default function BonusChannelBudgetSetup({
       budgetProportions: budgetProportions.map(num),
       maxSpots: parseInt(maxSpots, 10),
       timeLimit: parseInt(timeLimit, 10),
+      tvrBias,
       channel_max_spots: channelMaxSpots,
       channel_weekend_max_spots: channelWeekendMaxSpots,
 
@@ -592,6 +603,25 @@ export default function BonusChannelBudgetSetup({
             onChange={(e) => setTimeLimit(parseInt(e.target.value || 0, 10))}
             style={{ ...styles.input, width: 120 }}
           />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 8, flexWrap: 'nowrap' }}>
+          <span style={styles.label}>TVR Bias:</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={tvrBias}
+                onChange={e => setTvrBias(parseFloat(e.target.value) || 0)}
+                style={{ ...styles.input, width: 120 }}
+              />
+              <span style={{ color: '#4a5568', fontSize: 14, marginLeft: 4 }}>%</span>
+            </div>
+            <span style={{ color: '#64748b', fontSize: 13 }}>
+              (CPRP Bias: {100 - tvrBias}%)
+            </span>
+          </div>
         </div>
         <div style={styles.smallNote}>
           These default to the values you used in Optimization Setup; adjust only if needed for the bonus run.

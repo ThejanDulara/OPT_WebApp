@@ -23,6 +23,7 @@ function ChannelRatingAllocator({
 
   const [maxSpots, setMaxSpots] = useState(safeOpt.maxSpots ?? 10);
   const [timeLimit, setTimeLimit] = useState(safeOpt.timeLimit ?? 120);
+  const [tvrBias, setTvrBias] = useState(safeOpt.tvrBias ?? 50);
   const [primePct, setPrimePct] = useState(80);
   const [nonPrimePct, setNonPrimePct] = useState(20);
   const [channelMaxSpots, setChannelMaxSpots] = useState({});
@@ -155,6 +156,7 @@ function ChannelRatingAllocator({
     setBudgetShares(initialState.budgetShares || {});
     setMaxSpots(initialState.maxSpots || 10);
     setTimeLimit(initialState.timeLimit || 120);
+    setTvrBias(initialState.tvrBias ?? 50);
     setPrimePct(initialState.primePct || 80);
     setNonPrimePct(initialState.nonPrimePct || 20);
 
@@ -177,6 +179,7 @@ function ChannelRatingAllocator({
         budgetShares,
         maxSpots,
         timeLimit,
+        tvrBias,
         primePct,
         nonPrimePct,
         channelSplits,
@@ -194,6 +197,7 @@ function ChannelRatingAllocator({
     budgetShares,
     maxSpots,
     timeLimit,
+    tvrBias,
     primePct,
     nonPrimePct,
     channelSplits,
@@ -425,6 +429,7 @@ function ChannelRatingAllocator({
           budgetShares,
           maxSpots,
           timeLimit,
+          tvrBias,
           primePct,
           nonPrimePct,
           channelSplits,
@@ -507,6 +512,8 @@ function ChannelRatingAllocator({
       channel_max_spots: channelMaxSpots,
       channel_weekend_max_spots: channelWeekendMaxSpots,
       time_limit: timeLimit,
+      tvr_weight: tvrBias / 100.0,
+      cprp_weight: (100 - tvrBias) / 100.0,
       prime_pct: primePct,
       nonprime_pct: nonPrimePct,
       channel_prime_pct_map,
@@ -520,6 +527,7 @@ function ChannelRatingAllocator({
         budgetShares,
         maxSpots,
         timeLimit,
+        tvrBias,
         primePct,
         nonPrimePct,
         channelSplits,
@@ -839,6 +847,8 @@ function ChannelRatingAllocator({
         setMaxSpots={setMaxSpots}
         timeLimit={timeLimit}
         setTimeLimit={setTimeLimit}
+        tvrBias={tvrBias}
+        setTvrBias={setTvrBias}
         primePct={primePct}
         setPrimePct={setPrimePct}
         nonPrimePct={nonPrimePct}
