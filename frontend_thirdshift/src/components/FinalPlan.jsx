@@ -1382,9 +1382,17 @@ export default function FinalPlan({
       allNonBonusRows.sort((a, b) => {
         const slotA = toStr(a.Slot ?? 'A').toUpperCase();
         const slotB = toStr(b.Slot ?? 'A').toUpperCase();
-        if (slotA === 'A' && slotB === 'B') return -1;
-        if (slotA === 'B' && slotB === 'A') return 1;
-        return 0;
+        
+        if (slotA.startsWith('A') && slotB.startsWith('B')) return -1;
+        if (slotA.startsWith('B') && slotB.startsWith('A')) return 1;
+        
+        if (slotA.startsWith('A') && slotB.startsWith('A')) {
+          if (slotA === 'A' && slotB !== 'A') return 1;
+          if (slotB === 'A' && slotA !== 'A') return -1;
+          return slotA.localeCompare(slotB);
+        }
+        
+        return slotA.localeCompare(slotB);
       });
 
       return allNonBonusRows;
@@ -3379,9 +3387,17 @@ export default function FinalPlan({
                       allNonBonusRows.sort((a, b) => {
                         const slotA = toStr(a.Slot ?? 'A').toUpperCase();
                         const slotB = toStr(b.Slot ?? 'A').toUpperCase();
-                        if (slotA === 'A' && slotB === 'B') return -1;
-                        if (slotA === 'B' && slotB === 'A') return 1;
-                        return 0; // same slot or fallback
+                        
+                        if (slotA.startsWith('A') && slotB.startsWith('B')) return -1;
+                        if (slotA.startsWith('B') && slotB.startsWith('A')) return 1;
+                        
+                        if (slotA.startsWith('A') && slotB.startsWith('A')) {
+                          if (slotA === 'A' && slotB !== 'A') return 1;
+                          if (slotB === 'A' && slotA !== 'A') return -1;
+                          return slotA.localeCompare(slotB);
+                        }
+                        
+                        return slotA.localeCompare(slotB);
                       });
 
                       // Render sorted non-bonus rows (all white for merged/main/unmatched benefit)

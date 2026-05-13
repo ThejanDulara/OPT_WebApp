@@ -8,10 +8,10 @@ const hostname = window.location.hostname;
 const isLocal =
   hostname.includes("localhost") || hostname.includes("127.");
 
-const API_BASE_SAVE = "https://optwebapp-production-c7d6.up.railway.app"; // ✅ ALWAYS
+const API_BASE_SAVE = "https://optwebapp-production.up.railway.app"; // ✅ ALWAYS
 const API_BASE_READ = isLocal
   ? "http://localhost:5000"      // if you read anything locally
-  : "https://optwebapp-production-c7d6.up.railway.app";
+  : "https://optwebapp-production.up.railway.app";
 
 // ✅ LOCAL DEV AUTH (matches backend contract)
 const auth = isLocal
@@ -1382,9 +1382,17 @@ export default function FinalPlan({
       allNonBonusRows.sort((a, b) => {
         const slotA = toStr(a.Slot ?? 'A').toUpperCase();
         const slotB = toStr(b.Slot ?? 'A').toUpperCase();
-        if (slotA === 'A' && slotB === 'B') return -1;
-        if (slotA === 'B' && slotB === 'A') return 1;
-        return 0;
+
+        if (slotA.startsWith('A') && slotB.startsWith('B')) return -1;
+        if (slotA.startsWith('B') && slotB.startsWith('A')) return 1;
+
+        if (slotA.startsWith('A') && slotB.startsWith('A')) {
+          if (slotA === 'A' && slotB !== 'A') return 1;
+          if (slotB === 'A' && slotA !== 'A') return -1;
+          return slotA.localeCompare(slotB);
+        }
+
+        return slotA.localeCompare(slotB);
       });
 
       return allNonBonusRows;
@@ -2869,7 +2877,7 @@ export default function FinalPlan({
 
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [clientName, setClientName] = useState("");
-  const [agencyName, setAgencyName] = useState('Midas Media (Pvt) Ltd');
+  const [agencyName, setAgencyName] = useState('Media Factory (Pvt) Ltd');
   const [brandName, setBrandName] = useState("");
   const [refNo, setRefNo] = useState("");
   const [commercialNames, setCommercialNames] = useState({});
@@ -3379,9 +3387,17 @@ export default function FinalPlan({
                       allNonBonusRows.sort((a, b) => {
                         const slotA = toStr(a.Slot ?? 'A').toUpperCase();
                         const slotB = toStr(b.Slot ?? 'A').toUpperCase();
-                        if (slotA === 'A' && slotB === 'B') return -1;
-                        if (slotA === 'B' && slotB === 'A') return 1;
-                        return 0; // same slot or fallback
+
+                        if (slotA.startsWith('A') && slotB.startsWith('B')) return -1;
+                        if (slotA.startsWith('B') && slotB.startsWith('A')) return 1;
+
+                        if (slotA.startsWith('A') && slotB.startsWith('A')) {
+                          if (slotA === 'A' && slotB !== 'A') return 1;
+                          if (slotB === 'A' && slotA !== 'A') return -1;
+                          return slotA.localeCompare(slotB);
+                        }
+
+                        return slotA.localeCompare(slotB);
                       });
 
                       // Render sorted non-bonus rows (all white for merged/main/unmatched benefit)
@@ -3767,4 +3783,3 @@ export default function FinalPlan({
   );
 }
 
-//bjk
