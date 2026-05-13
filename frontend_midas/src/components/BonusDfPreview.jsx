@@ -18,6 +18,7 @@ export default function BonusDfPreview({
   defaultChannelAllowPct = 0.10,     // ±10% if not provided per channel
   timeLimitSec = 120,
   commercialTolerancePct = 0.05,     // ±5% around commercial targets within each channel
+  tvrBias = 50,
 
   setBonusReadyRows = () => {},
   styles = {},
@@ -255,6 +256,8 @@ export default function BonusDfPreview({
         channel_max_spots: channelMaxSpots,
         channel_weekend_max_spots: channelWeekendMaxSpots,
         commercialTolerancePct,
+        tvr_weight: tvrBias / 100.0,
+        cprp_weight: (100 - tvrBias) / 100.0,
       };
 
       const res = await fetch('https://optwebapp-production-c7d6.up.railway.app/optimize-bonus', {

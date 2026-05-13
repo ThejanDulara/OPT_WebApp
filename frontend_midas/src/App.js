@@ -98,6 +98,7 @@ function App() {
     ? "http://localhost:5000"   // your local OPT backend
     : "https://optwebapp-production-c7d6.up.railway.app"; // correct production OPT backend
 
+
   const handleOpenHistory = () => {
     navigate('/history');
   };
@@ -525,6 +526,7 @@ function App() {
                 channelAllowPctByChannel={bonusSharesInput?.channelAllowPctByChannel || {}}
                 defaultChannelAllowPct={bonusSharesInput?.defaultChannelAllowPct ?? 0.10}
                 timeLimitSec={bonusSharesInput?.timeLimitSec ?? 120}
+                tvrBias={bonusSharesInput?.tvrBias ?? 50}
                 setBonusReadyRows={setBonusReadyRows}
                 onBack={() => navigate('/bonus-setup')}
                 commercialTolerancePct={bonusSharesInput?.commercialTolerancePct ?? 0.05}
