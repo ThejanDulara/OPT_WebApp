@@ -1153,14 +1153,26 @@ def optimize_by_benefit_share():
         # PRE-CALCULATIONS FOR INDEX-BASED OPTIMIZATION
         # =========================================================
 
+        # Remove invalid numeric rows
+        df_full = df_full.replace([np.inf, -np.inf], np.nan)
+
+        # Remove invalid/missing values
+        df_full = df_full.dropna(subset=['NCost', 'NTVR'])
+
+        # Remove zero or negative TVR rows
+        df_full = df_full[df_full['NTVR'] > 0].copy()
+
         # ---------- NTVR Index ----------
         ntvr_min = df_full['NTVR'].min()
         ntvr_max = df_full['NTVR'].max()
 
-        df_full['NTVR_Index'] = (
-                                        (df_full['NTVR'] - ntvr_min) /
-                                        (ntvr_max - ntvr_min)
-                                ) * 100
+        if ntvr_max == ntvr_min:
+            df_full['NTVR_Index'] = 100
+        else:
+            df_full['NTVR_Index'] = (
+                (df_full['NTVR'] - ntvr_min) /
+                (ntvr_max - ntvr_min)
+            ) * 100
 
         # ---------- Program CPRP ----------
         df_full['PCPRP'] = df_full['NCost'] / df_full['NTVR']
@@ -1169,10 +1181,13 @@ def optimize_by_benefit_share():
         pcprp_min = df_full['PCPRP'].min()
         pcprp_max = df_full['PCPRP'].max()
 
-        df_full['CPRP_Index'] = (
-                                        (pcprp_max - df_full['PCPRP']) /
-                                        (pcprp_max - pcprp_min)
-                                ) * 100
+        if pcprp_max == pcprp_min:
+            df_full['CPRP_Index'] = 100
+        else:
+            df_full['CPRP_Index'] = (
+                (pcprp_max - df_full['PCPRP']) /
+                (pcprp_max - pcprp_min)
+            ) * 100
 
         # ---------- Weighted Index ----------
 
@@ -1570,26 +1585,41 @@ def optimize_bonus():
     # PRE-CALCULATIONS FOR INDEX-BASED OPTIMIZATION
     # =========================================================
 
-    # ---------- NTVR Index ----------
-    ntvr_min = df_full['NTVR'].min()
-    ntvr_max = df_full['NTVR'].max()
+        # Remove invalid numeric rows
+        df_full = df_full.replace([np.inf, -np.inf], np.nan)
 
-    df_full['NTVR_Index'] = (
-                                    (df_full['NTVR'] - ntvr_min) /
-                                    (ntvr_max - ntvr_min)
-                            ) * 100
+        # Remove invalid/missing values
+        df_full = df_full.dropna(subset=['NCost', 'NTVR'])
 
-    # ---------- Program CPRP ----------
-    df_full['PCPRP'] = df_full['NCost'] / df_full['NTVR']
+        # Remove zero or negative TVR rows
+        df_full = df_full[df_full['NTVR'] > 0].copy()
 
-    # ---------- CPRP Index ----------
-    pcprp_min = df_full['PCPRP'].min()
-    pcprp_max = df_full['PCPRP'].max()
+        # ---------- NTVR Index ----------
+        ntvr_min = df_full['NTVR'].min()
+        ntvr_max = df_full['NTVR'].max()
 
-    df_full['CPRP_Index'] = (
-                                    (pcprp_max - df_full['PCPRP']) /
-                                    (pcprp_max - pcprp_min)
-                            ) * 100
+        if ntvr_max == ntvr_min:
+            df_full['NTVR_Index'] = 100
+        else:
+            df_full['NTVR_Index'] = (
+                (df_full['NTVR'] - ntvr_min) /
+                (ntvr_max - ntvr_min)
+            ) * 100
+
+        # ---------- Program CPRP ----------
+        df_full['PCPRP'] = df_full['NCost'] / df_full['NTVR']
+
+        # ---------- CPRP Index ----------
+        pcprp_min = df_full['PCPRP'].min()
+        pcprp_max = df_full['PCPRP'].max()
+
+        if pcprp_max == pcprp_min:
+            df_full['CPRP_Index'] = 100
+        else:
+            df_full['CPRP_Index'] = (
+                (pcprp_max - df_full['PCPRP']) /
+                (pcprp_max - pcprp_min)
+            ) * 100
 
     # ---------- Weighted Index ----------
 
