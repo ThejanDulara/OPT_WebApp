@@ -1185,48 +1185,6 @@ def optimize_by_benefit_share():
 
         if num_commercials > 1 and 'Commercial' not in df_full.columns:
             return jsonify({"error": "Commercial column missing when num_commercials > 1"}), 400
-        
-
-        print("\n========== DEBUG CHECK ==========")
-
-        # Check nulls
-        print("NULL COUNTS:")
-        print(df_full[['NCost', 'NTVR', 'Weighted_Index']].isnull().sum())
-
-        # Check inf values
-        print("\nINF COUNTS:")
-        print("NCost inf:", np.isinf(df_full['NCost']).sum())
-        print("NTVR inf:", np.isinf(df_full['NTVR']).sum())
-        print("Weighted_Index inf:", np.isinf(df_full['Weighted_Index']).sum())
-
-        # Show problematic rows
-        bad_rows = df_full[
-            df_full['Weighted_Index'].isna() |
-            np.isinf(df_full['Weighted_Index']) |
-            df_full['NTVR'].isna() |
-            np.isinf(df_full['NTVR']) |
-            (df_full['NTVR'] == 0) |
-            df_full['NCost'].isna() |
-            np.isinf(df_full['NCost'])
-        ]
-
-        print("\nBAD ROWS:")
-        print(
-            bad_rows[
-                [
-                    'Channel',
-                    'Program',
-                    'NCost',
-                    'NTVR',
-                    'PCPRP',
-                    'NTVR_Index',
-                    'CPRP_Index',
-                    'Weighted_Index'
-                ]
-            ]
-        )
-
-        print("========== END DEBUG ==========\n")
 
 
         # --- 2. PULP OPTIMIZATION MODEL ---
@@ -1267,6 +1225,35 @@ def optimize_by_benefit_share():
                 upBound=upper_bound,
                 cat='Integer'
             )
+
+
+        print("\n========== CHECKING OBJECTIVE VALUES ==========")
+
+        for i in df_full.index:
+
+            val = df_full.loc[i, 'Weighted_Index']
+
+            if pd.isna(val) or np.isinf(val):
+
+                print("\nBAD ROW FOUND")
+                print("Index:", i)
+
+                cols_to_show = [
+                    'Channel',
+                    'Program',
+                    'NCost',
+                    'NTVR',
+                    'PCPRP',
+                    'NTVR_Index',
+                    'CPRP_Index',
+                    'Weighted_Index'
+                ]
+
+                existing_cols = [c for c in cols_to_show if c in df_full.columns]
+
+                print(df_full.loc[i, existing_cols])
+
+                print("\n========== END CHECK ==========\n")
 
         # Objective: Maximize Total NTVR (Rating)
         # prob += lpSum(df_full.loc[i, 'NTVR'] * x[i] for i in df_full.index)
