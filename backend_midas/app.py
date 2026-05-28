@@ -739,38 +739,51 @@ def optimize_by_budget_share():
     if missing:
         return jsonify({"error": f"Missing columns in df_full: {sorted(missing)}"}), 400
 
+    # Sanitize numeric columns to prevent NaN/inf errors
+    for col in ['NCost', 'NTVR', 'Cost', 'TVR']:
+        if col in df_full.columns:
+            df_full[col] = pd.to_numeric(df_full[col], errors='coerce').fillna(0.0)
+
     # If any commercial split is supplied (global or per-channel), we need the Commercial column
     commercial_required = (num_commercials > 1) and (budget_proportions or channel_commercial_pct_map)
     if commercial_required and ('Commercial' not in df_full.columns):
         return jsonify({"error": "Commercial splits provided, but 'Commercial' column missing"}), 400
 
-        # =========================================================
+    # =========================================================
     # PRE-CALCULATIONS FOR INDEX-BASED OPTIMIZATION
     # =========================================================
 
     # ---------- NTVR Index ----------
     ntvr_min = df_full['NTVR'].min()
     ntvr_max = df_full['NTVR'].max()
+    ntvr_denom = ntvr_max - ntvr_min
 
-    df_full['NTVR_Index'] = (
-                                    (df_full['NTVR'] - ntvr_min) /
-                                    (ntvr_max - ntvr_min)
-                            ) * 100
+    if ntvr_denom == 0:
+        df_full['NTVR_Index'] = 100.0
+    else:
+        df_full['NTVR_Index'] = (
+            (df_full['NTVR'] - ntvr_min) / ntvr_denom
+        ) * 100.0
 
     # ---------- Program CPRP ----------
-    df_full['PCPRP'] = df_full['NCost'] / df_full['NTVR']
+    # Safe division to prevent division by zero or NaN/inf
+    df_full['PCPRP'] = df_full['NCost'] / df_full['NTVR'].replace(0, np.nan)
+    # Fill NaN and inf values with a very high value (representing worst-possible CPRP)
+    df_full['PCPRP'] = df_full['PCPRP'].fillna(999999.0).replace([np.inf, -np.inf], 999999.0)
 
     # ---------- CPRP Index ----------
     pcprp_min = df_full['PCPRP'].min()
     pcprp_max = df_full['PCPRP'].max()
+    pcprp_denom = pcprp_max - pcprp_min
 
-    df_full['CPRP_Index'] = (
-                                    (pcprp_max - df_full['PCPRP']) /
-                                    (pcprp_max - pcprp_min)
-                            ) * 100
+    if pcprp_denom == 0:
+        df_full['CPRP_Index'] = 100.0
+    else:
+        df_full['CPRP_Index'] = (
+            (pcprp_max - df_full['PCPRP']) / pcprp_denom
+        ) * 100.0
 
     # ---------- Weighted Index ----------
-
     tvr_weight = float(data.get('tvr_weight', 0.5))
     cprp_weight = float(data.get('cprp_weight', 0.5))
 
@@ -789,6 +802,10 @@ def optimize_by_budget_share():
 
     for col in cols_round:
         df_full[col] = df_full[col].round(2)
+
+    # ---------- Final NaN/inf Sanitization for indices ----------
+    for col in ['NTVR_Index', 'CPRP_Index', 'Weighted_Index']:
+        df_full[col] = df_full[col].fillna(0.0).replace([np.inf, -np.inf], 0.0)
 
     prob = LpProblem("Maximize_TVR_With_Channel_and_Slot_Budget_Shares", LpMaximize)
     # x = {i: LpVariable(f"x2_{i}", lowBound=min_spots, upBound=max_spots, cat='Integer') for i in df_full.index}
@@ -1139,26 +1156,34 @@ def optimize_by_benefit_share():
         # ---------- NTVR Index ----------
         ntvr_min = df_full['NTVR'].min()
         ntvr_max = df_full['NTVR'].max()
+        ntvr_denom = ntvr_max - ntvr_min
 
-        df_full['NTVR_Index'] = (
-                                        (df_full['NTVR'] - ntvr_min) /
-                                        (ntvr_max - ntvr_min)
-                                ) * 100
+        if ntvr_denom == 0:
+            df_full['NTVR_Index'] = 100.0
+        else:
+            df_full['NTVR_Index'] = (
+                (df_full['NTVR'] - ntvr_min) / ntvr_denom
+            ) * 100.0
 
         # ---------- Program CPRP ----------
-        df_full['PCPRP'] = df_full['NCost'] / df_full['NTVR']
+        # Safe division to prevent division by zero or NaN/inf
+        df_full['PCPRP'] = df_full['NCost'] / df_full['NTVR'].replace(0, np.nan)
+        # Fill NaN and inf values with a very high value (representing worst-possible CPRP)
+        df_full['PCPRP'] = df_full['PCPRP'].fillna(999999.0).replace([np.inf, -np.inf], 999999.0)
 
         # ---------- CPRP Index ----------
         pcprp_min = df_full['PCPRP'].min()
         pcprp_max = df_full['PCPRP'].max()
+        pcprp_denom = pcprp_max - pcprp_min
 
-        df_full['CPRP_Index'] = (
-                                        (pcprp_max - df_full['PCPRP']) /
-                                        (pcprp_max - pcprp_min)
-                                ) * 100
+        if pcprp_denom == 0:
+            df_full['CPRP_Index'] = 100.0
+        else:
+            df_full['CPRP_Index'] = (
+                (pcprp_max - df_full['PCPRP']) / pcprp_denom
+            ) * 100.0
 
         # ---------- Weighted Index ----------
-
         tvr_weight = float(data.get('tvr_weight', 0.5))
         cprp_weight = float(data.get('cprp_weight', 0.5))
 
@@ -1177,6 +1202,10 @@ def optimize_by_benefit_share():
 
         for col in round_cols:
             df_full[col] = df_full[col].round(2)
+
+        # ---------- Final NaN/inf Sanitization for indices ----------
+        for col in ['NTVR_Index', 'CPRP_Index', 'Weighted_Index']:
+            df_full[col] = df_full[col].fillna(0.0).replace([np.inf, -np.inf], 0.0)
 
         required_cols = {'NCost', 'NTVR', 'Channel', 'Slot', 'IsWeekend'}
         missing = required_cols - set(df_full.columns)
@@ -1547,33 +1576,46 @@ def optimize_bonus():
             "message": f"Missing columns: {sorted(missing)}"
         }), 400
 
-        # =========================================================
+    # Sanitize numeric columns to prevent NaN/inf errors
+    for col in ['NCost', 'NTVR', 'Cost', 'TVR']:
+        if col in df_full.columns:
+            df_full[col] = pd.to_numeric(df_full[col], errors='coerce').fillna(0.0)
+
+    # =========================================================
     # PRE-CALCULATIONS FOR INDEX-BASED OPTIMIZATION
     # =========================================================
 
     # ---------- NTVR Index ----------
     ntvr_min = df_full['NTVR'].min()
     ntvr_max = df_full['NTVR'].max()
+    ntvr_denom = ntvr_max - ntvr_min
 
-    df_full['NTVR_Index'] = (
-                                    (df_full['NTVR'] - ntvr_min) /
-                                    (ntvr_max - ntvr_min)
-                            ) * 100
+    if ntvr_denom == 0:
+        df_full['NTVR_Index'] = 100.0
+    else:
+        df_full['NTVR_Index'] = (
+            (df_full['NTVR'] - ntvr_min) / ntvr_denom
+        ) * 100.0
 
     # ---------- Program CPRP ----------
-    df_full['PCPRP'] = df_full['NCost'] / df_full['NTVR']
+    # Safe division to prevent division by zero or NaN/inf
+    df_full['PCPRP'] = df_full['NCost'] / df_full['NTVR'].replace(0, np.nan)
+    # Fill NaN and inf values with a very high value (representing worst-possible CPRP)
+    df_full['PCPRP'] = df_full['PCPRP'].fillna(999999.0).replace([np.inf, -np.inf], 999999.0)
 
     # ---------- CPRP Index ----------
     pcprp_min = df_full['PCPRP'].min()
     pcprp_max = df_full['PCPRP'].max()
+    pcprp_denom = pcprp_max - pcprp_min
 
-    df_full['CPRP_Index'] = (
-                                    (pcprp_max - df_full['PCPRP']) /
-                                    (pcprp_max - pcprp_min)
-                            ) * 100
+    if pcprp_denom == 0:
+        df_full['CPRP_Index'] = 100.0
+    else:
+        df_full['CPRP_Index'] = (
+            (pcprp_max - df_full['PCPRP']) / pcprp_denom
+        ) * 100.0
 
     # ---------- Weighted Index ----------
-
     tvr_weight = float(data.get('tvr_weight', 0.5))
     cprp_weight = float(data.get('cprp_weight', 0.5))
 
@@ -1592,6 +1634,10 @@ def optimize_bonus():
 
     for col in round_cols:
         df_full[col] = df_full[col].round(2)
+
+    # ---------- Final NaN/inf Sanitization for indices ----------
+    for col in ['NTVR_Index', 'CPRP_Index', 'Weighted_Index']:
+        df_full[col] = df_full[col].fillna(0.0).replace([np.inf, -np.inf], 0.0)
 
     results = []
     for channel in df_full['Channel'].unique():
