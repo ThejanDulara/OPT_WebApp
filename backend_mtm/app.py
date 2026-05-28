@@ -816,6 +816,28 @@ def optimize_by_budget_share():
     # Objective: maximize NTVR * spots
     # prob += lpSum(df_full.loc[i, 'NTVR'] * x[i] for i in df_full.index)
     # Objective: maximize Weighted Index * spots
+
+    print("\n========== CHECKING OBJECTIVE VALUES ==========")
+
+    for i in df_full.index:
+        val = df_full.loc[i, 'Weighted_Index']
+        if pd.isna(val) or np.isinf(val):
+            print("\nBAD ROW FOUND")
+            print("Index:", i)
+            cols_to_show = [
+                'Channel',
+                'Program',
+                'NCost',
+                'NTVR',
+                'PCPRP',
+                'NTVR_Index',
+                'CPRP_Index',
+                'Weighted_Index'
+            ]
+            existing_cols = [c for c in cols_to_show if c in df_full.columns]
+            print(df_full.loc[i, existing_cols])
+    print("\n========== END CHECK ==========\n")
+
     prob += lpSum(
         df_full.loc[i, 'Weighted_Index'] * x[i]
         for i in df_full.index
@@ -1226,31 +1248,10 @@ def optimize_by_benefit_share():
                 cat='Integer'
             )
 
+
         # Objective: Maximize Total NTVR (Rating)
         # prob += lpSum(df_full.loc[i, 'NTVR'] * x[i] for i in df_full.index)
         # Objective: Maximize Weighted Index * Spots
-
-        print("\n========== CHECKING OBJECTIVE VALUES ==========")
-
-        for i in df_full.index:
-            val = df_full.loc[i, 'Weighted_Index']
-            if pd.isna(val) or np.isinf(val):
-                print("\nBAD ROW FOUND")
-                print("Index:", i)
-                cols_to_show = [
-                    'Channel',
-                    'Program',
-                    'NCost',
-                    'NTVR',
-                    'PCPRP',
-                    'NTVR_Index',
-                    'CPRP_Index',
-                    'Weighted_Index'
-                ]
-                existing_cols = [c for c in cols_to_show if c in df_full.columns]
-                print(df_full.loc[i, existing_cols])
-        print("\n========== END CHECK ==========\n")
-
         prob += lpSum(
             df_full.loc[i, 'Weighted_Index'] * x[i]
             for i in df_full.index
