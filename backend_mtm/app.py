@@ -748,6 +748,27 @@ def optimize_by_budget_share():
     # PRE-CALCULATIONS FOR INDEX-BASED OPTIMIZATION
     # =========================================================
 
+    print("\n========== CHECKING INVALID NTVR ROWS ==========")
+
+    bad_ntvr_rows = df_full[
+        (df_full['NTVR'] <= 0) |
+        (df_full['NTVR'].isna())
+    ]
+
+    if bad_ntvr_rows.empty:
+        print("No invalid NTVR rows found.")
+    else:
+        print(bad_ntvr_rows[
+            [
+                'Channel',
+                'Program',
+                'NCost',
+                'NTVR'
+            ]
+        ])
+
+    print("========== END NTVR CHECK ==========\n")
+
     # ---------- NTVR Index ----------
     ntvr_min = df_full['NTVR'].min()
     ntvr_max = df_full['NTVR'].max()
@@ -819,6 +840,7 @@ def optimize_by_budget_share():
             upBound=upper_bound,
             cat='Integer'
         )
+
     # Objective: maximize NTVR * spots
     # prob += lpSum(df_full.loc[i, 'NTVR'] * x[i] for i in df_full.index)
     # Objective: maximize Weighted Index * spots
