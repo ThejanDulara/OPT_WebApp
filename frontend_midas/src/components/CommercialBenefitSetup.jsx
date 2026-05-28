@@ -21,6 +21,7 @@ export default function CommercialBenefitSetup({
   const [nonPrimePct, setNonPrimePct] = useState(safeInit.nonPrimePct ?? 20);
   const [maxSpots, setMaxSpots] = useState(safeInit.maxSpots ?? (optimizationInput?.maxSpots || 10));
   const [timeLimit, setTimeLimit] = useState(safeInit.timeLimit ?? (optimizationInput?.timeLimit || 120));
+  const [tvrBias, setTvrBias] = useState(safeInit.tvrBias ?? (optimizationInput?.tvrBias || 50));
   const [budgetProportions, setBudgetProportions] = useState(
     safeInit.budgetProportions ??
     optimizationInput?.budgetProportions ??
@@ -80,6 +81,7 @@ export default function CommercialBenefitSetup({
         nonPrimePct,
         maxSpots,
         timeLimit,
+        tvrBias,
         budgetProportions,
         channelSplits,
         channelCommercialSplits,
@@ -92,6 +94,7 @@ export default function CommercialBenefitSetup({
     nonPrimePct,
     maxSpots,
     timeLimit,
+    tvrBias,
     budgetProportions,
     channelSplits,
     channelCommercialSplits,
@@ -311,6 +314,8 @@ export default function CommercialBenefitSetup({
       channel_max_spots: channelMaxSpots,
       channel_weekend_max_spots: channelWeekendMaxSpots,
       time_limit: timeLimit,
+      tvr_weight: tvrBias / 100.0,
+      cprp_weight: (100 - tvrBias) / 100.0,
       prime_pct: primePct,
       nonprime_pct: nonPrimePct,
       channel_slot_pct_map,
@@ -325,6 +330,7 @@ export default function CommercialBenefitSetup({
         nonPrimePct,
         maxSpots,
         timeLimit,
+        tvrBias,
         budgetProportions,
         channelSplits,
         channelCommercialSplits,
@@ -631,6 +637,25 @@ export default function CommercialBenefitSetup({
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <label style={{ minWidth: 250, fontWeight: 500, color: '#2d3748' }}>Optimization Time Limit (seconds):</label>
               <input type="number" min="10" value={timeLimit} onChange={e => setTimeLimit(parseInt(e.target.value))} style={styles.numberInput} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <label style={{ minWidth: 250, fontWeight: 500, color: '#2d3748' }}>TVR Bias:</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={tvrBias}
+                    onChange={e => setTvrBias(parseFloat(e.target.value) || 0)}
+                    style={styles.numberInput}
+                  />
+                  <span style={{ ...styles.percentSymbol, marginLeft: 4 }}>%</span>
+                </div>
+                <span style={{ color: '#64748b', fontSize: 13 }}>
+                  (CPRP Bias: {100 - tvrBias}%)
+                </span>
+              </div>
             </div>
           </div>
         </div>
