@@ -1185,6 +1185,7 @@ def optimize_by_benefit_share():
 
         if num_commercials > 1 and 'Commercial' not in df_full.columns:
             return jsonify({"error": "Commercial column missing when num_commercials > 1"}), 400
+        
 
         print("\n========== DEBUG CHECK ==========")
 
@@ -1226,6 +1227,8 @@ def optimize_by_benefit_share():
         )
 
         print("========== END DEBUG ==========\n")
+
+
         # --- 2. PULP OPTIMIZATION MODEL ---
         prob = LpProblem("Maximize_TVR_CommercialBenefit", LpMaximize)
 
