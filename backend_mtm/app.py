@@ -748,26 +748,14 @@ def optimize_by_budget_share():
     # PRE-CALCULATIONS FOR INDEX-BASED OPTIMIZATION
     # =========================================================
 
-    print("\n========== CHECKING INVALID NTVR ROWS ==========")
+    # Remove invalid numeric rows
+    df_full = df_full.replace([np.inf, -np.inf], np.nan)
 
-    bad_ntvr_rows = df_full[
-        (df_full['NTVR'] <= 0) |
-        (df_full['NTVR'].isna())
-    ]
+    # Remove invalid/missing values
+    df_full = df_full.dropna(subset=['NCost', 'NTVR'])
 
-    if bad_ntvr_rows.empty:
-        print("No invalid NTVR rows found.")
-    else:
-        print(bad_ntvr_rows[
-            [
-                'Channel',
-                'Program',
-                'NCost',
-                'NTVR'
-            ]
-        ])
-
-    print("========== END NTVR CHECK ==========\n")
+    # Remove zero or negative TVR rows
+    df_full = df_full[df_full['NTVR'] > 0].copy()
 
     # ---------- NTVR Index ----------
     ntvr_min = df_full['NTVR'].min()
