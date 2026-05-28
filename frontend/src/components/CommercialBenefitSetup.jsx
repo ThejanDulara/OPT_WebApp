@@ -21,6 +21,7 @@ export default function CommercialBenefitSetup({
   const [nonPrimePct, setNonPrimePct] = useState(safeInit.nonPrimePct ?? 20);
   const [maxSpots, setMaxSpots] = useState(safeInit.maxSpots ?? (optimizationInput?.maxSpots || 10));
   const [timeLimit, setTimeLimit] = useState(safeInit.timeLimit ?? (optimizationInput?.timeLimit || 120));
+  const [tvrBias, setTvrBias] = useState(safeInit.tvrBias ?? (optimizationInput?.tvrBias || 50));
   const [budgetProportions, setBudgetProportions] = useState(
     safeInit.budgetProportions ??
     optimizationInput?.budgetProportions ??
@@ -80,6 +81,7 @@ export default function CommercialBenefitSetup({
         nonPrimePct,
         maxSpots,
         timeLimit,
+        tvrBias,
         budgetProportions,
         channelSplits,
         channelCommercialSplits,
@@ -92,6 +94,7 @@ export default function CommercialBenefitSetup({
     nonPrimePct,
     maxSpots,
     timeLimit,
+    tvrBias,
     budgetProportions,
     channelSplits,
     channelCommercialSplits,
@@ -311,6 +314,8 @@ export default function CommercialBenefitSetup({
       channel_max_spots: channelMaxSpots,
       channel_weekend_max_spots: channelWeekendMaxSpots,
       time_limit: timeLimit,
+      tvr_weight: tvrBias / 100.0,
+      cprp_weight: (100 - tvrBias) / 100.0,
       prime_pct: primePct,
       nonprime_pct: nonPrimePct,
       channel_slot_pct_map,
@@ -325,6 +330,7 @@ export default function CommercialBenefitSetup({
         nonPrimePct,
         maxSpots,
         timeLimit,
+        tvrBias,
         budgetProportions,
         channelSplits,
         channelCommercialSplits,
@@ -337,7 +343,7 @@ export default function CommercialBenefitSetup({
     setStopRequested(false);
 
     // 🔁 Replace with your separate endpoint for CB optimization
-    const BENEFIT_ENDPOINT = 'https://optwebapp-production-60b4.up.railway.app/optimize-by-benefit-share';
+    const BENEFIT_ENDPOINT = 'https://optwebapp-production.up.railway.app/optimize-by-benefit-share';
 
     fetch(BENEFIT_ENDPOINT, {
       method: 'POST',
@@ -654,7 +660,6 @@ export default function CommercialBenefitSetup({
           </div>
         </div>
       </div>
-
 
       {Number(optimizationInput?.numCommercials || 1) > 1 && (
         <div style={styles.section}>
